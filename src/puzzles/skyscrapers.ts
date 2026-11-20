@@ -3,6 +3,7 @@ import { L } from '../core/i18n';
 import { byLevel, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
 import { latinEntry, latinEntrySteps } from './latinkit/entry';
+import { entryPlace, entryVals, lineHUnits, makeHint } from './sudokukit/hint';
 import { latinConflicts, latinUnique, randomLatin, revealLatin, type Table } from './latinkit/solver';
 
 /** Buildings seen from the start of `line` (taller ones hide shorter ones behind them). */
@@ -158,12 +159,14 @@ export const skyscrapers: PuzzleDef = {
       if (vs.some((v) => !v)) return 0;
       return visible(vs) === clue[k] ? 1 : -1;
     };
-    return latinEntry({
+    let cellEls: Element[] = [];
+    const inst = latinEntry({
       ctx,
       n,
       givens,
       boardClass: 'lk-num sky',
       layout(cells) {
+        cellEls = cells;
         const grid = board(n + 2, n + 2, 'lk-num sky');
         const corner = () => h('div', { class: 'sky-corner' });
         grid.append(corner(), ...clueEls.slice(0, n), corner());
@@ -181,5 +184,123 @@ export const skyscrapers: PuzzleDef = {
         });
       },
     });
+
+    const shown = clue.flatMap((_, k) => (on[k] ? [k] : []));
+    const cellsWord = (m: number) =>
+      L(m === 1 ? 'first cell' : `first ${m} cells`, m === 1 ? 'la première case' : `les ${m} premières cases`);
+    inst.hint = makeHint({
+      n,
+      givens,
+      sol,
+      cells: cellEls,
+      units: lineHUnits(n),
+      vals: entryVals(inst),
+      place: entryPlace(inst, cellEls),
+      scope: ['its row, column and edge clues', 'sa rangée, sa colonne et les indices du bord'],
+      pre: {
+        // A 1: the tallest building is right against the clue.
+        one(k) {
+          for (const c of shown) {
+            const i = clueLines[c][0];
+            if (clue[c] !== 1 || k.vals[i] !== 0) continue;
+            return {
+              text: L(
+                `A 1 means you see only one building from here: the tallest, ${n}, stands right next to the clue.`,
+                `Un 1 veut dire qu’on ne voit qu’un immeuble de ce côté : le plus haut, ${n}, est juste à côté de l’indice.`,
+              ),
+              why: [clueEls[c]],
+              at: [i],
+              moves: [[i, n]],
+            };
+          }
+          return null;
+        },
+        // An n: the heights climb one by one from the clue.
+        all(k) {
+          for (const c of shown) {
+            const line = clueLines[c];
+            const emp = line.filter((i) => k.vals[i] === 0);
+            if (clue[c] !== n || !emp.length) continue;
+            const steps = Array.from({ length: n }, (_, t) => t + 1).join(', ');
+            return {
+              text: L(
+                `A ${n} means you see all ${n} buildings, so none can hide another: the heights climb ${steps} from this side.`,
+                `Un ${n} veut dire qu’on voit les ${n} immeubles, donc aucun n’en cache un autre : les hauteurs montent ${steps} de ce côté.`,
+              ),
+              why: [clueEls[c]],
+              at: emp,
+              moves: emp.map((i) => [i, line.indexOf(i) + 1]),
+            };
+          }
+          return null;
+        },
+      },
+      post: {
+        // To see c buildings, the tallest can't stand in the first c − 1 cells.
+        tallest(k) {
+          for (const c of shown) {
+            const v = clue[c];
+            if (v < 2 || v >= n) continue;
+            const line = clueLines[c];
+            if (line.some((i) => k.vals[i] === n)) continue;
+            const spots = line.filter((i) => k.vals[i] === 0 && k.free(i).includes(n));
+            const far = spots.filter((i) => line.indexOf(i) >= v - 1);
+            const near = spots.filter((i) => line.indexOf(i) < v - 1);
+            if (far.length !== 1 || !near.length) continue;
+            const i = far[0];
+            const blocked = line.filter((j) => k.vals[j] === 0 && j !== i && !near.includes(j));
+            const w = blocked.flatMap((j) => k.witness(j, [n]).els);
+            return {
+              text: blocked.length
+                ? L(
+                    `To see ${v} buildings, the ${n} can’t be in the ${cellsWord(v - 1)} from this clue, and the other cells already see a ${n}. It goes here.`,
+                    `Pour voir ${v} immeubles, le ${n} ne peut pas être dans ${cellsWord(v - 1)} depuis cet indice, et les autres cases voient déjà un ${n}. Il va ici.`,
+                  )
+                : L(
+                    `To see ${v} buildings, the ${n} can’t be in the ${cellsWord(v - 1)} from this clue: it would hide the rest. It goes here.`,
+                    `Pour voir ${v} immeubles, le ${n} ne peut pas être dans ${cellsWord(v - 1)} depuis cet indice : il cacherait le reste. Il va ici.`,
+                  ),
+              why: [clueEls[c], ...new Set(w)],
+              at: [i],
+              moves: [[i, n]],
+            };
+          }
+          return null;
+        },
+        // Try every order of the line: only one height works in this cell.
+        line(k) {
+          for (const c of shown) {
+            const line = clueLines[c];
+            const emp = line.filter((i) => k.vals[i] === 0);
+            if (emp.length < 2) continue;
+            const ks = shown.filter((o) => clueLines[o].every((i) => line.includes(i)));
+            const fits: number[][] = [];
+            const P0 = perms(n);
+            for (let q = 0; q < P0.fwd.length; q++) {
+              const p = Array.from(P0.flat.subarray(q * n, q * n + n));
+              if (!line.every((i, t) => (k.vals[i] ? k.vals[i] === p[t] : k.free(i).includes(p[t])))) continue;
+              if (!ks.every((o) => visible(clueLines[o].map((i) => p[line.indexOf(i)])) === clue[o])) continue;
+              fits.push(p);
+            }
+            for (const i of emp) {
+              const t = line.indexOf(i);
+              const can = [...new Set(fits.map((p) => p[t]))];
+              if (can.length !== 1 || k.free(i).length === 1) continue;
+              return {
+                text: L(
+                  `Try each height here: only ${can[0]} lets this line match ${ks.length > 1 ? 'both its clues' : `its ${clue[ks[0]]}`} without repeating a number.`,
+                  `Essayez chaque hauteur : seul le ${can[0]} respecte ${ks.length > 1 ? 'les deux indices' : `le ${clue[ks[0]]}`} de cette ligne sans répéter de chiffre.`,
+                ),
+                why: ks.map((o) => clueEls[o]),
+                at: [i],
+                moves: [[i, can[0]]],
+              };
+            }
+          }
+          return null;
+        },
+      },
+    });
+    return inst;
   },
 };

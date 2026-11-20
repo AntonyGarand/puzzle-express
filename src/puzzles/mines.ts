@@ -1,5 +1,5 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
 import { nb8 } from './logickit/kit';
 import { flood, genMines, mineCounts } from './logickit/minesgen';
@@ -54,7 +54,7 @@ export const mines: PuzzleDef = {
     const { root, rng, difficulty: d } = ctx;
     const cols = byLevel(d, [8, 9, 9, 10, 10]);
     const rows = byLevel(d, [8, 9, 11, 12, 13]);
-    const total = byLevel(d, [9, 13, 18, 23, 28]);
+    let total = byLevel(d, [9, 13, 18, 23, 28]);
     const N = cols * rows;
 
     // Mines are generated lazily on the first dig, from the untouched rng, so resume can rebuild them.
@@ -76,6 +76,7 @@ export const mines: PuzzleDef = {
     const lay = (i: number) => {
       first = i;
       mine = genMines(cols, rows, total, i, rng);
+      total = mine.filter(Boolean).length; // the generator may drop a mine to avoid a forced guess
       count = mineCounts(mine, cols, rows);
     };
 
@@ -220,9 +221,128 @@ export const mines: PuzzleDef = {
     root.append(grid);
     render();
 
+    let lastRule = -1;
+    /** The next deduction a person can make, for the guide. Flags are taken as given. */
+    const hint = (): Hint | null => {
+      if (over) return null;
+      if (first < 0) {
+        const mid = Math.floor(rows / 2) * cols + Math.floor(cols / 2);
+        return {
+          text: L(
+            'Start anywhere: the first tile is always safe, and a blank tile opens the area around it.',
+            'Commencez n’importe où : la première case est toujours sûre, et une case vide ouvre la zone autour.',
+          ),
+          at: [cells[mid]],
+          play: () => dig(mid),
+        };
+      }
+      const cons: { i: number; unk: number[]; flags: number[]; m: number }[] = [];
+      for (let i = 0; i < N; i++) {
+        if (!open[i] || !count[i]) continue;
+        const nb = nb8(i, cols, rows);
+        const unk = nb.filter((j) => !open[j] && !flag[j]);
+        if (!unk.length) continue;
+        const flags = nb.filter((j) => flag[j]);
+        cons.push({ i, unk, flags, m: count[i] - flags.length });
+      }
+      const els = (ix: number[]) => ix.map((j) => cells[j]);
+      const openAll = (ix: number[]) => () => ix.forEach((j) => !open[j] && dig(j));
+      const flagAll = (ix: number[]) => () => ix.forEach((j) => !flag[j] && toggleFlag(j));
+      // Rules, simplest first; the guide avoids repeating the same rule twice in a row when it can.
+      const mineRule = (): Hint | null => {
+        // A number with as many closed tiles as missing mines: they're all mines.
+        for (const c of cons)
+          if (c.m === c.unk.length)
+            return {
+              text: L(
+                `This ${count[c.i]} touches exactly ${c.unk.length === 1 ? 'one closed tile' : `${c.unk.length} closed tiles`}${c.flags.length ? ' besides its flags' : ''}, so ${c.unk.length === 1 ? 'it must be a mine' : 'they must all be mines'}. Flag ${c.unk.length === 1 ? 'it' : 'them'}.`,
+                `Ce ${count[c.i]} touche exactement ${c.unk.length === 1 ? 'une case fermée' : `${c.unk.length} cases fermées`}${c.flags.length ? ' en plus de ses drapeaux' : ''} : ${c.unk.length === 1 ? 'c’est forcément une mine' : 'ce sont toutes des mines'}. Posez ${c.unk.length === 1 ? 'un drapeau' : 'des drapeaux'}.`,
+              ),
+              why: els([c.i]),
+              at: els(c.unk),
+              play: flagAll(c.unk),
+            };
+        return null;
+      };
+      const safe = (): Hint | null => {
+        // A number whose mines are all flagged: the rest is safe.
+        for (const c of cons)
+          if (c.m === 0)
+            return {
+              text: L(
+                `This ${count[c.i]} already has its ${c.flags.length === 1 ? 'mine flagged' : `${c.flags.length} mines flagged`}, so every other tile around it is safe to open.`,
+                `Ce ${count[c.i]} a déjà ${c.flags.length === 1 ? 'sa mine marquée' : `ses ${c.flags.length} mines marquées`} : toutes les autres cases autour peuvent être ouvertes.`,
+              ),
+              why: els([c.i, ...c.flags]),
+              at: els(c.unk),
+              play: openAll(c.unk),
+            };
+        return null;
+      };
+      const shared = (): Hint | null => {
+        // Two numbers sharing tiles: the difference tells the rest.
+        for (const a of cons)
+          for (const b of cons) {
+            if (a === b || a.unk.length >= b.unk.length || !a.unk.every((x) => b.unk.includes(x))) continue;
+            const rest = b.unk.filter((x) => !a.unk.includes(x));
+            const m = b.m - a.m;
+            if (m === 0)
+              return {
+                text: L(
+                  `The ${count[a.i]}’s ${a.m === 1 ? 'mine is' : `${a.m} mines are`} among the tiles it shares with this ${count[b.i]}, which needs no more than that, so its other tiles are safe.`,
+                  `${a.m === 1 ? 'La mine' : `Les ${a.m} mines`} du ${count[a.i]} ${a.m === 1 ? 'est' : 'sont'} dans les cases qu’il partage avec ce ${count[b.i]}, qui n’en demande pas plus : ses autres cases sont sûres.`,
+                ),
+                why: els([a.i, b.i, ...a.unk]),
+                at: els(rest),
+                play: openAll(rest),
+              };
+            if (m === rest.length)
+              return {
+                text: L(
+                  `The ${count[a.i]} can put at most ${a.m} mine${a.m === 1 ? '' : 's'} in the tiles it shares with this ${count[b.i]}, so the ${count[b.i]}’s other ${rest.length === 1 ? 'tile is a mine' : `${rest.length} tiles are mines`}.`,
+                  `Le ${count[a.i]} met au plus ${a.m} mine${a.m === 1 ? '' : 's'} dans les cases partagées avec ce ${count[b.i]} : ${rest.length === 1 ? 'l’autre case du ' + count[b.i] + ' est une mine' : `les ${rest.length} autres cases du ${count[b.i]} sont des mines`}.`,
+                ),
+                why: els([a.i, b.i, ...a.unk]),
+                at: els(rest),
+                play: flagAll(rest),
+              };
+          }
+        return null;
+      };
+      const rules = [mineRule, safe, shared];
+      // The rule functions are rebuilt on every call, so remember the last one by index.
+      for (const k of [0, 1, 2].filter((r) => r !== lastRule).concat(lastRule < 0 ? [] : [lastRule])) {
+        const found = rules[k]();
+        if (found) {
+          lastRule = k;
+          return found;
+        }
+      }
+      // Counting what's left.
+      const unknown = [...Array(N).keys()].filter((i) => !open[i] && !flag[i]);
+      const left = total - flag.filter(Boolean).length;
+      if (unknown.length && (left === 0 || left === unknown.length))
+        return {
+          text:
+            left === 0
+              ? L(
+                  'Every mine is flagged, so all the remaining tiles are safe.',
+                  'Toutes les mines sont marquées : les cases restantes sont sûres.',
+                )
+              : L(
+                  'Only as many closed tiles as mines are left: they are all mines.',
+                  'Il reste autant de cases fermées que de mines : ce sont toutes des mines.',
+                ),
+          at: els(unknown),
+          play: left === 0 ? openAll(unknown) : flagAll(unknown),
+        };
+      return null;
+    };
+
     const list = (a: boolean[]) => a.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
     return {
       snapshot: () => ({ first, open: list(open), flag: list(flag) }),
+      hint,
       onKey(e) {
         if (e.key !== 'f' && e.key !== 'F') return false;
         const i = cellOf(document.activeElement);

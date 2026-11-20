@@ -35,6 +35,22 @@ export interface Help {
   tips?: string[];
 }
 
+/**
+ * One step of logic, shown by the animated guide behind the "?" button: the guide outlines `why`,
+ * draws an arrow to `at`, shows `text`, then calls `play()` to make the move on the real board.
+ * @public
+ */
+export interface Hint {
+  /** What to notice and what it lets you do (one or two short sentences, via L()). */
+  text: string;
+  /** Elements that justify the move (clues, numbers, neighbours). Outlined. */
+  why?: Element[];
+  /** Where the move happens. Ringed; the arrow points here. */
+  at: Element[];
+  /** Make the move exactly as a player would (same code path as a tap). */
+  play(): void;
+}
+
 export interface PuzzleCtx {
   difficulty: Difficulty;
   rng: Rng;
@@ -61,6 +77,11 @@ export interface PuzzleInstance {
   activate?(): void;
   /** Keyboard input while this card is active. Return true if handled. */
   onKey?(e: KeyboardEvent): boolean;
+  /**
+   * The next logical move from the current state, explained; null when there's nothing left to show.
+   * Powers the step-by-step guide, so prefer moves a person can deduce (not just "the answer is X").
+   */
+  hint?(): Hint | null;
   /** Serializable progress, restored through `ctx.saved`. */
   snapshot?(): unknown;
   destroy?(): void;

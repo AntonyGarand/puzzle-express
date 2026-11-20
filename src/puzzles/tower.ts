@@ -1,9 +1,9 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, shake } from '../core/ui';
 import { keyboard, keyValue } from './wordkit/keyboard';
 import { diff, makeLadder } from './wordkit/ladder';
-import { dictReady, isWord, whenDict } from './wordkit/lexicon';
+import { commonOfLength, dictReady, isWord, whenDict } from './wordkit/lexicon';
 import './tower.css';
 
 export const tower: PuzzleDef = {
@@ -197,7 +197,109 @@ export const tower: PuzzleDef = {
     whenDict(() => {
       if (!won) status();
     });
+    /** Next word on a shortest ladder from `w` to the goal: the built path, else a BFS over common words. */
+    const nextWord = (w: string): string | null => {
+      const k = path.indexOf(w);
+      if (k >= 0 && k < path.length - 1) return path[k + 1];
+      const words = new Set(commonOfLength(len));
+      const prev = new Map<string, string>([[w, '']]);
+      let frontier = [w];
+      while (frontier.length) {
+        const nx: string[] = [];
+        for (const u of frontier)
+          for (let i = 0; i < len; i++)
+            for (let ch = 97; ch <= 122; ch++) {
+              const v = u.slice(0, i) + String.fromCharCode(ch) + u.slice(i + 1);
+              if ((!words.has(v) && v !== goal) || prev.has(v)) continue;
+              prev.set(v, u);
+              if (v === goal) {
+                let x = v;
+                while (prev.get(x) !== w) x = prev.get(x)!;
+                return x;
+              }
+              nx.push(v);
+            }
+        frontier = nx;
+      }
+      return null;
+    };
+    const keyEl = (k: string) =>
+      [...kb.el.querySelectorAll<HTMLElement>('.key')].find(
+        (b) => b.getAttribute('aria-label') === (k === 'enter' ? L('Enter', 'Entrée') : k),
+      )!;
+    const rowCells = (r: number) => cells.slice(r * len, r * len + len);
+    const up = (x: string) => x.toUpperCase();
+    const hint = (): Hint | null => {
+      if (won) return null;
+      const prev = last();
+      // Straight steps: put one of the top word's letters in place, if that makes a real word.
+      const straight: string[] = [];
+      const nonWords: string[] = [];
+      for (let i = 0; i < len; i++) {
+        if (prev[i] === goal[i]) continue;
+        const w = prev.slice(0, i) + goal[i] + prev.slice(i + 1);
+        if (w === start || rungs.includes(w)) continue;
+        const ok = isWord(w);
+        if (ok === false) nonWords.push(up(w));
+        else if (ok && (diff(w, goal) === 1 || nextWord(w))) straight.push(w);
+      }
+      const planned = nextWord(prev);
+      const target = planned && straight.includes(planned) ? planned : (straight[0] ?? planned);
+      if (!target || rungs.length >= floors) return null;
+      const r = floors - rungs.length; // grid row being typed
+      if (cur && cur !== target)
+        return {
+          text: L(
+            'Clear the typing first: Delete removes one letter at a time.',
+            'Effacez d’abord la saisie : Effacer retire une lettre à la fois.',
+          ),
+          at: [keyEl('back')],
+          play: () => {
+            for (let n = cur.length; n > 0; n--) press('back');
+          },
+        };
+      const p = [...target].findIndex((ch, i) => ch !== prev[i]);
+      const from = up(prev[p]);
+      const to = up(target[p]);
+      const nth = L(['1st', '2nd', '3rd', '4th', '5th'][p], ['1re', '2e', '3e', '4e', '5e'][p]);
+      if (cur === target) {
+        const top = diff(target, goal) === 1;
+        return {
+          text: top
+            ? L(
+                `${up(target)} is a real word, and it is only one letter away from ${up(goal)}. Press Enter: you reach the top.`,
+                `${up(target)} est un vrai mot, à une seule lettre de ${up(goal)}. Appuyez sur Entrée : vous atteignez le sommet.`,
+              )
+            : L(
+                `${up(target)} is a real word that changes only the ${from} of ${up(prev)}. Press Enter to build the floor.`,
+                `${up(target)} est un vrai mot qui ne change que le ${from} de ${up(prev)}. Appuyez sur Entrée pour bâtir l’étage.`,
+              ),
+          why: rowCells(r),
+          at: [keyEl('enter')],
+          play: () => press('enter'),
+        };
+      }
+      const toward = goal[p] === target[p];
+      return {
+        text: toward
+          ? L(
+              `Compare ${up(prev)} with the top word ${up(goal)}: change the ${nth} letter, ${from} → ${to}, to match it. Type ${up(target)}.`,
+              `Comparez ${up(prev)} au mot du sommet ${up(goal)} : changez la ${nth} lettre, ${from} → ${to}, comme en haut. Tapez ${up(target)}.`,
+            )
+          : L(
+              `${nonWords.length ? nonWords.join(', ') + (nonWords.length > 1 ? ' are not words' : ' is not a word') : 'No letter of ' + up(goal) + ' fits yet'}, so take a detour: ${from} → ${to} gives ${up(target)}, a real word that leads up.`,
+              `${nonWords.length ? nonWords.join(', ') + (nonWords.length > 1 ? ' ne sont pas des mots' : ' n’est pas un mot') : 'Aucune lettre de ' + up(goal) + ' ne convient encore'} : faites un détour, ${from} → ${to} donne ${up(target)}, un vrai mot qui mène plus haut.`,
+            ),
+        why: toward ? [cells[(r + 1) * len + p], cells[p]] : [cells[(r + 1) * len + p]],
+        at: rowCells(r),
+        play: () => {
+          for (const ch of target) press(ch);
+        },
+      };
+    };
+
     return {
+      hint,
       snapshot: () => ({ r: rungs, cur }),
       onKey(e) {
         if (e.key === 'Escape') {

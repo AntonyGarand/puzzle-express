@@ -59,4 +59,10 @@ The screenshot script writes contact sheets (`sheet-*.png`) into the output fold
 
   It shows in a dialog behind the "?" next to the title. Keep it concrete, short and friendly, and make it match what the game actually does.
 
+- **Guide:** return `hint()` from the instance. The "?" sheet replays an Easy board (difficulty 1, fixed seed) with up to 6 hints in a row: it outlines `why` (the clue), draws an arrow to `at` (where the move goes), shows `text`, then calls `play()`. See `Hint` in `src/core/types.ts` and `mines.ts` for a full example.
+  - `text` explains the _reasoning_, not just the move: "This 2 touches exactly two closed tiles, so both are mines." Mention the actual numbers or letters from the board. Keep it to one or two short sentences, in both languages.
+  - Prefer moves a person can deduce from what's visible, simplest rule first, and vary the rules over consecutive steps. Use the solution only to choose among equally good moves, or for games without pure logic (cards, memory, word guesses), where the text explains the strategy.
+  - `play()` must go through the same code path as a player's tap or drag, so the board animates and updates normally. The hint must reflect the _current_ state, since it's called again after every `play()`.
+  - Return `null` when solved or when there's nothing useful left.
+  - Check it with `IDS=<id> node scripts/guide.mjs` (needs `npm run dev`). It prints each caption and writes one screenshot per step to `shots/guide/`.
 - Word games whose content depends on the language set `localized: true` and must generate from the current locale's word list.

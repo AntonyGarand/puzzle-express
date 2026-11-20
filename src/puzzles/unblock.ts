@@ -1,7 +1,8 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, PALETTE } from '../core/ui';
 import { int, isIntArr, keyDir } from './movekit/kit';
+import { nextUnblockMove } from './movekit/unblock-hint';
 import { EXIT_ROW, generateUnblock, N, range } from './movekit/unblockgen';
 import './unblock.css';
 
@@ -97,7 +98,8 @@ export const unblock: PuzzleDef = {
     }
 
     const field = h('div', { class: 'ub-field' });
-    const wrap = h('div', { class: 'ub-board', style: `--n:${N};--exit:${EXIT_ROW}` }, h('div', { class: 'ub-exit' }), field);
+    const exitEl = h('div', { class: 'ub-exit' });
+    const wrap = h('div', { class: 'ub-board', style: `--n:${N};--exit:${EXIT_ROW}` }, exitEl, field);
     const els = blocks.map((b, i) => {
       const el = h('div', {
         class: `ub-blk ${i === 0 ? 'key' : ''} ${b.hz ? 'hz' : 'vt'}`,
@@ -220,12 +222,121 @@ export const unblock: PuzzleDef = {
       drag = null;
     });
 
+    let chainAlt = false;
+    const flip = () => (chainAlt = !chainAlt);
+    /** Guide: the first move of a shortest solution, explained by working backwards from the key block. */
+    const hint = (): Hint | null => {
+      if (done) return null;
+      const mv = nextUnblockMove(blocks, pos);
+      if (!mv) return null;
+      const [m, p] = mv;
+      const play = () => {
+        sel = m;
+        commit(m, p);
+        if (!done) render();
+      };
+      const b = blocks[m];
+      const fwd = p > pos[m];
+      const dir = b.hz ? (fwd ? L('right', 'à droite') : L('left', 'à gauche')) : fwd ? L('down', 'vers le bas') : L('up', 'vers le haut');
+      const k = Math.abs(p - pos[m]);
+      const sq = k === 1 ? L('one square', 'd’une case') : L(`${k} squares`, `de ${k} cases`);
+      const how = moves === 0 ? L(' Drag blocks along their lane.', ' Glissez les blocs dans leur axe.') : '';
+      if (m === 0) {
+        if (p === N - b.len)
+          return {
+            text: L(
+              'The key block’s row is clear: slide it out through the exit.',
+              'La rangée du bloc clé est libre : faites-le sortir par la sortie.',
+            ),
+            why: [els[0]],
+            at: [exitEl],
+            play,
+          };
+        return { text: L(`Move the key block ${sq} ${dir}.`, `Avancez le bloc clé ${sq} ${dir}.`), at: [els[0]], play };
+      }
+      /** Vertical blocks crossing the key's row ahead of it. */
+      const covers = (i: number, at: number) => !blocks[i].hz && at <= EXIT_ROW && EXIT_ROW < at + blocks[i].len;
+      const ahead = (i: number) => blocks[i].line >= pos[0] + blocks[0].len;
+      if (covers(m, pos[m]) && ahead(m)) {
+        const clears = !covers(m, p);
+        return {
+          text: clears
+            ? L(
+                `This block stands in the key block’s row. Move it ${dir} out of the way.${how}`,
+                `Ce bloc est dans la rangée du bloc clé. Déplacez-le ${dir} pour libérer le passage.${how}`,
+              )
+            : L(
+                `This block stands in the key block’s row. Move it ${sq} ${dir} for now.${how}`,
+                `Ce bloc est dans la rangée du bloc clé. Déplacez-le ${sq} ${dir} pour l’instant.${how}`,
+              ),
+          why: [els[0]],
+          at: [els[m]],
+          play,
+        };
+      }
+      // Work backwards: who is in whose lane, starting from the key block's row ahead of it.
+      const cellsOf = (i: number) =>
+        Array.from({ length: blocks[i].len }, (_, j) =>
+          blocks[i].hz ? blocks[i].line * N + pos[i] + j : (pos[i] + j) * N + blocks[i].line,
+        );
+      const inLane = (i: number, v: number) =>
+        cellsOf(i).some((c) => (blocks[v].hz ? Math.floor(c / N) === blocks[v].line : c % N === blocks[v].line));
+      const parent = new Map<number, number>();
+      const depth = new Map<number, number>();
+      const q: number[] = [];
+      blocks.forEach((_, i) => {
+        if (i > 0 && covers(i, pos[i]) && ahead(i)) {
+          depth.set(i, 1);
+          q.push(i);
+        }
+      });
+      for (let x = 0; x < q.length && !depth.has(m); x++)
+        blocks.forEach((_, i) => {
+          if (i > 0 && !depth.has(i) && inLane(i, q[x])) {
+            depth.set(i, depth.get(q[x])! + 1);
+            parent.set(i, q[x]);
+            q.push(i);
+          }
+        });
+      const up = parent.get(m);
+      if (up != null)
+        return {
+          text:
+            depth.get(m) === 2
+              ? L(
+                  `The outlined block stands in the key block’s row, but it can’t get out while this one is in its way. Move this one ${dir} first.${how}`,
+                  `Le bloc encadré est dans la rangée du bloc clé, mais il ne peut pas en sortir tant que celui-ci lui barre la route. Déplacez d’abord celui-ci ${dir}.${how}`,
+                )
+              : flip()
+                ? L(
+                    `Work backwards: this block is in the way of the outlined one, which must move to help free the key block’s row. Move it ${sq} ${dir}.${how}`,
+                    `Raisonnez à rebours : ce bloc gêne le bloc encadré, qui doit bouger pour aider à libérer la rangée du bloc clé. Déplacez-le ${sq} ${dir}.${how}`,
+                  )
+                : L(
+                    `Next link in the chain: moving this block ${sq} ${dir} gives the outlined one room to move.${how}`,
+                    `Maillon suivant : déplacer ce bloc ${sq} ${dir} donne au bloc encadré la place de bouger.${how}`,
+                  ),
+          why: [els[up]],
+          at: [els[m]],
+          play,
+        };
+      return {
+        text: L(
+          `Make room: move this block ${sq} ${dir} so the blocks around the key’s row can shift later.${how}`,
+          `Faites de la place : déplacez ce bloc ${sq} ${dir} pour que les blocs autour de la rangée du bloc clé puissent bouger ensuite.${how}`,
+        ),
+        at: [els[m]],
+        play,
+      };
+    };
+
     ctx.controls(btn(L('Undo', 'Annuler'), undo, 'ghost'), btn(L('Restart', 'Repartir'), restart, 'ghost'));
     root.append(wrap);
     render();
 
     return {
       snapshot: () => ({ pos, moves, last, sel, history }),
+      hint,
       onKey(e) {
         if (done) return false;
         if (e.key === 'Tab' || e.key === ' ') {

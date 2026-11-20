@@ -21,7 +21,7 @@ export function flood(i: number, open: boolean[], mine: boolean[], count: number
 }
 
 /** Can the board be cleared from `first` by pure deduction (single-cell + subset rules + mine total)? */
-function solvableByLogic(mine: boolean[], cols: number, rows: number, first: number): boolean {
+export function solvableByLogic(mine: boolean[], cols: number, rows: number, first: number): boolean {
   const N = cols * rows;
   const count = mineCounts(mine, cols, rows);
   const open = new Array<boolean>(N).fill(false);
@@ -92,16 +92,20 @@ function solvableByLogic(mine: boolean[], cols: number, rows: number, first: num
   return false;
 }
 
-/** Mines placed away from `first` (and its neighbours); prefers layouts solvable without guessing. */
-export function genMines(cols: number, rows: number, count: number, first: number, rng: Rng, attempts = 80): boolean[] {
+/**
+ * Mines placed away from `first` (and its neighbours), always solvable without guessing: if no
+ * layout of `count` mines works after `attempts` tries, try again with one mine fewer.
+ */
+export function genMines(cols: number, rows: number, count: number, first: number, rng: Rng, attempts = 300): boolean[] {
   const N = cols * rows;
   const keep = new Set([first, ...nb8(first, cols, rows)]);
   const pool = Array.from({ length: N }, (_, i) => i).filter((i) => !keep.has(i));
-  let mine: boolean[] = [];
-  for (let a = 0; a < attempts; a++) {
-    mine = new Array<boolean>(N).fill(false);
-    for (const i of rng.shuffle([...pool]).slice(0, count)) mine[i] = true;
-    if (solvableByLogic(mine, cols, rows, first)) break;
+  for (let n = Math.min(count, pool.length); n >= 0; n--) {
+    for (let a = 0; a < attempts; a++) {
+      const mine = new Array<boolean>(N).fill(false);
+      for (const i of rng.shuffle([...pool]).slice(0, n)) mine[i] = true;
+      if (solvableByLogic(mine, cols, rows, first)) return mine;
+    }
   }
-  return mine;
+  return new Array<boolean>(N).fill(false);
 }

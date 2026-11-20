@@ -1,8 +1,8 @@
 import './spider.css';
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, shake } from '../core/ui';
-import { cardEl, deck, fan, pileEl, slotEl, tableEl } from './cardkit/cards';
+import { cardEl, deck, elAt, fan, label, leCard, pileEl, rank, slotEl, suit, SUITS, tableEl, topEl } from './cardkit/cards';
 import { bestDestS, canDealS, dealRow, dealS, hasMoveS, moveS, pickedS, wonS, type SState } from './cardkit/spider';
 import { bindTable, History } from './cardkit/table';
 
@@ -158,6 +158,13 @@ export const spider: PuzzleDef = {
       after();
     };
 
+    /** Apply a validated move (tap, drop and the guide all come through here). */
+    const go = (p: string, i: number, to: string) => {
+      hist.push(s);
+      moveS(s, p, i, to);
+      after();
+    };
+
     bindTable(table, {
       canDrag: (p, i) => !over && pickedS(s, p, i) != null,
       accepts: (p, i, to) => moveS(s, p, i, to, true),
@@ -174,16 +181,12 @@ export const spider: PuzzleDef = {
           bump(p, i);
           return;
         }
-        hist.push(s);
-        moveS(s, p, i, to);
-        after();
+        go(p, i, to);
       },
       drop(p, i, to) {
         if (over || !moveS(s, p, i, to, true)) return false;
         ctx.touch();
-        hist.push(s);
-        moveS(s, p, i, to);
-        after();
+        go(p, i, to);
         return true;
       },
     });
@@ -202,7 +205,103 @@ export const spider: PuzzleDef = {
     render();
     status();
 
+    let lastRule = '';
+    const hint = (): Hint | null => {
+      if (over) return null;
+      type M = { a: number; i: number; b: number; rule: string; rank: number };
+      const moves: M[] = [];
+      const n = s.cols.length;
+      for (let a = 0; a < n; a++) {
+        const src = s.cols[a];
+        for (let k = 0; k < src.u.length; k++) {
+          const i = src.d.length + k;
+          if (!pickedS(s, 't' + a, i)) continue;
+          const c = src.u[k];
+          const reveals = k === 0 && src.d.length > 0;
+          for (let b = 0; b < n; b++) {
+            if (b === a || !moveS(s, 't' + a, i, 't' + b, true)) continue;
+            const dst = s.cols[b].u[s.cols[b].u.length - 1];
+            const same = dst != null && suit(dst) === suit(c);
+            // Would this finish a K→A run?
+            const sim: typeof s = { ...s, cols: s.cols.map((x) => ({ d: x.d.slice(), u: x.u.slice() })), done: s.done.slice() };
+            moveS(sim, 't' + a, i, 't' + b);
+            const completes = sim.done.length > s.done.length;
+            let rule = '';
+            if (completes) rule = 'done';
+            else if (dst == null) rule = reveals ? 'empty' : '';
+            else if (reveals) rule = same ? 'reveal' : 'mixed';
+            else if (same && k === 0 && !src.d.length) rule = 'clear';
+            else if (same && k > 0 && (suit(src.u[k - 1]) !== suit(c) || rank(src.u[k - 1]) !== rank(c) + 1)) rule = 'build';
+            if (rule)
+              moves.push({
+                a,
+                i,
+                b,
+                rule,
+                rank: ['done', 'reveal', 'clear', 'mixed', 'build', 'empty'].indexOf(rule) * 100 - src.d.length,
+              });
+          }
+        }
+      }
+      moves.sort((x, y) => x.rank - y.rank);
+      if (!moves.length) {
+        if (!canDealS(s)) return null;
+        lastRule = 'deal';
+        return {
+          text: L(
+            `No useful move left: tap the stock to deal a new row, one card on every column. ${s.stock.length / n === 1 ? 'This is the last one.' : `The stock holds ${s.stock.length / n}.`}`,
+            `Plus de coup utile : touchez la pioche pour donner une nouvelle rangée, une carte par colonne. ${s.stock.length / n === 1 ? 'C’est la dernière.' : `La pioche en contient ${s.stock.length / n}.`}`,
+          ),
+          at: [topEl(table, 's')!],
+          play: deal,
+        };
+      }
+      // Best move first; vary the lesson only between moves that also turn a card over.
+      const m = moves.find((x) => x.rule !== lastRule && x.rank < moves[0].rank + 300 && x.rule !== 'build') ?? moves[0];
+      lastRule = m.rule;
+      const src = s.cols[m.a];
+      const c = src.u[m.i - src.d.length];
+      const cnt = src.u.length - (m.i - src.d.length);
+      const dst = s.cols[m.b].u[s.cols[m.b].u.length - 1];
+      const what =
+        cnt > 1 ? L(`the ${label(c)} run (${cnt} cards)`, `la suite du ${label(c)} (${cnt} cartes)`) : L(`the ${label(c)}`, leCard(c));
+      const dn = dst != null ? label(dst) : '';
+      const texts: Record<string, string> = {
+        done: L(
+          `Move ${what} onto the ${dn}: that completes K to A in ${SUITS[suit(c)]}, and a finished run leaves the table.`,
+          `Déplacez ${what} sur le ${dn} : cela complète une suite du R à l’A en ${SUITS[suit(c)]}, et une suite complète quitte la table.`,
+        ),
+        reveal: L(
+          `Move ${what} onto the ${dn}: one lower and the same suit, so they can later move together. The hidden card underneath turns over.`,
+          `Déplacez ${what} sur le ${dn} : une valeur de moins et même sorte, ils pourront bouger ensemble. La carte cachée dessous se retourne.`,
+        ),
+        mixed: L(
+          `Any card one lower fits, even of another suit: move ${what} onto the ${dn} to turn over the hidden card. Mixed suits can’t move as a block, though.`,
+          `N’importe quelle carte d’une valeur de moins convient, même d’une autre sorte : déplacez ${what} sur le ${dn} pour retourner la carte cachée. Mais des sortes mêlées ne bougent pas en bloc.`,
+        ),
+        clear: L(
+          `Move ${what} onto the ${dn} (same suit, one lower): that empties a column, and an empty column takes any card.`,
+          `Déplacez ${what} sur le ${dn} (même sorte, une valeur de moins) : cela vide une colonne, et une colonne vide accepte n’importe quelle carte.`,
+        ),
+        build: L(
+          `Join ${what} to the ${dn}: same suit, one lower. Same-suit runs grow toward a full K-to-A set.`,
+          `Joignez ${what} au ${dn} : même sorte, une valeur de moins. Les suites d’une même sorte grandissent vers un ensemble complet du R à l’A.`,
+        ),
+        empty: L(
+          `An empty column takes any card: move ${what} there and turn over the hidden card it covered.`,
+          `Une colonne vide accepte n’importe quelle carte : déplacez-y ${what} et retournez la carte cachée qu’elle couvrait.`,
+        ),
+      };
+      return {
+        text: texts[m.rule],
+        why: Array.from({ length: cnt }, (_, j) => elAt(table, 't' + m.a, m.i + j)!),
+        at: [topEl(table, 't' + m.b)!],
+        play: () => go('t' + m.a, m.i, 't' + m.b),
+      };
+    };
+
     return {
+      hint,
       snapshot: () => ({ s, hist: hist.stack }),
       onKey(e) {
         if (e.key === 'z' || e.key === 'Backspace') {

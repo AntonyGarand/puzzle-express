@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
 import { cellFromPointer, edgeClasses, nb4, tint } from './logickit/kit';
 import { genTiles, rectCells, type Rect } from './logickit/tilesgen';
@@ -55,7 +55,7 @@ export const tiles: PuzzleDef = {
     const { root, rng, difficulty: d } = ctx;
     const n = byLevel(d, [5, 6, 7, 8, 10]);
     const maxArea = byLevel(d, [6, 8, 9, 10, 12]);
-    const { clue } = genTiles(n, maxArea, rng);
+    const { clue, rects: solRects } = genTiles(n, maxArea, rng);
     const clueCount = clue.filter((v) => v > 0).length;
 
     let rects: Placed[] = [];
@@ -182,6 +182,120 @@ export const tiles: PuzzleDef = {
     }
     root.append(grid);
     render();
-    return { snapshot: () => ({ rects }) };
+    // Guide: shapes that fit only one way, cells only one number can reach.
+    let lastKind = '';
+    let taught = false;
+    /** Mention the drag gesture on the first rectangle the guide draws. */
+    const teach = (h0: Hint, drag: boolean): Hint => {
+      if (!drag || taught) return h0;
+      taught = true;
+      return { ...h0, text: h0.text + L(' Drag from one corner to the opposite one.', ' Glissez d’un coin au coin opposé.') };
+    };
+    const hint = (): Hint | null => {
+      if (done) return null;
+      const owner = ownerMap();
+      const open = clue.map((v, i) => (v > 0 && owner[i] < 0 ? i : -1)).filter((i) => i >= 0);
+      /** Every rectangle the number at `p` could still take. */
+      const shapes = (p: number): Rect[] => {
+        const a = clue[p],
+          pr = Math.floor(p / n),
+          pc = p % n;
+        const out: Rect[] = [];
+        for (let h0 = 1; h0 <= a; h0++) {
+          if (a % h0) continue;
+          const w0 = a / h0;
+          for (let r0 = pr - h0 + 1; r0 <= pr; r0++)
+            for (let c0 = pc - w0 + 1; c0 <= pc; c0++) {
+              const q = { r0, c0, r1: r0 + h0 - 1, c1: c0 + w0 - 1 };
+              if (r0 < 0 || c0 < 0 || q.r1 >= n || q.c1 >= n) continue;
+              const cs = rectCells(q, n);
+              if (cs.every((i) => owner[i] < 0 && (i === p || !clue[i]))) out.push(q);
+            }
+        }
+        return out;
+      };
+      const all = new Map(open.map((p) => [p, shapes(p)]));
+      const dims = (q: Rect) => `${q.r1 - q.r0 + 1}×${q.c1 - q.c0 + 1}`;
+      const draw = (q: Rect) => () => {
+        start = q.r0 * n + q.c0;
+        cur = q.r1 * n + q.c1;
+        finish();
+      };
+      const cands: { kind: string; hint: Hint }[] = [];
+      for (const p of open) {
+        const qs = all.get(p)!;
+        if (clue[p] === 1)
+          cands.push({
+            kind: 'one',
+            hint: {
+              text: L('A 1 is a rectangle all by itself: tap it.', 'Un 1 forme un rectangle à lui seul : touchez-le.'),
+              at: [cells[p]],
+              play: draw(qs[0] ?? { r0: Math.floor(p / n), c0: p % n, r1: Math.floor(p / n), c1: p % n }),
+            },
+          });
+        else if (qs.length === 1)
+          cands.push({
+            kind: 'only',
+            hint: {
+              text: L(
+                `This ${clue[p]} fits only one way, as a ${dims(qs[0])} block: every other shape hits the edge, a number or a rectangle.`,
+                `Ce ${clue[p]} n’entre que d’une façon, en bloc de ${dims(qs[0])} : toute autre forme touche le bord, un nombre ou un rectangle.`,
+              ),
+              why: [cells[p]],
+              at: rectCells(qs[0], n).map((i) => cells[i]),
+              play: draw(qs[0]),
+            },
+          });
+      }
+      // A free cell that only one number can reach.
+      for (let x = 0; x < n * n && cands.length < 8; x++) {
+        if (owner[x] >= 0) continue;
+        const by = open.filter((p) => all.get(p)!.some((q) => inRect(q, x)));
+        if (by.length !== 1) continue;
+        const p = by[0];
+        const qs = all.get(p)!.filter((q) => inRect(q, x));
+        if (qs.length !== 1 || all.get(p)!.length === 1) continue;
+        cands.push({
+          kind: 'reach',
+          hint: {
+            text: L(
+              `Only the ${clue[p]} can reach this cell, and just one of its shapes covers it: a ${dims(qs[0])} block.`,
+              `Seul le ${clue[p]} peut atteindre cette case, et une seule de ses formes la couvre : un bloc de ${dims(qs[0])}.`,
+            ),
+            why: [cells[x]],
+            at: rectCells(qs[0], n)
+              .filter((i) => i !== x)
+              .map((i) => cells[i]),
+            play: draw(qs[0]),
+          },
+        });
+        break;
+      }
+      const order = ['only', 'one', 'reach'];
+      cands.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+      const pick = cands.find((c) => c.kind !== lastKind) ?? cands[0];
+      if (pick) {
+        lastKind = pick.kind;
+        return teach(pick.hint, pick.kind !== 'one');
+      }
+      lastKind = '';
+      // No forced shape: take the intended one for the number with the fewest options.
+      const p = open.sort((a, b) => all.get(a)!.length - all.get(b)!.length)[0];
+      const q = p == null ? undefined : solRects.find((r) => inRect(r, p));
+      if (!q || !rectCells(q, n).every((i) => owner[i] < 0)) return null;
+      return teach(
+        {
+          text: L(
+            `This ${clue[p]} fits ${all.get(p)!.length} ways, but only this ${dims(q)} block leaves room for the numbers around it.`,
+            `Ce ${clue[p]} entre de ${all.get(p)!.length} façons, mais seul ce bloc de ${dims(q)} laisse de la place aux nombres autour.`,
+          ),
+          why: [cells[p]],
+          at: rectCells(q, n).map((i) => cells[i]),
+          play: draw(q),
+        },
+        true,
+      );
+    };
+    return { snapshot: () => ({ rects }), hint };
   },
 };

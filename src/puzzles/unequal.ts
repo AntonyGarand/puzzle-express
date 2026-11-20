@@ -3,6 +3,7 @@ import { L } from '../core/i18n';
 import { byLevel, type PuzzleDef } from '../core/types';
 import { h, s } from '../core/ui';
 import { entryGame, entryHelpSteps } from './sudokukit/entry';
+import { and, entryPlace, entryVals, isAre, lineHUnits, makeHint } from './sudokukit/hint';
 import { isUnique, lineUnits, revealUntilUnique, solve, type Problem } from './sudokukit/solver';
 
 export const unequal: PuzzleDef = {
@@ -95,11 +96,14 @@ export const unequal: PuzzleDef = {
       const pts = across ? (pSmaller ? '66,14 30,50 66,86' : '34,14 70,50 34,86') : pSmaller ? '14,66 50,30 86,66' : '14,34 50,70 86,34';
       signsAt[p].push([across ? 'r' : 'd', pts, across ? (pSmaller ? '<' : '>') : pSmaller ? '^' : 'v']);
     });
-    return entryGame({
+    const problem = prob();
+    const lt = problem.lt ?? [];
+    const cells: Element[] = [];
+    const inst = entryGame({
       ctx,
       cols: n,
       rows: n,
-      problem: prob(),
+      problem,
       puzzle,
       boardClass: 'unequal',
       decorate(el, i) {
@@ -108,7 +112,99 @@ export const unequal: PuzzleDef = {
             h('span', { class: `sg ${dir}`, 'data-sign': label }, s('svg', { viewBox: '0 0 100 100' }, s('polyline', { points: pts }))),
           );
         }
+        cells[i] = el;
       },
     });
+
+    // Bounds that chains of signs alone force (a < b < c… means c ≥ 3).
+    const lo = new Array<number>(n * n).fill(1),
+      hi = new Array<number>(n * n).fill(n);
+    for (let it = 0; it <= n; it++)
+      for (const [a, b] of lt) {
+        lo[b] = Math.max(lo[b], lo[a] + 1);
+        hi[a] = Math.min(hi[a], hi[b] - 1);
+      }
+    inst.hint = makeHint({
+      n,
+      givens: puzzle,
+      sol,
+      cells,
+      units: lineHUnits(n),
+      vals: entryVals(inst),
+      place: entryPlace(inst, cells),
+      scope: ['its row, column and signs', 'sa rangée, sa colonne et les signes'],
+      post: {
+        // The signs bound the cell; its row and column rule out the rest.
+        signs(k) {
+          for (const i of k.empties) {
+            let below = 0, // biggest filled neighbour this cell must beat
+              above = n + 1; // smallest filled neighbour this cell must stay under
+            const near: number[] = [],
+              chainLo: number[] = [],
+              chainHi: number[] = [];
+            for (const [a, b] of lt) {
+              if (a === i) {
+                if (k.vals[b] > 0) {
+                  above = Math.min(above, k.vals[b]);
+                  near.push(b);
+                } else chainHi.push(b);
+              }
+              if (b === i) {
+                if (k.vals[a] > 0) {
+                  below = Math.max(below, k.vals[a]);
+                  near.push(a);
+                } else chainLo.push(a);
+              }
+            }
+            const l = Math.max(lo[i], below + 1),
+              u = Math.min(hi[i], above - 1);
+            if (l === 1 && u === n) continue;
+            const f = k.free(i);
+            const fit = f.filter((v) => v >= l && v <= u);
+            if (fit.length !== 1) continue;
+            const v = fit[0];
+            const excl = Array.from({ length: u - l + 1 }, (_, t) => l + t).filter((x) => x !== v);
+            const w = k.witness(i, excl);
+            const en: string[] = [],
+              fr: string[] = [];
+            const why = near.map((j) => cells[j]);
+            if (l > 1) {
+              if (below + 1 >= lo[i]) {
+                en.push(`bigger than the ${below} next to it`);
+                fr.push(`plus grande que le ${below} voisin`);
+              } else {
+                en.push(`at least ${lo[i]} (a chain of ${lo[i]} rising cells ends here)`);
+                fr.push(`au moins ${lo[i]} (une chaîne de ${lo[i]} cases croissantes finit ici)`);
+                why.push(...chainLo.map((j) => cells[j]));
+              }
+            }
+            if (u < n) {
+              if (above - 1 <= hi[i]) {
+                en.push(`smaller than the ${above} next to it`);
+                fr.push(`plus petite que le ${above} voisin`);
+              } else {
+                en.push(`at most ${hi[i]} (a chain of ${n - hi[i] + 1} rising cells starts here)`);
+                fr.push(`au plus ${hi[i]} (une chaîne de ${n - hi[i] + 1} cases croissantes part d’ici)`);
+                why.push(...chainHi.map((j) => cells[j]));
+              }
+            }
+            const rest = excl.length
+              ? L(`; ${and(excl)} ${isAre(excl)} already in ${w.where}`, `; ${and(excl)} ${isAre(excl)} déjà dans ${w.where}`)
+              : '';
+            return {
+              text: L(
+                `The signs make this cell ${en.join(' and ')}${rest}, so it’s ${v}.`,
+                `D’après les signes, cette case est ${fr.join(' et ')}${rest} : c’est donc ${v}.`,
+              ),
+              why: [...why, ...w.els],
+              at: [i],
+              moves: [[i, v]],
+            };
+          }
+          return null;
+        },
+      },
+    });
+    return inst;
   },
 };

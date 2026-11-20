@@ -1,8 +1,8 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, PALETTE, s } from '../core/ui';
 import { genConnect } from './pathkit/connect-gen';
-import { adjacent, capture, cellAt, pts, stepsToward } from './pathkit/grid';
+import { adjacent, capture, cellAt, nbrs, pts, stepsToward } from './pathkit/grid';
 import './connect.css';
 
 export const connect: PuzzleDef = {
@@ -205,7 +205,137 @@ export const connect: PuzzleDef = {
     root.append(grid);
     render();
 
+    // ---- guide: forced moves first, then short links along the edge ----
+    let lastRule = '';
+    const hint = (): Hint | null => {
+      if (finished) return null;
+      const el = (i: number) => cells[i];
+      // Each colour's solution, oriented from the dot its drawn line starts at.
+      const route = (c: number) => (paths[c].length && paths[c][0] !== sol[c][0] ? [...sol[c]].reverse() : sol[c]);
+      // A drawn line that strays from the solution: cut it back.
+      for (let c = 0; c < k; c++) {
+        const p = paths[c],
+          r = route(c);
+        let m = 0;
+        while (m < p.length && p[m] === r[m]) m++;
+        if (m < p.length)
+          return {
+            text: L(
+              'This line blocks the others. Press on it where it should turn to cut it back.',
+              'Cette ligne bloque les autres. Appuyez à l’endroit où elle devrait tourner pour la couper.',
+            ),
+            why: p.slice(m).map(el),
+            at: [el(r[Math.max(0, m - 1)])],
+            play: () => {
+              start(r[Math.max(0, m - 1)]);
+              active = -1;
+            },
+          };
+      }
+      const free = (i: number) => owner[i] < 0 && dot[i] < 0;
+      const open = (head: number, target: number) => nbrs(head, n, n).filter((j) => free(j) || j === target);
+      /** Press on `from` (a dot or a line end), then drag through `more`. */
+      const draw = (from: number, more: number[]) => () => {
+        start(from);
+        for (const j of more) dragTo(j);
+        active = -1;
+      };
+      type Opt = { c: number; head: number; target: number; r: number[]; rest: number[] };
+      const opts: Opt[] = [];
+      for (let c = 0; c < k; c++) {
+        if (complete(c)) continue;
+        if (paths[c].length) {
+          const r = route(c);
+          const head = paths[c][paths[c].length - 1];
+          opts.push({ c, head, target: r[r.length - 1], r, rest: r.slice(paths[c].length) });
+        } else {
+          // Not started: either dot can lead.
+          for (const r of [sol[c], [...sol[c]].reverse()]) opts.push({ c, head: r[0], target: r[r.length - 1], r, rest: r.slice(1) });
+        }
+      }
+      const rules: Record<string, () => Hint | null> = {
+        touch: () => {
+          for (const o of opts)
+            if (o.rest.length === 1)
+              return {
+                text: L(
+                  'These two dots of the same colour touch: just join them.',
+                  'Ces deux points de même couleur se touchent : reliez-les, tout simplement.',
+                ),
+                why: [el(o.head)],
+                at: [el(o.target)],
+                play: draw(o.head, o.rest),
+              };
+          return null;
+        },
+        forced: () => {
+          for (const o of opts) {
+            const choices = open(o.head, o.target);
+            if (choices.length !== 1 || choices[0] !== o.rest[0]) continue;
+            // Follow the chain of forced cells.
+            const run = [o.rest[0]];
+            const taken = new Set([...paths[o.c], o.head, o.rest[0]]);
+            for (let t = 1; t < o.rest.length; t++) {
+              const at = run[run.length - 1];
+              const ch = nbrs(at, n, n).filter((j) => !taken.has(j) && (free(j) || j === o.target));
+              if (ch.length !== 1 || ch[0] !== o.rest[t]) break;
+              run.push(o.rest[t]);
+              taken.add(o.rest[t]);
+            }
+            return {
+              text: L(
+                `This ${paths[o.c].length > 1 ? 'line end' : 'dot'} has only one free neighbour, so the line must go there${run.length > 1 ? ', and on until it gets a choice' : ''}.`,
+                `${paths[o.c].length > 1 ? 'Ce bout de ligne' : 'Ce point'} n’a qu’une case libre à côté : la ligne doit y passer${run.length > 1 ? ', puis continuer jusqu’à avoir le choix' : ''}.`,
+              ),
+              why: [el(o.head)],
+              at: run.map(el),
+              play: draw(o.head, run),
+            };
+          }
+          return null;
+        },
+        edge: () => {
+          // A short link that hugs the border can't get in anyone's way.
+          const onEdge = (i: number) => i < n || i >= N - n || i % n === 0 || i % n === n - 1;
+          const best = opts.filter((o) => [o.head, ...o.rest].every(onEdge)).sort((x, y) => x.rest.length - y.rest.length)[0];
+          if (!best) return null;
+          return {
+            text: L(
+              'Both dots sit on the edge: run the line along the border. Hugging the edge leaves the middle free for the others.',
+              'Les deux points sont sur le bord : longez la bordure. Coller au bord laisse le centre libre pour les autres.',
+            ),
+            why: [el(best.head), el(best.target)],
+            at: best.rest.map(el),
+            play: draw(best.head, best.rest),
+          };
+        },
+      };
+      const order = ['touch', 'forced', 'edge'];
+      for (const r of [...order.filter((o) => o !== lastRule), lastRule]) {
+        const found = rules[r]?.();
+        if (found) {
+          lastRule = r;
+          return found;
+        }
+      }
+      lastRule = '';
+      // Nothing forced: link the closest pair, the way that leaves room for the rest.
+      const o = opts.sort((x, y) => x.rest.length - y.rest.length)[0];
+      if (o)
+        return {
+          text: L(
+            `Link the closest pair first, along the path that walls off no empty cells. Every cell must end up filled.`,
+            `Reliez d’abord la paire la plus proche, sans enfermer de case vide. Toutes les cases doivent être remplies.`,
+          ),
+          why: [el(o.head), el(o.target)],
+          at: o.rest.map(el),
+          play: draw(o.head, o.rest),
+        };
+      return null;
+    };
+
     return {
+      hint,
       snapshot: () => ({ paths }),
     };
   },

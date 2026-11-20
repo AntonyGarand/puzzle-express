@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h, PALETTE, shake } from '../core/ui';
 import { anim, baseSeed, int, isIntArr, subRng } from './movekit/kit';
 import { drawPiece, fits, fitsAnywhere, fullLines, PIECES, type Piece } from './movekit/pieces';
@@ -274,10 +274,132 @@ export const blocks: PuzzleDef = {
       el.addEventListener('pointercancel', (e) => endDrag(e, true));
     }
 
+    /** Guide: the best-looking placement (clears first, then building lines, edges, no holes), explained. */
+    const hint = (): Hint | null => {
+      if (over) return null;
+      let best: { k: number; r: number; c: number; score: number; rows: number[]; cols: number[]; tmp: number[] } | null = null;
+      for (let k = 0; k < 3; k++) {
+        const p = PIECES[tray[k]];
+        if (!p) continue;
+        for (let r = 0; r + p.h <= n; r++)
+          for (let c = 0; c + p.w <= n; c++) {
+            if (!fits(cells, n, p, r, c)) continue;
+            const tmp = cells.slice();
+            for (const [dr, dc] of p.cells) tmp[(r + dr) * n + c + dc] = 1;
+            const { rows, cols } = fullLines(tmp, n);
+            const after = tmp.slice();
+            for (const rr of rows) for (let j = 0; j < n; j++) after[rr * n + j] = 0;
+            for (const cc of cols) for (let j = 0; j < n; j++) after[j * n + cc] = 0;
+            let score = (rows.length + cols.length) * 1000;
+            // Build lines up: fuller rows and columns score more.
+            for (let j = 0; j < n; j++) {
+              let rc = 0,
+                cc = 0;
+              for (let x = 0; x < n; x++) {
+                rc += after[j * n + x] ? 1 : 0;
+                cc += after[x * n + j] ? 1 : 0;
+              }
+              score += rc * rc + cc * cc;
+            }
+            // Hug edges and other pieces; avoid single-cell holes.
+            for (const [dr, dc] of p.cells) {
+              const rr = r + dr,
+                cc = c + dc;
+              for (const [y, x] of [
+                [rr - 1, cc],
+                [rr + 1, cc],
+                [rr, cc - 1],
+                [rr, cc + 1],
+              ])
+                if (y < 0 || x < 0 || y >= n || x >= n || tmp[y * n + x]) score += 2;
+            }
+            for (let i = 0; i < n * n; i++) {
+              if (after[i]) continue;
+              const y = Math.floor(i / n),
+                x = i % n;
+              const shut = [
+                [y - 1, x],
+                [y + 1, x],
+                [y, x - 1],
+                [y, x + 1],
+              ].every(([a, b]) => a < 0 || b < 0 || a >= n || b >= n || after[a * n + b]);
+              if (shut) score -= 30;
+            }
+            if (!best || score > best.score) best = { k, r, c, score, rows, cols, tmp };
+          }
+      }
+      if (!best) return null;
+      const { k, r, c, rows, cols, tmp } = best;
+      const p = PIECES[tray[k]];
+      const at = p.cells.map(([dr, dc]) => els[(r + dr) * n + c + dc]);
+      const play = () => place(k, r, c);
+      const lineName = (isRow: boolean, j: number) =>
+        isRow ? L(`row ${j + 1}`, `la rangée ${j + 1}`) : L(`column ${j + 1}`, `la colonne ${j + 1}`);
+      const lineCells = (isRow: boolean, j: number) => Array.from({ length: n }, (_, x) => (isRow ? j * n + x : x * n + j));
+      const lastOne = tray.filter((x) => x >= 0).length === 1;
+      const more = lastOne
+        ? L(' It’s your last piece, so three new ones arrive next.', ' C’est votre dernière pièce : trois nouvelles arrivent ensuite.')
+        : '';
+      if (rows.length || cols.length) {
+        const lines = [...rows.map((j) => lineName(true, j)), ...cols.map((j) => lineName(false, j))];
+        const filled = [...rows.flatMap((j) => lineCells(true, j)), ...cols.flatMap((j) => lineCells(false, j))].filter((i) => cells[i]);
+        return {
+          text: L(
+            `This piece completes ${lines.join(' and ')}: a full line clears and counts toward the goal.${more}`,
+            `Cette pièce complète ${lines.join(' et ')} : une ligne pleine s’efface et compte pour l’objectif.${more}`,
+          ),
+          why: [...new Set(filled)].map((i) => els[i]),
+          at,
+          play,
+        };
+      }
+      if (cells.every((v) => !v))
+        return {
+          text: L(
+            'Drag a piece from the tray onto the grid. Start against an edge so the middle stays open for big pieces.',
+            'Glissez une pièce du bac vers la grille. Commencez contre un bord pour garder le centre libre pour les grosses pièces.',
+          ),
+          why: [slots[k]],
+          at,
+          play,
+        };
+      // The fullest line this piece adds to.
+      let line: { isRow: boolean; j: number; cnt: number } | null = null;
+      for (const [dr, dc] of p.cells)
+        for (const isRow of [true, false]) {
+          const j = isRow ? r + dr : c + dc;
+          const cnt = lineCells(isRow, j).filter((i) => tmp[i]).length;
+          if (!line || cnt > line.cnt) line = { isRow, j, cnt };
+        }
+      if (line && line.cnt >= Math.ceil(n / 2)) {
+        const gaps = n - line.cnt;
+        const old = lineCells(line.isRow, line.j).filter((i) => cells[i]);
+        return {
+          text: L(
+            `Build up ${lineName(line.isRow, line.j)}: after this piece it needs just ${gaps === 1 ? 'one more cell' : `${gaps} more cells`} to clear.${more}`,
+            `Remplissez ${lineName(line.isRow, line.j)} : après cette pièce, il ne lui manque ${gaps === 1 ? 'qu’une case' : `que ${gaps} cases`} pour s’effacer.${more}`,
+          ),
+          why: old.length ? old.map((i) => els[i]) : [slots[k]],
+          at,
+          play,
+        };
+      }
+      return {
+        text: L(
+          `Fit this piece snugly against the edge and the other pieces, without leaving single holes that nothing can fill.${more}`,
+          `Placez cette pièce bien collée au bord et aux autres pièces, sans laisser de trous isolés impossibles à remplir.${more}`,
+        ),
+        why: [slots[k]],
+        at,
+        play,
+      };
+    };
+
     root.append(grid, trayEl);
     render();
     return {
       snapshot: () => ({ cells, tray, batch, cleared, sel }),
+      hint,
       onKey(e) {
         const k = Number(e.key) - 1;
         if (k >= 0 && k <= 2 && e.key.length === 1) {

@@ -1,5 +1,5 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
 
 export const lights: PuzzleDef = {
@@ -95,6 +95,75 @@ export const lights: PuzzleDef = {
     }
     root.append(grid);
     render();
-    return { snapshot: () => ({ on, moves }) };
+    /** Tile `i` and its up-to-4 neighbours. */
+    const cross = (i: number) => {
+      const r = Math.floor(i / n),
+        c = i % n;
+      return [i, r > 0 ? i - n : -1, r < n - 1 ? i + n : -1, c > 0 ? i - 1 : -1, c < n - 1 ? i + 1 : -1].filter((j) => j >= 0);
+    };
+    /** Fewest taps that clear the board: try every first row, then chase the lights down. */
+    const plan = (): number[] => {
+      let best: number[] | null = null;
+      for (let m = 0; m < 1 << n; m++) {
+        const b = on.slice();
+        const taps: number[] = [];
+        const tap = (i: number) => {
+          taps.push(i);
+          for (const j of cross(i)) b[j] = !b[j];
+        };
+        for (let c = 0; c < n; c++) if (m & (1 << c)) tap(c);
+        for (let r = 1; r < n; r++) for (let c = 0; c < n; c++) if (b[(r - 1) * n + c]) tap(r * n + c);
+        if (!b.some(Boolean) && (!best || taps.length < best.length)) best = taps;
+      }
+      return best ?? [];
+    };
+    let lastKind = '';
+    const hint = (): Hint | null => {
+      if (!on.some(Boolean)) return null;
+      const taps = plan();
+      if (!taps.length) return null;
+      const score = (i: number) => cross(i).reduce((t, j) => t + (on[j] ? 1 : -1), 0);
+      const opts = taps.map((i) => {
+        const cr = cross(i);
+        const litN = cr.filter((j) => on[j]).length;
+        const above = Math.floor(i / n) > 0 && on[i - n];
+        const kind = litN === cr.length ? 'all' : above ? 'chase' : 'net';
+        return { i, cr, litN, kind, s: score(i) };
+      });
+      opts.sort((a, b) => b.s - a.s);
+      const first = moves === 0 && lastKind === '';
+      const o = opts.find((x) => x.kind !== lastKind) ?? opts[0];
+      lastKind = o.kind;
+      const off = o.litN,
+        onN = o.cr.length - o.litN;
+      const mech = first
+        ? L(
+            'A tap flips a tile and the ones above, below, left and right. ',
+            'Une touche inverse la case et celles au-dessus, au-dessous, à gauche et à droite. ',
+          )
+        : '';
+      const text =
+        o.kind === 'all'
+          ? L(
+              `This tile and all its neighbours are lit: one tap switches all ${off} off.`,
+              `Cette case et toutes ses voisines sont allumées : une touche éteint les ${off}.`,
+            )
+          : o.kind === 'chase'
+            ? L(
+                'To switch off a light without disturbing the rest of its row, tap the tile just below it.',
+                'Pour éteindre une lumière sans déranger le reste de sa rangée, touchez la case juste en dessous.',
+              )
+            : L(
+                `Two taps on the same tile cancel out, so each tile needs one tap at most. This one turns ${off} off and ${onN} on, which the next taps fix.`,
+                `Deux touches sur une même case s’annulent : chaque case en demande une au plus. Celle-ci en éteint ${off} et en allume ${onN}, que les suivantes corrigeront.`,
+              );
+      return {
+        text: mech + text,
+        why: o.kind === 'chase' ? [cells[o.i - n]] : o.cr.filter((j) => j !== o.i && on[j]).map((j) => cells[j]),
+        at: [cells[o.i]],
+        play: () => press(o.i),
+      };
+    };
+    return { snapshot: () => ({ on, moves }), hint };
   },
 };

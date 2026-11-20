@@ -1,9 +1,9 @@
 import './freecell.css';
 import { L, P } from '../core/i18n';
 import type { Rng } from '../core/rng';
-import { byLevel, type Difficulty, type PuzzleDef } from '../core/types';
+import { byLevel, type Difficulty, type Hint, type PuzzleDef } from '../core/types';
 import { btn, shake } from '../core/ui';
-import { cardEl, deck, fan, pileEl, rank, slotEl, SUITS, tableEl } from './cardkit/cards';
+import { cap, cardEl, deck, elAt, fan, isRed, label, leCard, pileEl, rank, slotEl, suit, SUITS, tableEl, topEl } from './cardkit/cards';
 import { autoF, bestDestF, dealF, moveF, pickedF, solveF, wonF, type FState } from './cardkit/freecell';
 import { bindTable, History } from './cardkit/table';
 
@@ -180,6 +180,13 @@ export const freecell: PuzzleDef = {
       if (el) shake(el);
     };
 
+    /** Apply a validated move (tap, drop and the guide all come through here). */
+    const go = (p: string, i: number, to: string) => {
+      hist.push(s);
+      moveF(s, p, i, to);
+      after();
+    };
+
     bindTable(table, {
       canDrag: (p, i) => !over && pickedF(s, p, i) != null,
       accepts: (p, i, to) => moveF(s, p, i, to[0] === 'f' ? 'f' : to, true) || (to[0] === 't' && (pickedF(s, p, i)?.length ?? 0) > 1),
@@ -191,9 +198,7 @@ export const freecell: PuzzleDef = {
           bump(p, i);
           return;
         }
-        hist.push(s);
-        moveF(s, p, i, to);
-        after();
+        go(p, i, to);
       },
       drop(p, i, to) {
         if (over) return false;
@@ -205,9 +210,7 @@ export const freecell: PuzzleDef = {
             ctx.status(L(`Not enough free space to move ${n} cards`, `Pas assez d’espace libre pour déplacer ${n} cartes`));
           return false;
         }
-        hist.push(s);
-        moveF(s, p, i, dest);
-        after();
+        go(p, i, dest);
         return true;
       },
     });
@@ -226,7 +229,160 @@ export const freecell: PuzzleDef = {
     render();
     status();
 
+    let lastRule = '';
+    const hint = (): Hint | null => {
+      if (over) return null;
+      const el = (p: string, i: number) => elAt(table, p, i)!;
+      const topOf = (t: number) => s.cas[t][s.cas[t].length - 1];
+      const cands: { rule: string; h: Hint }[] = [];
+      // Home: a card that fits its foundation (the safe ones already went up on their own).
+      const home = (p: string, i: number, c: number) =>
+        cands.push({
+          rule: 'home',
+          h: {
+            text:
+              rank(c) === 1
+                ? L(
+                    `The ${label(c)} starts its foundation. Each suit builds up there from ace to king.`,
+                    `${cap(leCard(c))} commence sa fondation. Chaque sorte s’y empile de l’as au roi.`,
+                  )
+                : L(
+                    `The ${label(c)} goes home on the ${label(c - 1)}: foundations build up by suit.`,
+                    `${cap(leCard(c))} monte sur ${leCard(c - 1)} : les fondations montent par sorte.`,
+                  ),
+            why: [el(p, i)],
+            at: [topEl(table, 'f' + suit(c))!],
+            play: () => go(p, i, 'f'),
+          },
+        });
+      for (let k = 0; k < nc; k++) if (s.cells[k] >= 0 && moveF(s, 'c' + k, 0, 'f', true)) home('c' + k, 0, s.cells[k]);
+      s.cas.forEach((col, a) => {
+        if (col.length && moveF(s, 't' + a, col.length - 1, 'f', true)) home('t' + a, col.length - 1, col[col.length - 1]);
+      });
+      // Dig: uncover the next card a foundation needs, shallowest first.
+      const needs: { a: number; j: number; c: number }[] = [];
+      for (let su = 0; su < 4; su++) {
+        if (s.found[su] === 13) continue;
+        const c = su * 13 + s.found[su];
+        s.cas.forEach((col, a) => {
+          const j = col.indexOf(c);
+          if (j >= 0 && j < col.length - 1) needs.push({ a, j, c });
+        });
+      }
+      needs.sort((x, y) => s.cas[x.a].length - x.j - (s.cas[y.a].length - y.j) || rank(x.c) - rank(y.c));
+      // First try stacking what covers a needed card elsewhere; park in a cell only as a last resort.
+      dig: for (const { a, j, c } of needs) {
+        const col = s.cas[a];
+        const p = 't' + a;
+        for (let i = j + 1; i < col.length; i++) {
+          if (!pickedF(s, p, i)) continue;
+          for (let t = 0; t < 8; t++) {
+            if (t === a || !s.cas[t].length || !moveF(s, p, i, 't' + t, true)) continue;
+            const n = col.length - i;
+            const dst = topOf(t);
+            cands.push({
+              rule: n === 1 ? 'dig' : 'run',
+              h: {
+                text:
+                  n === 1
+                    ? L(
+                        `Dig toward the ${label(c)}: the ${label(col[i])} fits on the ${label(dst)}, one lower and ${isRed(dst) ? 'black on red' : 'red on black'}.`,
+                        `Dégagez ${leCard(c)} : ${leCard(col[i])} va sur ${leCard(dst)}, une valeur de moins et ${isRed(dst) ? 'noir sur rouge' : 'rouge sur noir'}.`,
+                      )
+                    : L(
+                        `Dig toward the ${label(c)}: move these ${n} cards onto the ${label(dst)} at once. Free cells and empty columns let runs move together.`,
+                        `Dégagez ${leCard(c)} : déplacez ces ${n} cartes d’un coup sur ${leCard(dst)}. Les cellules et colonnes libres permettent de bouger une suite entière.`,
+                      ),
+                why: [el(p, j), el(p, i)],
+                at: [el('t' + t, s.cas[t].length - 1)],
+                play: () => go(p, i, 't' + t),
+              },
+            });
+            break dig;
+          }
+        }
+      }
+      // Nothing to stack on: park a lone card in a free cell, if that soon frees the needed card.
+      const freeN = s.cells.filter((c) => c < 0).length;
+      if (!cands.some((x) => x.rule === 'dig' || x.rule === 'run'))
+        for (const { a, j, c } of needs) {
+          const col = s.cas[a];
+          const p = 't' + a;
+          const top = col[col.length - 1];
+          const free = s.cells.indexOf(-1);
+          if (free < 0 || col.length - 1 - j > freeN || pickedF(s, p, col.length - 2) != null) continue;
+          cands.push({
+            rule: 'cell',
+            h: {
+              text: L(
+                `The ${label(top)} has nowhere to go and covers the ${label(c)}. Park it in a free cell: each cell holds one card.`,
+                `${cap(leCard(top))} n’a pas de place et couvre ${leCard(c)}. Rangez-le dans une cellule libre : une carte par cellule.`,
+              ),
+              why: [el(p, j), el(p, col.length - 1)],
+              at: [el('c' + free, -1)],
+              play: () => go(p, col.length - 1, 'c'),
+            },
+          });
+          break;
+        }
+      // Back: bring a parked card down from its cell so the cell is free again.
+      back: for (let k = 0; k < nc; k++) {
+        const c = s.cells[k];
+        if (c < 0) continue;
+        for (let t = 0; t < 8; t++) {
+          if (!s.cas[t].length || !moveF(s, 'c' + k, 0, 't' + t, true)) continue;
+          const dst = topOf(t);
+          cands.push({
+            rule: 'back',
+            h: {
+              text: L(
+                `The ${label(c)} can leave its cell for the ${label(dst)}: one lower, opposite colour. Free cells are precious; empty them when you can.`,
+                `${cap(leCard(c))} peut quitter sa cellule pour ${leCard(dst)} : une valeur de moins, couleur opposée. Videz les cellules dès que possible.`,
+              ),
+              why: [el('c' + k, 0)],
+              at: [el('t' + t, s.cas[t].length - 1)],
+              play: () => go('c' + k, 0, 't' + t),
+            },
+          });
+          break back;
+        }
+      }
+      // Fallback: what a tap would do with some exposed card.
+      for (let a = 0; a < 8 && !cands.length; a++) {
+        const col = s.cas[a];
+        if (!col.length) continue;
+        const i = col.length - 1;
+        const to = bestDestF(s, 't' + a, i);
+        if (!to || to[0] !== 't') continue;
+        const n = Number(to.slice(1));
+        const dst = s.cas[n].length ? topOf(n) : -1;
+        cands.push({
+          rule: 'any',
+          h: {
+            text:
+              dst >= 0
+                ? L(
+                    `Stack the ${label(col[i])} on the ${label(dst)}: one lower, opposite colour.`,
+                    `Empilez ${leCard(col[i])} sur ${leCard(dst)} : une valeur de moins, couleur opposée.`,
+                  )
+                : L(
+                    `An empty column takes any card: move the ${label(col[i])} there.`,
+                    `Une colonne vide accepte n’importe quelle carte : déplacez-y ${leCard(col[i])}.`,
+                  ),
+            why: [el('t' + a, i)],
+            at: [topEl(table, to)!],
+            play: () => go('t' + a, i, to),
+          },
+        });
+      }
+      if (!cands.length) return null;
+      const pick = cands.find((x) => x.rule !== lastRule) ?? cands[0];
+      lastRule = pick.rule;
+      return pick.h;
+    };
+
     return {
+      hint,
       snapshot: () => ({ s, hist: hist.stack }),
       onKey(e) {
         if (e.key === 'z' || e.key === 'Backspace') {

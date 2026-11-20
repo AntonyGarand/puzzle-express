@@ -1,5 +1,5 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h, PALETTE, s, shake } from '../core/ui';
 import { int, isIntArr } from './movekit/kit';
 import './pairs.css';
@@ -28,6 +28,12 @@ function shape(k: number, fill: string): SVGElement {
       return s('path', { ...a, d: 'M14 50 L50 14 L86 50 L68 50 L68 86 L32 86 L32 50 Z' });
   }
 }
+/** Shape names for the guide: [singular, plural] per language, in `shape()` order. */
+const SHAPE_EN = ['circle', 'square', 'triangle', 'diamond', 'star', 'cross', 'hexagon', 'ring', 'arrow'];
+const SHAPE_EN_PL = ['circles', 'squares', 'triangles', 'diamonds', 'stars', 'crosses', 'hexagons', 'rings', 'arrows'];
+const SHAPE_FR = ['cercle', 'carré', 'triangle', 'losange', 'étoile', 'croix', 'hexagone', 'anneau', 'flèche'];
+const SHAPE_FR_PL = ['cercles', 'carrés', 'triangles', 'losanges', 'étoiles', 'croix', 'hexagones', 'anneaux', 'flèches'];
+const SHAPE_FR_ART = ['le cercle', 'le carré', 'le triangle', 'le losange', 'l’étoile', 'la croix', 'l’hexagone', 'l’anneau', 'la flèche'];
 const symbol = (id: number) =>
   s('svg', { viewBox: '0 0 100 100', class: 'sym', 'aria-hidden': 'true' }, shape(id % SHAPES, PALETTE[Math.floor(id / SHAPES)]));
 
@@ -50,8 +56,8 @@ export const pairs: PuzzleDef = {
         'Sinon, les cartes tremblent et se retournent après un instant (ou dès que vous touchez une autre carte).',
       ),
       L(
-        'Each pair of flips is one try, shown at the bottom. Every mismatch adds to the ✕ mistakes count at the top.',
-        'Chaque paire de cartes retournées compte pour un essai, affiché en bas. Chaque paire ratée s’ajoute au compteur d’erreurs ✕ en haut.',
+        'Each pair of flips is one try, shown at the bottom. A miss only counts as a ✕ mistake when you could have known: the match of your first card was already seen, or your second card was one you’d already seen.',
+        'Chaque paire de cartes retournées compte pour un essai, affiché en bas. Une paire ratée ne compte comme erreur ✕ que si vous pouviez le savoir : la jumelle de votre première carte avait déjà été vue, ou votre deuxième carte était déjà connue.',
       ),
       L(
         'On Master you have 40 tries; run out and the game is lost.',
@@ -154,6 +160,16 @@ export const pairs: PuzzleDef = {
       );
     };
 
+    /**
+     * A miss only counts as a mistake when you could have known better: the first card's partner was
+     * already seen somewhere, or the second card was one you'd already seen (so it couldn't match).
+     * Checked before this try marks `b` as seen; `a` was marked on the first flip, its partner wasn't.
+     */
+    const avoidable = (a: number, b: number) => {
+      const partner = deck.findIndex((v, k) => k !== a && v === deck[a]);
+      return seen[partner] || seen[b];
+    };
+
     const tap = (i: number) => {
       if (over || matched[i]) return;
       clearTimeout(hideTimer);
@@ -175,7 +191,7 @@ export const pairs: PuzzleDef = {
         if (hit) {
           matched[a] = matched[b] = true;
           open = [];
-        } else {
+        } else if (avoidable(a, b)) {
           ctx.mistake();
         }
         seen[a] = seen[b] = true;
@@ -212,10 +228,89 @@ export const pairs: PuzzleDef = {
       render();
     };
 
+    /**
+     * Guide: play like a careful player who remembers every card the demo has flipped (`seen`), never
+     * peeking at unseen ones: match known pairs, otherwise flip a new card, and never waste a flip on a known one.
+     */
+    const named = (v: number) => syms.filter((x) => x % SHAPES === v % SHAPES).length === 1;
+    const one = (v: number) => (named(v) ? L(SHAPE_EN[v % SHAPES], SHAPE_FR[v % SHAPES]) : L('symbol', 'symbole'));
+    const both = (v: number) => (named(v) ? L(SHAPE_EN_PL[v % SHAPES], SHAPE_FR_PL[v % SHAPES]) : L('symbols', 'symboles'));
+    const hint = (): Hint | null => {
+      if (over) return null;
+      const unseen = (skip: number) => els.findIndex((_, i) => !seen[i] && !matched[i] && i !== skip);
+      if (open.length === 1) {
+        const a = open[0];
+        const partner = deck.findIndex((v, k) => k !== a && v === deck[a]);
+        if (seen[partner])
+          return {
+            text: L(
+              `You’ve already seen the other ${one(deck[a])} right here. Flip it to make the pair.`,
+              `Vous avez déjà vu l’autre ${one(deck[a])} juste ici. Retournez-la pour former la paire.`,
+            ),
+            why: [els[a]],
+            at: [els[partner]],
+            play: () => tap(partner),
+          };
+        const b = unseen(a);
+        if (b < 0) return null;
+        return {
+          text: L(
+            `No other ${one(deck[a])} seen yet, so flip a new card. A card you’ve already seen can’t match: that miss would count as a mistake.`,
+            `Vous n’avez pas encore vu l’autre ${one(deck[a])} : retournez une nouvelle carte. Une carte déjà vue ne peut pas correspondre, et ce serait une erreur.`,
+          ),
+          why: [els[a]],
+          at: [els[b]],
+          play: () => tap(b),
+        };
+      }
+      // A pair whose two cards have both been seen: match it from memory.
+      for (let i = 0; i < n; i++) {
+        if (!seen[i] || matched[i]) continue;
+        const j = deck.findIndex((v, k) => k > i && v === deck[i] && seen[k] && !matched[k]);
+        if (j < 0) continue;
+        return {
+          text: L(
+            `You’ve seen both ${both(deck[i])}: remember where they were and flip them one after the other.`,
+            `Vous avez vu les deux ${both(deck[i])} : rappelez-vous leur place et retournez-les l’une après l’autre.`,
+          ),
+          at: [els[i], els[j]],
+          play: () => {
+            tap(i);
+            tap(j);
+          },
+        };
+      }
+      const a = unseen(-1);
+      if (a < 0) return null;
+      if (open.length === 2) {
+        const [x, y] = open;
+        return {
+          text: L(
+            `No match: ${named(deck[x]) && named(deck[y]) ? `the ${one(deck[x])} and the ${one(deck[y])}` : 'both cards'} flip back, but remember where they are. Now flip a new card.`,
+            `Pas de paire : ${named(deck[x]) && named(deck[y]) ? `${SHAPE_FR_ART[deck[x] % SHAPES]} et ${SHAPE_FR_ART[deck[y] % SHAPES]} se retournent` : 'les deux cartes se retournent'}, mais retenez leur place. Retournez maintenant une nouvelle carte.`,
+          ),
+          why: [els[x], els[y]],
+          at: [els[a]],
+          play: () => tap(a),
+        };
+      }
+      return {
+        text: tries
+          ? L('Flip a card you haven’t seen yet and remember its symbol.', 'Retournez une carte encore jamais vue et retenez son symbole.')
+          : L(
+              'Tap a card to flip it. You know nothing yet, so any card will do: just remember what you see.',
+              'Touchez une carte pour la retourner. Vous ne savez rien encore, donc n’importe laquelle fait l’affaire : retenez ce que vous voyez.',
+            ),
+        at: [els[a]],
+        play: () => tap(a),
+      };
+    };
+
     root.append(grid);
     render();
     return {
       snapshot: () => ({ m: matched.map(Number), seen: seen.map(Number), open, tries }),
+      hint,
       destroy: () => clearTimeout(hideTimer),
     };
   },

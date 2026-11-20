@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, s } from '../core/ui';
 import { adjacent, capture, cellAt, stepsToward } from './pathkit/grid';
 import { genTracks } from './pathkit/tracks-gen';
@@ -154,15 +154,19 @@ export const tracks: PuzzleDef = {
       }
       check();
     };
-    grid.addEventListener('pointerdown', (e) => {
-      if (finished) return;
-      const i = cellAt(grid, n, n, e.clientX, e.clientY);
-      if (i < 0) return;
+    /** Press on cell i: cut the trail back to it, or start extending from the end. */
+    const press = (i: number) => {
+      if (finished || i < 0) return false;
       const at = trail.indexOf(i);
       if (at >= 0) trail.length = at + 1;
-      else if (!adjacent(trail[trail.length - 1], i, n)) return;
+      else if (!adjacent(trail[trail.length - 1], i, n)) return false;
       ctx.touch();
       drawing = true;
+      return true;
+    };
+    grid.addEventListener('pointerdown', (e) => {
+      const i = cellAt(grid, n, n, e.clientX, e.clientY);
+      if (!press(i)) return;
       capture(grid, e.pointerId);
       e.preventDefault();
       dragTo(i);
@@ -202,6 +206,168 @@ export const tracks: PuzzleDef = {
     }
     root.append(wrap);
     render();
-    return { snapshot: () => ({ trail }) };
+
+    // ---- guide: lay the solution one straight run at a time, explained from the edge counts ----
+    const rowOf = (i: number) => Math.floor(i / n);
+    const colOf = (i: number) => i % n;
+    let lastReason = '';
+    const hint = (): Hint | null => {
+      if (finished) return null;
+      const sol = P.path;
+      let k = 0;
+      while (k < trail.length && trail[k] === sol[k]) k++;
+      if (k < trail.length) {
+        const back = sol[k - 1];
+        return {
+          text: L(
+            'This part of the track leads nowhere useful. Tap a cell on the track to cut it back there.',
+            'Ce bout de tracé ne mène nulle part. Touchez une case du tracé pour le couper à cet endroit.',
+          ),
+          why: trail.slice(k).map((i) => cells[i]),
+          at: [cells[back]],
+          play: () => {
+            press(back);
+            dragTo(back);
+            drawing = false;
+          },
+        };
+      }
+      const from = sol[k - 1];
+      const dir = sol[k] - from;
+      const seg: number[] = [];
+      for (let j = k; j < sol.length; j++) {
+        if (sol[j] - sol[j - 1] !== dir) break;
+        seg.push(sol[j]);
+      }
+      const tail = seg[seg.length - 1];
+      const horiz = Math.abs(dir) === 1;
+      const rc = new Array<number>(n).fill(0),
+        cc = new Array<number>(n).fill(0);
+      for (const i of [...trail, ...seg]) {
+        rc[rowOf(i)]++;
+        cc[colOf(i)]++;
+      }
+      const dirEn = dir === 1 ? 'right' : dir === -1 ? 'left' : dir > 0 ? 'down' : 'up';
+      const dirFr = dir === 1 ? 'vers la droite' : dir === -1 ? 'vers la gauche' : dir > 0 ? 'vers le bas' : 'vers le haut';
+      const play = () => {
+        press(from);
+        for (const i of seg) dragTo(i);
+        drawing = false;
+      };
+      const at = seg.map((i) => cells[i]);
+      const reasons: [string, Hint][] = [];
+      const g = seg.find((i) => given.has(i));
+      if (g != null)
+        reasons.push([
+          'given',
+          {
+            text: L(
+              `Cells with a small square must be on the track: run ${dirEn} through this one.`,
+              `Les cases marquées d’un petit carré font partie du tracé : passez ${dirFr} par celle-ci.`,
+            ),
+            why: [cells[g]],
+            at,
+            play,
+          },
+        ]);
+      // The line we run along fills up: the track has to turn out of it.
+      const line = horiz ? rowOf(tail) : colOf(tail);
+      const have = horiz ? rc[line] : cc[line];
+      const want = horiz ? P.rowCounts[line] : P.colCounts[line];
+      const lineEl = horiz ? rowEls[line] : colEls[line];
+      const lineEn = `${horiz ? 'Row' : 'Column'} ${line + 1}`;
+      const lineFr = `${horiz ? 'La rangée' : 'La colonne'} ${line + 1}`;
+      if (tail === b)
+        reasons.unshift([
+          'b',
+          {
+            text: L(
+              `${lineEn} needs ${want}: run ${dirEn} into B to finish the track.`,
+              `${lineFr} demande ${want} : allez ${dirFr} jusqu’à B pour terminer le tracé.`,
+            ),
+            why: [lineEl],
+            at,
+            play,
+          },
+        ]);
+      if (tail !== b && have === want && seg.length > 1)
+        reasons.push([
+          'full',
+          {
+            text: L(
+              `${lineEn} needs ${want} track cells: run ${dirEn} to fill them, then turn out of it.`,
+              `${lineFr} demande ${want} cases : avancez ${dirFr} pour les remplir, puis sortez-en.`,
+            ),
+            why: [lineEl],
+            at,
+            play,
+          },
+        ]);
+      // The cell straight ahead is off-limits: wall, or a crossing line that's already full.
+      const ahead = tail + dir;
+      const wall = horiz ? ahead < 0 || rowOf(ahead) !== rowOf(tail) : ahead < 0 || ahead >= N;
+      if (tail !== b && !wall) {
+        const cross = horiz ? colOf(ahead) : rowOf(ahead);
+        const cHave = horiz ? cc[cross] : rc[cross];
+        const cWant = horiz ? P.colCounts[cross] : P.rowCounts[cross];
+        const cEl = horiz ? colEls[cross] : rowEls[cross];
+        const cEn = `${horiz ? 'Column' : 'Row'} ${cross + 1}`;
+        const cFr = `${horiz ? 'colonne' : 'rangée'} ${cross + 1}`;
+        if (cHave >= cWant)
+          reasons.push([
+            'blocked',
+            {
+              text:
+                cWant === 0
+                  ? L(
+                      `${cEn} shows 0: the track never enters it. Go ${dirEn} up to it, then turn.`,
+                      `La ${cFr} affiche 0 : le tracé n’y entre jamais. Allez ${dirFr} jusqu’à elle, puis tournez.`,
+                    )
+                  : L(
+                      `${cEn} wants ${cWant} and this run brings it to ${cWant}, so the track turns before going further.`,
+                      `La ${cFr} demande ${cWant} et ce trajet l’amène à ${cWant} : le tracé tourne avant d’aller plus loin.`,
+                    ),
+              why: [cEl],
+              at,
+              play,
+            },
+          ]);
+      } else if (tail !== b && wall && seg.length > 1)
+        reasons.push([
+          'wall',
+          {
+            text: L(
+              `Run ${dirEn} to the edge of the grid; there the track has to turn.`,
+              `Allez ${dirFr} jusqu’au bord de la grille; le tracé doit y tourner.`,
+            ),
+            why: [lineEl],
+            at,
+            play,
+          },
+        ]);
+      const pick = reasons.find(([r]) => r !== lastReason) ?? reasons[0];
+      if (pick) {
+        lastReason = pick[0];
+        return pick[1];
+      }
+      lastReason = 'count';
+      const left = want - have + seg.length;
+      return {
+        text:
+          k === 1
+            ? L(
+                `The track enters at A. ${lineEn} needs ${want} cells: start ${dirEn} from A.`,
+                `Le tracé entre par A. ${lineFr} demande ${want} cases : partez ${dirFr} à partir de A.`,
+              )
+            : L(
+                `${lineEn} still needs ${left} cell${left > 1 ? 's' : ''}: go ${dirEn}, keeping the other counts in check.`,
+                `${lineFr} demande encore ${left} case${left > 1 ? 's' : ''} : allez ${dirFr} en surveillant les autres chiffres.`,
+              ),
+        why: k === 1 ? [cells[a], lineEl] : [lineEl],
+        at,
+        play,
+      };
+    };
+    return { hint, snapshot: () => ({ trail }) };
   },
 };

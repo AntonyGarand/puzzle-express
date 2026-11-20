@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
 import { colourRegions, edgeClasses, nb8, regionAdjacency, tint } from './logickit/kit';
 import { genStars } from './logickit/starsgen';
@@ -46,7 +46,7 @@ export const stars: PuzzleDef = {
   create(ctx) {
     const { root, rng, difficulty: d } = ctx;
     const n = byLevel(d, [5, 6, 7, 8, 9]);
-    const { region } = genStars(n, rng);
+    const { region, sol } = genStars(n, rng);
     // Distinct colours while the palette lasts; otherwise neighbours differ.
     const colour =
       n <= 8 ? rng.shuffle([0, 1, 2, 3, 4, 5, 6, 7]).slice(0, n) : colourRegions(n, regionAdjacency(region, n, n, n), rng.int(0, 7));
@@ -103,6 +103,149 @@ export const stars: PuzzleDef = {
     if (Array.isArray(sv?.st) && sv.st.length === st.length) sv.st.forEach((v, i) => (st[i] = v === 1 || v === 2 ? v : 0));
     root.append(grid);
     render();
-    return { snapshot: () => ({ st }) };
+
+    const all = [...st.keys()];
+    const rowOf = (i: number) => Math.floor(i / n);
+    const colOf = (i: number) => i % n;
+    /** Cells a star at `i` rules out: its row, column, region and 8 neighbours. */
+    const reach = (i: number) =>
+      all.filter((j) => j !== i && (rowOf(j) === rowOf(i) || colOf(j) === colOf(i) || region[j] === region[i] || nb8(i, n, n).includes(j)));
+    const units = () => {
+      const out: { kind: 'row' | 'col' | 'region'; k: number; cells: number[] }[] = [];
+      for (let k = 0; k < n; k++) {
+        out.push({ kind: 'region', k, cells: all.filter((i) => region[i] === k) });
+        out.push({ kind: 'row', k, cells: all.filter((i) => rowOf(i) === k) });
+        out.push({ kind: 'col', k, cells: all.filter((i) => colOf(i) === k) });
+      }
+      return out;
+    };
+    const unitName = (u: { kind: string; k: number }) =>
+      u.kind === 'row'
+        ? L(`row ${u.k + 1}`, `la rangée ${u.k + 1}`)
+        : u.kind === 'col'
+          ? L(`column ${u.k + 1}`, `la colonne ${u.k + 1}`)
+          : L('this region', 'cette région');
+    const els = (ix: number[]) => ix.map((i) => cells[i]);
+    const cross = (ix: number[]) => () => ix.forEach((i) => st[i] === 0 && tap(i));
+    const place = (i: number) => () => {
+      for (let t = 0; t < 2 && st[i] !== 2; t++) tap(i);
+    };
+
+    let last = -1;
+    /** The next deduction for the guide, from the stars and ✕ marks on the board. */
+    const hint = (): Hint | null => {
+      if (done) return null;
+      const placed = all.filter((i) => st[i] === 2);
+      const ruled = new Set(placed.flatMap(reach));
+      const free = (i: number) => st[i] === 0 && !ruled.has(i);
+      const open = units().filter((u) => !u.cells.some((i) => st[i] === 2));
+
+      const clear = (): Hint | null => {
+        // A star rules out its row, column, region and neighbours: mark them.
+        for (const a of placed) {
+          const ix = reach(a).filter((j) => st[j] === 0);
+          if (ix.length)
+            return {
+              text: L(
+                'A star rules out the rest of its row, column and region, and the 8 cells around it. Tap them once to mark ✕.',
+                'Une étoile exclut le reste de sa rangée, de sa colonne et de sa région, ainsi que ses 8 voisines. Touchez-les une fois pour les marquer ✕.',
+              ),
+              why: els([a]),
+              at: els(ix),
+              play: cross(ix),
+            };
+        }
+        return null;
+      };
+      const single = (): Hint | null => {
+        // A row, column or region with one free cell left gets its star there.
+        for (const kind of ['region', 'row', 'col'])
+          for (const u of open) {
+            if (u.kind !== kind) continue;
+            const f = u.cells.filter(free);
+            if (f.length !== 1) continue;
+            const name = unitName(u);
+            return {
+              text: L(
+                `Every other cell of ${name} is ruled out, so its star must go here. Tap twice for a star.`,
+                `Toutes les autres cases de ${name} sont exclues : son étoile va donc ici. Touchez deux fois pour une étoile.`,
+              ),
+              why: els(u.cells.filter((i) => i !== f[0])),
+              at: els(f),
+              play: place(f[0]),
+            };
+          }
+        return null;
+      };
+      const inLine = (): Hint | null => {
+        // A region whose free cells sit in one row (or column) owns that line's star.
+        for (const u of open) {
+          if (u.kind !== 'region') continue;
+          const f = u.cells.filter(free);
+          if (!f.length) continue;
+          for (const row of [true, false]) {
+            const line = row ? rowOf(f[0]) : colOf(f[0]);
+            if (!f.every((i) => (row ? rowOf(i) : colOf(i)) === line)) continue;
+            const ix = all.filter((j) => (row ? rowOf(j) : colOf(j)) === line && region[j] !== u.k && st[j] === 0);
+            if (!ix.length) continue;
+            return {
+              text: L(
+                `This region’s free cells all lie in ${row ? 'row' : 'column'} ${line + 1}, so that line’s one star belongs to this region. Cross out the rest of the ${row ? 'row' : 'column'}.`,
+                `Les cases libres de cette région sont toutes dans la ${row ? 'rangée' : 'colonne'} ${line + 1} : l’unique étoile de cette ligne revient à la région. Barrez le reste de la ${row ? 'rangée' : 'colonne'}.`,
+              ),
+              why: els(f),
+              at: els(ix),
+              play: cross(ix),
+            };
+          }
+        }
+        return null;
+      };
+      const squeeze = (): Hint | null => {
+        // A star here would leave some row, column or region with no room at all.
+        for (const i of all) {
+          if (!free(i)) continue;
+          const hit = new Set(reach(i));
+          for (const u of open) {
+            if (u.cells.includes(i)) continue;
+            const f = u.cells.filter(free);
+            if (!f.length || !f.every((j) => hit.has(j))) continue;
+            const name = unitName(u);
+            return {
+              text: L(
+                `A star here would rule out every free cell of ${name}, leaving it no star. Mark this cell ✕.`,
+                `Une étoile ici exclurait toutes les cases libres de ${name}, qui n’aurait plus d’étoile. Marquez cette case ✕.`,
+              ),
+              why: els(f),
+              at: els([i]),
+              play: cross([i]),
+            };
+          }
+        }
+        return null;
+      };
+      const rules = [clear, single, inLine, squeeze];
+      for (const rule of [...rules.filter((_, k) => k !== last), ...rules.filter((_, k) => k === last)]) {
+        const found = rule();
+        if (found) {
+          last = rules.indexOf(rule);
+          return found;
+        }
+      }
+      // Nothing simple: follow the solution for the first row still missing its star.
+      const r = sol.findIndex((c, rr) => st[rr * n + c] !== 2);
+      if (r < 0) return null;
+      const i = r * n + sol[r];
+      last = -1;
+      return {
+        text: L(
+          `Only this cell fits row ${r + 1}’s star (check its column, its region and its neighbours).`,
+          `Seule cette case convient à l’étoile de la rangée ${r + 1} (vérifiez sa colonne, sa région et ses voisines).`,
+        ),
+        at: els([i]),
+        play: place(i),
+      };
+    };
+    return { snapshot: () => ({ st }), hint };
   },
 };

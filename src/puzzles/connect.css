@@ -19,6 +19,9 @@
   touch-action: none;
 }
 [data-puzzle='connect'] .connect-grid .cell {
+  /* fill the grid track (the global .dot rule would shrink dot cells to 14px) */
+  width: auto;
+  height: auto;
   border: 0;
   border-radius: 0;
   background: transparent;

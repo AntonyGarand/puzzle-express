@@ -1,7 +1,8 @@
 import { L, P } from '../core/i18n';
 import type { Rng } from '../core/rng';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
+import { type TakuzuRule, takuzuStep } from './logickit/takuzu-hint';
 
 // Cell values: -1 empty, 0, 1.
 
@@ -152,6 +153,53 @@ export const binary: PuzzleDef = {
     if (sv?.g?.length === g.length) sv.g.forEach((v, i) => !given[i] && (g[i] = v));
     root.append(grid);
     render();
-    return { snapshot: () => ({ g }) };
+
+    const lineName = (row: boolean, k: number) =>
+      row ? L(`Row ${k + 1}`, `La rangée ${k + 1}`) : L(`Column ${k + 1}`, `La colonne ${k + 1}`);
+    // v0 is dark, v1 is the accent colour.
+    const one = (v: number) => (v === 0 ? L('dark', 'foncée') : L('coloured', 'en couleur'));
+    const many = (v: number) => (v === 0 ? L('dark', 'foncées') : L('coloured', 'en couleur'));
+    const fill = (ix: number[], vs: number[]) => () =>
+      ix.forEach((i, k) => {
+        for (let t = 0; t < 2 && g[i] !== vs[k]; t++) tap(i);
+      });
+    let last: TakuzuRule | undefined;
+    /** The next deduction for the guide, from the visible cells only. */
+    const hint = (): Hint | null => {
+      if (!g.includes(-1)) return null;
+      const st = takuzuStep(g, n, last, ['pair', 'gap', 'count']);
+      if (!st) {
+        const i = g.indexOf(-1);
+        return {
+          text: L(
+            `Only a ${one(sol[i])} cell fits here: the other colour would break a rule (check its row and column).`,
+            `Seule une case ${one(sol[i])} convient ici : l’autre couleur briserait une règle (vérifiez sa rangée et sa colonne).`,
+          ),
+          at: [cells[i]],
+          play: fill([i], [sol[i]]),
+        };
+      }
+      last = st.rule;
+      const name = lineName(st.row, st.line);
+      const w = 1 - st.v;
+      const both = st.at.length > 1;
+      const text =
+        st.rule === 'pair'
+          ? L(
+              `${name} has two ${many(st.v)} cells side by side, so ${both ? 'the cells at both ends are' : 'the next cell is'} ${one(w)}: never three alike.`,
+              `${name} a deux cases ${many(st.v)} côte à côte : ${both ? 'les cases aux deux bouts sont' : 'la case suivante est'} ${both ? many(w) : one(w)}. Jamais trois pareilles!`,
+            )
+          : st.rule === 'gap'
+            ? L(
+                `Two ${many(st.v)} cells with a gap between them in ${name.toLowerCase()}: the middle one must be ${one(w)}, or it would make three in a row.`,
+                `Deux cases ${many(st.v)} séparées d’un trou dans ${name.toLowerCase()} : celle du milieu doit être ${one(w)}, sinon ça ferait trois de suite.`,
+              )
+            : L(
+                `${name} already has its ${n / 2} ${many(st.v)} cells (half of ${n}), so ${both ? 'the rest are' : 'the last one is'} ${one(w)}.`,
+                `${name} a déjà ses ${n / 2} cases ${many(st.v)} (la moitié de ${n}) : ${both ? `les autres doivent être ${many(w)}` : `la dernière doit être ${one(w)}`}.`,
+              );
+      return { text, why: st.why.map((i) => cells[i]), at: st.at.map((i) => cells[i]), play: fill(st.at, st.vals) };
+    };
+    return { snapshot: () => ({ g }), hint };
   },
 };

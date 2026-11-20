@@ -1,6 +1,7 @@
 import { genMaze } from './pathkit/maze-gen';
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
+import './maze.css';
 import { h } from '../core/ui';
 
 // Passage bits
@@ -67,7 +68,9 @@ export const maze: PuzzleDef = {
     const goal = n * n - 1;
     const path = [0];
     const canvas = h('canvas', { class: 'maze' });
-    const wrap = h('div', { class: 'maze-wrap' }, canvas);
+    // Invisible per-cell boxes over the canvas, so the guide can point at cells.
+    const marks = Array.from({ length: n * n }, () => h('span'));
+    const wrap = h('div', { class: 'maze-wrap' }, canvas, h('div', { class: 'maze-marks', style: `--n:${n}` }, ...marks));
 
     const css = (v: string) => getComputedStyle(canvas).getPropertyValue(v).trim();
     const draw = () => {
@@ -233,7 +236,140 @@ export const maze: PuzzleDef = {
     root.append(wrap);
     requestAnimationFrame(draw);
 
+    // ---- guide ----
+    const exitsOf = (i: number) => DIRS.filter((dd) => open[i] & dd.bit);
+    const go = (i: number, dd: (typeof DIRS)[number]) => (Math.floor(i / n) + dd.dr) * n + (i % n) + dd.dc;
+    const DIR_EN = ['up', 'right', 'down', 'left'];
+    const DIR_FR = ['vers le haut', 'vers la droite', 'vers le bas', 'vers la gauche'];
+    /** Cells reachable from `from` without passing through `block`. */
+    const region = (from: number, block: number) => {
+      const seen = new Set([block, from]);
+      const q = [from];
+      while (q.length) {
+        const i = q.shift()!;
+        for (const dd of exitsOf(i)) {
+          const j = go(i, dd);
+          if (!seen.has(j)) {
+            seen.add(j);
+            q.push(j);
+          }
+        }
+      }
+      seen.delete(block);
+      return [...seen];
+    };
+    /** Shortest route from `from` to the goal. */
+    const route = (from: number) => {
+      const par = new Int32Array(n * n).fill(-1);
+      par[from] = from;
+      const q = [from];
+      while (q.length) {
+        const i = q.shift()!;
+        if (i === goal) break;
+        for (const dd of exitsOf(i)) {
+          const j = go(i, dd);
+          if (par[j] < 0) {
+            par[j] = i;
+            q.push(j);
+          }
+        }
+      }
+      const out = [goal];
+      while (out[out.length - 1] !== from) out.push(par[out[out.length - 1]]);
+      return out.reverse();
+    };
+    let lastRule = '';
+    const hint = (): Hint | null => {
+      if (finished) return null;
+      const p = path[path.length - 1];
+      const prev = path.length > 1 ? path[path.length - 2] : -1;
+      const r = route(p);
+      // Follow the route to the next fork (or the goal).
+      const seg: number[] = [];
+      for (let k = 1; k < r.length; k++) {
+        seg.push(r[k]);
+        if (exitsOf(r[k]).length >= 3) break;
+      }
+      const dirOf = (a: number, b: number) => DIRS.findIndex((dd) => go(a, dd) === b);
+      const play = () => {
+        let at = p;
+        for (const j of seg) {
+          step(DIRS[dirOf(at, j)]);
+          at = j;
+        }
+        after();
+      };
+      const last = seg[seg.length - 1];
+      const at = [marks[last]];
+      const d0 = dirOf(p, seg[0]);
+      if (seg[0] === prev)
+        return {
+          text: L(
+            'Dead end: walk back over your trail (it erases itself) to the last fork.',
+            'Cul-de-sac : revenez sur vos pas (la trace s’efface) jusqu’au dernier embranchement.',
+          ),
+          why: [marks[p]],
+          at,
+          play,
+        };
+      const others = exitsOf(p)
+        .map((dd) => go(p, dd))
+        .filter((j) => j !== prev && j !== seg[0]);
+      if (!others.length) {
+        const toGoal = last === goal;
+        return {
+          text: toGoal
+            ? L('Last stretch: no more forks between you and the goal.', 'Dernier bout : plus aucun embranchement d’ici au but.')
+            : path.length === 1
+              ? L(
+                  'No choice yet: follow the only corridor to the first fork. A swipe makes the dot run on its own.',
+                  'Pas encore de choix : suivez le seul couloir jusqu’au premier embranchement. Un balayage fait courir le point.',
+                )
+              : L(
+                  'Only one way on here: follow the corridor to the next fork.',
+                  'Un seul chemin ici : suivez le couloir jusqu’au prochain embranchement.',
+                ),
+          why: [marks[p]],
+          at,
+          play,
+        };
+      }
+      // A fork: the other branches lead nowhere.
+      const dead = others.map((j) => region(j, p)).sort((a, b) => a.length - b.length);
+      const wrong = others.map((j) => dirOf(p, j));
+      const small = dead[dead.length - 1].length <= 4;
+      lastRule = small && lastRule !== 'dead' ? 'dead' : 'trace';
+      if (lastRule === 'dead') {
+        const cells = dead.flat();
+        return {
+          text:
+            others.length === 1
+              ? L(
+                  `The branch going ${DIR_EN[wrong[0]]} stops after ${cells.length} cell${cells.length > 1 ? 's' : ''}: a dead end. Go ${DIR_EN[d0]}.`,
+                  `La branche ${DIR_FR[wrong[0]]} s’arrête après ${cells.length} case${cells.length > 1 ? 's' : ''} : un cul-de-sac. Allez ${DIR_FR[d0]}.`,
+                )
+              : L(
+                  `Every other branch here is a short dead end, so go ${DIR_EN[d0]}.`,
+                  `Les autres branches sont de courts culs-de-sac : allez ${DIR_FR[d0]}.`,
+                ),
+          why: cells.map((i) => marks[i]),
+          at,
+          play,
+        };
+      }
+      return {
+        text: L(
+          `Trace back from the goal: its route reaches this fork by the branch going ${DIR_EN[d0]}. The other way only leads to dead ends.`,
+          `Remontez depuis le but : son chemin arrive à cet embranchement par la branche ${DIR_FR[d0]}. L’autre ne mène qu’à des culs-de-sac.`,
+        ),
+        why: [marks[goal]],
+        at,
+        play,
+      };
+    };
+
     return {
+      hint,
       snapshot: () => ({ v: 2, path }),
       onKey(e) {
         const map: Record<string, number> = { ArrowUp: 0, w: 0, ArrowRight: 1, d: 1, ArrowDown: 2, s: 2, ArrowLeft: 3, a: 3 };

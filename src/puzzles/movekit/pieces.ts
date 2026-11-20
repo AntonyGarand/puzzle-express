@@ -71,13 +71,14 @@ export function drawPiece(rng: Rng, maxTier: number, bigBias: number): number {
   // weight per family, spread across its orientations
   const famCount = new Map<number, number>();
   PIECES.forEach((p) => famCount.set(p.fam, (famCount.get(p.fam) ?? 0) + 1));
-  const weights = PIECES.map((p) => (p.tier > maxTier ? 0 : (1 + bigBias * (p.tier - 1)) / famCount.get(p.fam)!));
+  // 1×1 and 2×1 pieces are never dealt (too easy); they stay in PIECES so saved trays keep their indices.
+  const weights = PIECES.map((p) => (p.tier > maxTier || p.cells.length < 3 ? 0 : (1 + bigBias * (p.tier - 1)) / famCount.get(p.fam)!));
   let t = rng.next() * weights.reduce((a, b) => a + b, 0);
   for (let i = 0; i < weights.length; i++) {
     t -= weights[i];
     if (t <= 0 && weights[i] > 0) return i;
   }
-  return 0;
+  return weights.findLastIndex((w) => w > 0);
 }
 
 export function fits(board: number[], n: number, p: Piece, r: number, c: number) {

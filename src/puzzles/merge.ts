@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h, shake } from '../core/ui';
 import { anim, baseSeed, GROW, int, isIntArr, keyDir, onSwipe, POP, subRng, type Dir } from './movekit/kit';
 import './merge.css';
@@ -176,8 +176,143 @@ export const merge: PuzzleDef = {
     root.append(grid);
     render();
 
+    // ---- Guide ----
+    const DIRS_EN = ['up', 'right', 'down', 'left'];
+    const DIRS_FR = ['vers le haut', 'vers la droite', 'vers le bas', 'vers la gauche'];
+    /** Where each tile goes in a slide: merges as [from, from, to], and plain moves as [from, to]. */
+    const track = (dir: Dir) => {
+      const merges: { a: number; b: number; to: number; v: number }[] = [];
+      const moves: { from: number; to: number }[] = [];
+      for (let line = 0; line < n; line++) {
+        const idx: number[] = [];
+        for (let k = 0; k < n; k++) {
+          const p = dir === 0 || dir === 3 ? k : n - 1 - k;
+          idx.push(dir === 0 || dir === 2 ? p * n + line : line * n + p);
+        }
+        const full = idx.filter((i) => cells[i]);
+        let slot = 0;
+        for (let k = 0; k < full.length; k++, slot++) {
+          if (k + 1 < full.length && cells[full[k]] === cells[full[k + 1]]) {
+            merges.push({ a: full[k], b: full[k + 1], to: idx[slot], v: cells[full[k]] * 2 });
+            k++;
+          } else moves.push({ from: full[k], to: idx[slot] });
+        }
+      }
+      return { merges, moves };
+    };
+    /** The guide builds in the bottom-left corner: down and left push into it. */
+    const corner = () => {
+      const top = best();
+      return { top, at: cells.lastIndexOf(top), dirs: [2, 3] as Dir[], idx: (n - 1) * n };
+    };
+    let lastKind = '';
+    const hint = (): Hint | null => {
+      if (over) return null;
+      const cn = corner();
+      const opts = ([0, 1, 2, 3] as Dir[])
+        .map((dir) => {
+          const res = slideBoard(cells, n, dir);
+          const empty = res.b.filter((v) => !v).length;
+          const keeps = res.b[cn.idx] >= cn.top;
+          return { dir, res, empty, keeps, pref: cn.dirs.includes(dir) };
+        })
+        .filter((o) => o.res.moved);
+      if (!opts.length) return null;
+      const rank = (o: (typeof opts)[number]) => (o.pref ? 1000 : 0) + (o.keeps ? 500 : 0) + o.res.gained * 20 + o.empty;
+      opts.sort((x, y) => rank(y) - rank(x));
+      const pick = opts[0];
+      const dir = pick.dir;
+      const t = track(dir);
+      const way = L(DIRS_EN[dir], DIRS_FR[dir]);
+      const cornerName = L(
+        `${cn.idx >= n ? 'bottom' : 'top'}-${cn.idx % n ? 'right' : 'left'}`,
+        `en ${cn.idx >= n ? 'bas' : 'haut'} à ${cn.idx % n ? 'droite' : 'gauche'}`,
+      );
+      const big = t.merges.reduce((m, x) => (!m || x.v > m.v ? x : m), null as (typeof t.merges)[number] | null);
+      const kinds: { kind: string; text: string; why: Element[]; at: Element[] }[] = [];
+      const mergeEls = { why: t.merges.flatMap((m) => [els[m.a], els[m.b]]), at: t.merges.map((m) => els[m.to]) };
+      if (spawns <= 2 && score === 0)
+        kinds.push({
+          kind: 'start',
+          text: big
+            ? L(
+                `Swipe and every tile slides as far as it can. Slide ${way}: the two ${big.v / 2}s meet and merge into a ${big.v}.`,
+                `Balayez et toutes les tuiles glissent le plus loin possible. Glissez ${way} : les deux ${big.v / 2} se rencontrent et fusionnent en un ${big.v}.`,
+              )
+            : L(
+                `Swipe and every tile slides as far as it can. Slide ${way} to gather the tiles in the ${cornerName} corner; a new 2 or 4 then appears.`,
+                `Balayez et toutes les tuiles glissent le plus loin possible. Glissez ${way} pour regrouper les tuiles dans le coin ${cornerName}; un nouveau 2 ou 4 apparaît ensuite.`,
+              ),
+          ...(big ? mergeEls : { why: [], at: t.moves.map((m) => els[m.to]) }),
+        });
+      if (big)
+        kinds.push({
+          kind: 'merge',
+          text: L(
+            `Equal tiles that meet merge into one worth double: sliding ${way} turns ${t.merges.length > 1 ? `${t.merges.length} pairs into bigger tiles, including two ${big.v / 2}s into a ${big.v}` : `these two ${big.v / 2}s into a ${big.v}`}.`,
+            `Deux tuiles égales qui se rencontrent fusionnent en une tuile double : glisser ${way} ${t.merges.length > 1 ? `fusionne ${t.merges.length} paires, dont deux ${big.v / 2} en un ${big.v}` : `change ces deux ${big.v / 2} en un ${big.v}`}.`,
+          ),
+          ...mergeEls,
+        });
+      if (cn.top >= 8 && pick.pref && pick.keeps) {
+        const other = L(DIRS_EN[cn.dirs.find((d2) => d2 !== dir)!], DIRS_FR[cn.dirs.find((d2) => d2 !== dir)!]);
+        kinds.push({
+          kind: 'corner',
+          text: L(
+            `Keep your biggest tile, the ${cn.top}, in the ${cornerName} corner: stick to sliding ${way} or ${other}, so it never gets pulled out.`,
+            `Gardez votre plus grosse tuile, le ${cn.top}, dans le coin ${cornerName} : glissez surtout ${way} ou ${other}, pour qu’elle n’en sorte jamais.`,
+          ),
+          why: [els[cn.at]],
+          at: [els[cn.idx]],
+        });
+      }
+      if (!pick.pref)
+        kinds.push({
+          kind: 'stuck',
+          text: L(
+            `Neither of your corner directions moves anything, so slide ${way}${pick.keeps ? `: the ${cn.top} stays put` : ''}. Next move, push back toward the corner.`,
+            `Aucune des deux directions vers votre coin ne bouge rien : glissez ${way}${pick.keeps ? `; le ${cn.top} ne bouge pas` : ''}. Au prochain coup, revenez vers le coin.`,
+          ),
+          why: [els[cn.at]],
+          at: t.moves.length ? t.moves.map((m) => els[m.to]) : mergeEls.at,
+        });
+      // No merge now, but the slide lines up equal tiles for the next move.
+      if (!big) {
+        const b2 = pick.res.b;
+        let pair: [number, number] | null = null;
+        for (let i = 0; i < n * n && !pair; i++)
+          for (const j of [i % n < n - 1 ? i + 1 : -1, i + n < n * n ? i + n : -1])
+            if (j >= 0 && b2[i] && b2[i] === b2[j] && !(cells[i] === b2[i] && cells[j] === b2[j])) {
+              pair = [i, j];
+              break;
+            }
+        if (pair)
+          kinds.push({
+            kind: 'setup',
+            text: L(
+              `Nothing merges yet, but sliding ${way} brings two ${b2[pair[0]]}s side by side, ready to merge on the next move.`,
+              `Rien ne fusionne encore, mais glisser ${way} place deux ${b2[pair[0]]} côte à côte, prêts à fusionner au prochain coup.`,
+            ),
+            why: t.moves.filter((m) => m.to === pair[0] || m.to === pair[1]).map((m) => els[m.from]),
+            at: pair.map((x) => els[x]),
+          });
+      }
+      kinds.push({
+        kind: 'space',
+        text: L(
+          `Each move adds a new 2 or 4, so free space matters: sliding ${way} leaves ${pick.empty} empty cell${pick.empty === 1 ? '' : 's'}${cn.top >= 8 ? ` and keeps the ${cn.top} in its corner` : ''}.`,
+          `Chaque coup ajoute un 2 ou un 4 : l’espace libre compte. Glisser ${way} laisse ${pick.empty} case${pick.empty > 1 ? 's' : ''} vide${pick.empty > 1 ? 's' : ''}${cn.top >= 8 ? ` et garde le ${cn.top} dans son coin` : ''}.`,
+        ),
+        ...(big ? mergeEls : { why: [], at: t.moves.filter((m) => m.from !== m.to).map((m) => els[m.to]) }),
+      });
+      const k = kinds.find((x) => x.kind !== lastKind) ?? kinds[0];
+      lastKind = k.kind;
+      return { text: k.text, why: k.why, at: k.at.length ? k.at : [els[cn.at]], play: () => move(dir) };
+    };
+
     return {
       snapshot: () => ({ cells, score, spawns }),
+      hint,
       onKey(e) {
         const k = keyDir(e);
         if (k == null) return false;

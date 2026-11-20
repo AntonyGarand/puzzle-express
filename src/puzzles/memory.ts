@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
 
 export const memory: PuzzleDef = {
@@ -97,10 +97,80 @@ export const memory: PuzzleDef = {
         }
       }
     };
+    /** Guide: skip the rest of the showing (as if the player had memorised it) and start tapping. */
+    const skipShow = () => {
+      if (phase !== 'wait' && phase !== 'show') return;
+      clearTimeout(timer);
+      reveal(false);
+      phase = 'play';
+      status();
+    };
+    const rc = (i: number) => [Math.floor(i / n) + 1, (i % n) + 1];
+    const touching = (a: number, b: number) => Math.abs(Math.floor(a / n) - Math.floor(b / n)) <= 1 && Math.abs((a % n) - (b % n)) <= 1;
+    /** Guide: watch the lit tiles, then tap them back, using the shape built so far. */
+    const hint = (): Hint | null => {
+      if (phase === 'over') return null;
+      const lit = [...targets].sort((a, b) => a - b);
+      if (phase !== 'play')
+        return {
+          text: L(
+            `Watch: ${k} tiles light up for a moment. Remember them as one shape rather than one by one.`,
+            `Regardez : ${k} cases s’allument un instant. Retenez-les comme une seule forme plutôt qu’une par une.`,
+          ),
+          at: lit.map((i) => cells[i]),
+          play: skipShow,
+        };
+      const left = lit.filter((i) => !found.has(i));
+      if (!left.length) return null;
+      const got = [...found].map((i) => cells[i]);
+      if (!found.size) {
+        const [r, c] = rc(left[0]);
+        return {
+          text: L(
+            `The tiles went dark. Tap one you’re sure of, like the one in row ${r}, column ${c}.`,
+            `Les cases se sont éteintes. Touchez-en une dont vous êtes sûr, comme celle de la rangée ${r}, colonne ${c}.`,
+          ),
+          at: [cells[left[0]]],
+          play: () => tap(left[0]),
+        };
+      }
+      if (left.length === 1)
+        return {
+          text: L(
+            'One tile left: it completes the shape you remembered. Tap it to finish.',
+            'Il en reste une : elle complète la forme mémorisée. Touchez-la pour terminer.',
+          ),
+          why: got,
+          at: [cells[left[0]]],
+          play: () => tap(left[0]),
+        };
+      const near = left.find((i) => [...found].some((f) => touching(f, i)));
+      if (near != null)
+        return {
+          text: L(
+            'Right next to the tile you found, another one was lit: follow the shape. A wrong tap would cost a life.',
+            'Juste à côté de la case trouvée, une autre était allumée : suivez la forme. Une erreur vous coûterait une vie.',
+          ),
+          why: got,
+          at: [cells[near]],
+          play: () => tap(near),
+        };
+      const [r] = rc(left[0]);
+      return {
+        text: L(
+          `Another lit tile was in row ${r}, apart from the others. Tap it.`,
+          `Une autre case allumée était dans la rangée ${r}, à l’écart des autres. Touchez-la.`,
+        ),
+        why: got,
+        at: [cells[left[0]]],
+        play: () => tap(left[0]),
+      };
+    };
     root.append(grid);
     status();
     return {
       activate: start,
+      hint,
       destroy: () => clearTimeout(timer),
     };
   },

@@ -1,6 +1,36 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, PALETTE, shake } from '../core/ui';
+
+/** Mastermind score of a guess: ● right colour and spot, ○ right colour elsewhere (repeats counted once each). */
+function scoreOf(code: number[], g: number[]) {
+  let exact = 0;
+  const rc: number[] = [],
+    rg: number[] = [];
+  g.forEach((c, k) => (c === code[k] ? exact++ : (rc.push(code[k]), rg.push(c))));
+  let near = 0;
+  for (const c of rg) {
+    const j = rc.indexOf(c);
+    if (j >= 0) {
+      near++;
+      rc.splice(j, 1);
+    }
+  }
+  return { exact, near };
+}
+
+/** Names of the PALETTE colours, for the guide. */
+const colourName = (c: number) =>
+  [
+    L('orange', 'orange'),
+    L('blue', 'bleu'),
+    L('green', 'vert'),
+    L('yellow', 'jaune'),
+    L('purple', 'violet'),
+    L('cyan', 'turquoise'),
+    L('pink', 'rose'),
+    L('lime', 'lime'),
+  ][c];
 
 export const codebreaker: PuzzleDef = {
   id: 'codebreaker',
@@ -109,18 +139,7 @@ export const codebreaker: PuzzleDef = {
         shake(board.children[guesses.length]);
         return;
       }
-      let exact = 0;
-      const rc: number[] = [],
-        rg: number[] = [];
-      cur.forEach((c, k) => (c === code[k] ? exact++ : (rc.push(code[k]), rg.push(c))));
-      let near = 0;
-      for (const c of rg) {
-        const j = rc.indexOf(c);
-        if (j >= 0) {
-          near++;
-          rc.splice(j, 1);
-        }
-      }
+      const { exact, near } = scoreOf(code, cur);
       guesses.push({ g: cur, exact, near });
       cur = [];
       render();
@@ -143,9 +162,80 @@ export const codebreaker: PuzzleDef = {
       guesses.push(...sv.guesses.slice(0, maxGuesses - 1));
       cur = sv.cur ?? [];
     }
+    // ---------- guide ----------
+    const hint = (): Hint | null => {
+      const last = guesses[guesses.length - 1];
+      if ((last && last.exact === len) || guesses.length >= maxGuesses) return null;
+      const fits = (s: number[]) =>
+        guesses.every((x) => {
+          const r = scoreOf(s, x.g);
+          return r.exact === x.exact && r.near === x.near;
+        });
+      const cands: number[][] = [];
+      const gen = (pre: number[]) => {
+        if (pre.length === len) {
+          if (fits(pre)) cands.push(pre);
+          return;
+        }
+        for (let c = 0; c < colors; c++) if (dupes || !pre.includes(c)) gen([...pre, c]);
+      };
+      gen([]);
+      if (!cands.length) return null;
+      const names = (g: number[]) => g.map(colourName).join(', ');
+      const swatches = (g: number[]) => [...new Set(g)].map((c) => palette.children[c]);
+      const guessOf = (g: number[]): Pick<Hint, 'at' | 'play'> => ({
+        at: swatches(g),
+        play: () => {
+          while (cur.length) back();
+          g.forEach(add);
+          submit();
+        },
+      });
+      if (!last) {
+        // Opening: pairs of colours when repeats are allowed, otherwise the first colours in order.
+        const g = Array.from({ length: len }, (_, k) => (dupes ? (k < len / 2 ? 0 : 1) : k));
+        return {
+          text: dupes
+            ? L(
+                `Colours can repeat here, so open with two colours, ${names([0, 1])}: one guess tests both. ● means right colour, right spot; ○ right colour, wrong spot.`,
+                `Les couleurs peuvent se répéter : ouvrez avec deux couleurs (${names([0, 1])}), un seul essai les teste toutes les deux. ● : bonne couleur bien placée; ○ : bonne couleur mal placée.`,
+              )
+            : L(
+                `Start with any ${len} colours, like ${names(g)}. ● means right colour, right spot; ○ right colour, wrong spot.`,
+                `Commencez par ${len} couleurs au choix, comme ${names(g)}. ● : bonne couleur bien placée; ○ : bonne couleur mal placée.`,
+              ),
+          ...guessOf(g),
+        };
+      }
+      const g = cands.find((c) => c.join() !== code.join() || cands.length === 1) ?? cands[0];
+      const tot = last.exact + last.near;
+      const tried = names(last.g);
+      const first =
+        tot === 0
+          ? L(`No pegs: ${tried} are all out of the code.`, `Aucun indice : ${tried}, rien de tout ça n’est dans le code.`)
+          : tot === len
+            ? L(
+                `${tot} pegs: every colour is right, only the order is off.`,
+                `${tot} indices : toutes les couleurs sont bonnes, seul l’ordre cloche.`,
+              )
+            : L(
+                `${last.exact} ● and ${last.near} ○: ${tot} of those colours ${tot === 1 ? 'is' : 'are'} in the code, ${last.exact ? `${last.exact} already in place` : 'but none in place yet'}.`,
+                `${last.exact} ● et ${last.near} ○ : ${tot} de ces couleurs ${tot > 1 ? 'sont' : 'est'} dans le code, ${last.exact ? `dont ${last.exact} déjà bien placée${last.exact > 1 ? 's' : ''}` : 'mais aucune n’est encore bien placée'}.`,
+              );
+      const second =
+        cands.length === 1
+          ? L(`Only ${names(g)} fits every row.`, `Seul le code ${names(g)} respecte toutes les rangées.`)
+          : L(
+              `${cands.length} codes still fit every row, such as ${names(g)}.`,
+              `${cands.length} codes respectent encore toutes les rangées, comme ${names(g)}.`,
+            );
+      return { text: `${first} ${second}`, why: [board.children[guesses.length - 1]], ...guessOf(g) };
+    };
+
     root.append(board, palette);
     render();
     return {
+      hint,
       snapshot: () => ({ guesses, cur }),
       onKey(e) {
         const n = Number(e.key);

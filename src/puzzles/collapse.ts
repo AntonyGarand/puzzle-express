@@ -1,5 +1,5 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, PALETTE, shake } from '../core/ui';
 import { anim } from './movekit/kit';
 import { genCollapse, groupAt, hasMove, removeCells, type Cols } from './playkit/collapse-gen';
@@ -7,6 +7,9 @@ import './collapse.css';
 
 /** Palette slots used for the blocks (well apart from each other in both themes). */
 const TONES = [0, 1, 2, 4, 6];
+/** Colour names for the guide, matching TONES (French: masculine plural, for « blocs »). */
+const NAMES_EN = ['orange', 'blue', 'green', 'purple', 'pink'];
+const NAMES_FR = ['orange', 'bleus', 'verts', 'violets', 'roses'];
 
 export const collapse: PuzzleDef = {
   id: 'collapse',
@@ -58,7 +61,8 @@ export const collapse: PuzzleDef = {
     const H = W;
     const k = byLevel(d, [3, 3, 4, 4, 5]);
     const target = byLevel(d, [6, 2, 0, 0, 0]);
-    const start: Cols = genCollapse(rng, W, H, k).cols;
+    const gen = genCollapse(rng, W, H, k);
+    const start: Cols = gen.cols;
     // Block identities, so moves can animate each block from where it was.
     let nextId = 0;
     const startIds = start.map((col) => col.map(() => nextId++));
@@ -193,10 +197,138 @@ export const collapse: PuzzleDef = {
     reset();
     const sv = ctx.saved as { moves?: unknown } | undefined;
     if (Array.isArray(sv?.moves)) for (const m of sv.moves) if (!Number.isInteger(m) || !apply(m as number)) break;
+    // ---- Guide ----
+    const disp = ([x, y]: [number, number]) => (H - 1 - y) * W + x;
+    /** Group label per block id, and each label's size and colour. */
+    const label = (cs: Cols, is: number[][]) => {
+      const of = new Map<number, number>();
+      const size: number[] = [];
+      cs.forEach((col, x) =>
+        col.forEach((_, y) => {
+          if (of.has(is[x][y])) return;
+          const g = groupAt(cs, x, y);
+          for (const [a, b] of g) of.set(is[a][b], size.length);
+          size.push(g.length);
+        }),
+      );
+      return { of, size };
+    };
+    /** Display cell of a block id in the current board. */
+    const cellOf = (id: number) => {
+      for (let x = 0; x < ids.length; x++) {
+        const y = ids[x].indexOf(id);
+        if (y >= 0) return cells[disp([x, y])];
+      }
+      return null;
+    };
+    let lastKind = '';
+    const hint = (): Hint | null => {
+      if (over) return null;
+      const onPlan = moves.every((m, t) => gen.solution[t] && disp(gen.solution[t]) === m);
+      let pick: [number, number] | undefined = onPlan ? gen.solution[moves.length] : undefined;
+      if (!pick || groupAt(cols, pick[0], pick[1]).length < 2) {
+        // Off the plan: take the biggest group.
+        let best = 1;
+        pick = undefined;
+        cols.forEach((col, x) =>
+          col.forEach((_, y) => {
+            const s = groupAt(cols, x, y).length;
+            if (s > best) [best, pick] = [s, [x, y]];
+          }),
+        );
+      }
+      if (!pick) return null;
+      const grp = groupAt(cols, pick[0], pick[1]);
+      const c = cols[pick[0]][pick[1]];
+      const sz = grp.length;
+      const en = NAMES_EN[c],
+        fr = NAMES_FR[c];
+      const gone = new Set(grp.map(([a, b]) => `${a},${b}`));
+      const nextCols = removeCells(cols, grp);
+      const nextIds = ids.map((col, a) => col.filter((_, b) => !gone.has(`${a},${b}`))).filter((col) => col.length);
+      const before = label(cols, ids),
+        after = label(nextCols, nextIds);
+      // Groups that join after the fall: one new group fed by two or more old ones.
+      const feeders = new Map<number, Set<number>>();
+      for (const col of nextIds)
+        for (const id of col) {
+          const nl = after.of.get(id)!;
+          if (!feeders.has(nl)) feeders.set(nl, new Set());
+          feeders.get(nl)!.add(before.of.get(id)!);
+        }
+      const joined = [...feeders.entries()].filter(([, olds]) => olds.size > 1);
+      const joinIds = joined.length ? nextIds.flat().filter((id) => after.of.get(id) === joined[0][0]) : [];
+      const lone = joined.length ? [...joined[0][1]].some((o) => before.size[o] === 1) : false;
+      const joinSize = joined.length ? after.size[joined[0][0]] : 0;
+      const jc = joinIds.length ? nextCols.flat()[nextIds.flat().indexOf(joinIds[0])] : 0;
+      const wholeCol = cols.some((col, x) => col.every((_, y) => gone.has(`${x},${y}`)) && x < cols.length - 1);
+      const pts = (sz - 2) ** 2;
+      const ring = grp.map((p) => cells[disp(p)]);
+      const tap = disp(pick);
+      const kinds: { kind: string; text: string; why?: Element[] }[] = [];
+      if (!moves.length)
+        kinds.push({
+          kind: 'start',
+          text: L(
+            `Tap any block that touches one of its colour: this group of ${sz} ${en} blocks disappears, and the blocks above fall into the gap.`,
+            `Touchez un bloc qui touche un bloc de sa couleur : ce groupe de ${sz} blocs ${fr} disparaît, et les blocs au-dessus tombent dans le trou.`,
+          ),
+        });
+      if (joined.length) {
+        const why = joinIds.map(cellOf).filter((e) => e != null) as Element[];
+        kinds.push(
+          lone
+            ? {
+                kind: 'lone',
+                text: L(
+                  `A lone block can never be removed by itself. Clear these ${sz} ${en} blocks and a lone ${NAMES_EN[jc]} block lands next to its colour: a group of ${joinSize}.`,
+                  `Un bloc isolé ne peut jamais partir seul. Retirez ces ${sz} blocs ${fr} et un bloc ${NAMES_FR[jc].replace(/s$/, '')} isolé rejoint sa couleur : un groupe de ${joinSize}.`,
+                ),
+                why,
+              }
+            : {
+                kind: 'join',
+                text: L(
+                  `Clear these ${sz} ${en} blocks first: the blocks above them drop, and the outlined ${NAMES_EN[jc]} blocks join up into one group of ${joinSize}.`,
+                  `Retirez d’abord ces ${sz} blocs ${fr} : les blocs au-dessus descendent, et les blocs ${NAMES_FR[jc]} encadrés se rejoignent en un seul groupe de ${joinSize}.`,
+                ),
+                why,
+              },
+        );
+      }
+      if (wholeCol)
+        kinds.push({
+          kind: 'col',
+          text: L(
+            `This ${en} group fills a whole column. Clear it and the columns to its right slide left to close the gap.`,
+            `Ce groupe ${fr.replace(/s$/, '')} remplit toute une colonne. Retirez-le et les colonnes à sa droite glissent vers la gauche.`,
+          ),
+        });
+      if (sz >= 4)
+        kinds.push({
+          kind: 'big',
+          text: L(
+            `Big groups pay off: these ${sz} ${en} blocks score (${sz} − 2)² = ${pts} points.`,
+            `Les gros groupes rapportent : ces ${sz} blocs ${fr} valent (${sz} − 2)² = ${pts} points.`,
+          ),
+        });
+      kinds.push({
+        kind: 'plain',
+        text: L(
+          `Clear these ${sz} ${en} blocks: every block removed brings you closer to the goal${target ? ` of ${target} or fewer` : ''}, and the blocks above fall into new spots.`,
+          `Retirez ces ${sz} blocs ${fr} : chaque bloc retiré vous rapproche de l’objectif${target ? ` (${target} ou moins)` : ''}, et les blocs au-dessus tombent à de nouvelles places.`,
+        ),
+      });
+      const say = kinds.find((x) => x.kind !== lastKind) ?? kinds[0];
+      lastKind = say.kind;
+      return { text: say.text, why: say.why, at: ring, play: () => tapCell(tap) };
+    };
+
     root.append(grid, goalEl);
     render();
     return {
       snapshot: () => ({ moves }),
+      hint,
       onKey(e) {
         if (e.key !== 'z' && e.key !== 'Z' && e.key !== 'Backspace') return false;
         undo();

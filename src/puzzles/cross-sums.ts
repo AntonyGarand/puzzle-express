@@ -4,6 +4,7 @@ import { L } from '../core/i18n';
 import { byLevel, type PuzzleDef } from '../core/types';
 import { h } from '../core/ui';
 import { entryGame, entryHelpSteps } from './sudokukit/entry';
+import { entryPlace, entryVals, makeHint } from './sudokukit/hint';
 import { revealUntilUnique, solve, type Problem, type Unit } from './sudokukit/solver';
 
 interface Run {
@@ -127,7 +128,7 @@ export const crossSums: PuzzleDef = {
     const blackFrac = byLevel(d, [0.1, 0.16, 0.2, 0.22, 0.24]);
 
     // Several layouts/fills; keep the one that needs the fewest revealed digits.
-    let best: { white: boolean[]; units: Unit[]; puzzle: number[]; runs: Run[] } | null = null;
+    let best: { white: boolean[]; units: Unit[]; puzzle: number[]; runs: Run[]; sol: number[] } | null = null;
     for (let attempt = 0, built = 0; attempt < 30 && built < byLevel(d, [4, 4, 5, 5, 6]); attempt++) {
       const w = layout(n, maxRun, blackFrac, rng);
       if (!w) continue;
@@ -140,7 +141,7 @@ export const crossSums: PuzzleDef = {
       const puzzle = w.map((x) => (x ? 0 : -1));
       revealUntilUnique({ size: n * n, maxDigit: 9, units }, puzzle, sol, 20000, rng);
       const count = (p: number[]) => p.filter((v) => v > 0).length;
-      if (!best || count(puzzle) < count(best.puzzle)) best = { white: w, units, puzzle, runs };
+      if (!best || count(puzzle) < count(best.puzzle)) best = { white: w, units, puzzle, runs, sol };
     }
     if (!best) {
       // Fallback: open grid with a cyclic fill (always valid, runs of n-1 <= 8 cells); reveal until unique.
@@ -150,15 +151,16 @@ export const crossSums: PuzzleDef = {
       const units: Unit[] = runs.map((run) => ({ cells: run.cells, sum: run.cells.reduce((s, c) => s + sol[c], 0) }));
       const puzzle = white.map((w) => (w ? 0 : -1));
       revealUntilUnique({ size: n * n, maxDigit: 9, units }, puzzle, sol, 20000, rng);
-      best = { white, units, puzzle, runs };
+      best = { white, units, puzzle, runs, sol };
     }
-    const { units, puzzle, runs } = best;
+    const { units, puzzle, runs, sol } = best;
     const problem: Problem = { size: n * n, maxDigit: 9, units };
 
     const across = new Map<number, number>(),
       down = new Map<number, number>();
     runs.forEach((run, k) => (run.across ? across : down).set(run.clue, units[k].sum!));
-    return entryGame({
+    const cellEls: Element[] = [];
+    const inst = entryGame({
       ctx,
       cols: n,
       rows: n,
@@ -167,10 +169,22 @@ export const crossSums: PuzzleDef = {
       boardClass: 'slab kakuro',
       cellClass: (i) => (puzzle[i] < 0 && (across.has(i) || down.has(i)) ? 'split' : ''),
       decorate(el, i) {
+        cellEls[i] = el;
         if (puzzle[i] >= 0) return;
         if (across.has(i)) el.append(h('span', { class: 'ac' }, across.get(i)));
         if (down.has(i)) el.append(h('span', { class: 'dn' }, down.get(i)));
       },
     });
+    inst.hint = makeHint({
+      n: 9,
+      givens: puzzle,
+      sol,
+      cells: cellEls,
+      units: runs.map((run, k) => ({ kind: 'run', across: run.across, cells: run.cells, sum: units[k].sum, clue: [cellEls[run.clue]] })),
+      vals: entryVals(inst),
+      place: entryPlace(inst, cellEls),
+      scope: ['its two runs', 'ses deux segments'],
+    });
+    return inst;
   },
 };

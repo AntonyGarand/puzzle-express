@@ -1,0 +1,11 @@
+.maze-wrap:has(> .maze-marks) {
+  position: relative;
+}
+.maze-marks {
+  position: absolute;
+  inset: 3px;
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  grid-template-rows: repeat(var(--n), 1fr);
+  pointer-events: none;
+}

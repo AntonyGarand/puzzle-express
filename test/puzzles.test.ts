@@ -42,6 +42,23 @@ describe.each(PUZZLES.map((p) => [p.id, p] as const))('%s', (_id, def) => {
       inst.destroy?.();
     }
   });
+
+  it('explains at least one move in the guide, without mistakes', () => {
+    // Same board as the "?" walkthrough: Easy, fixed seed.
+    const { c, root, events } = ctx(1, 0x5eed);
+    const inst = def.create(c) || {};
+    expect(inst.hint, 'instance.hint() is missing').toBeTypeOf('function');
+    let steps = 0;
+    for (let hint = inst.hint!(); hint && steps < 6; hint = inst.hint!(), steps++) {
+      expect(hint.text.length).toBeGreaterThan(10);
+      expect(hint.at.length).toBeGreaterThan(0);
+      for (const el of [...hint.at, ...(hint.why ?? [])]) expect(root.contains(el)).toBe(true);
+      hint.play();
+    }
+    expect(steps).toBeGreaterThan(0);
+    expect(events.filter((e) => e !== 'solved')).toEqual([]);
+    inst.destroy?.();
+  });
 });
 
 describe('words', () => {

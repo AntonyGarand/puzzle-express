@@ -1,5 +1,5 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { h, s } from '../core/ui';
 import { capture } from './pathkit/grid';
 import { genLoop, isSingleLoop } from './gridkit/slither';
@@ -58,7 +58,7 @@ export const loop: PuzzleDef = {
   create(ctx) {
     const { root, rng, difficulty: d } = ctx;
     const n = byLevel(d, [5, 6, 7, 8, 10]);
-    const { g, clue } = genLoop(n, n, byLevel(d, [0.6, 0.45, 0.3, 0.15, 0]), rng);
+    const { g, clue, sol } = genLoop(n, n, byLevel(d, [0.6, 0.45, 0.3, 0.15, 0]), rng);
     const { E, ea, eb, ve, ce } = g;
     const W = n + 1; // vertices per row
     const vx = (v: number) => v % W,
@@ -213,6 +213,242 @@ export const loop: PuzzleDef = {
     if (Array.isArray(sv?.st) && sv.st.length === E) sv.st.forEach((v, e) => (st[e] = v === 1 || v === 2 ? v : 0));
     root.append(wrap);
     render();
-    return { snapshot: () => ({ st }) };
+    // Guide: numbers first (0, two 3s, corners, full or settled counts), then what each dot allows.
+    let lastKind = '';
+    const hint = (): Hint | null => {
+      if (done) return null;
+      const set = (es: number[], v: number) => () => {
+        es.forEach((e) => (st[e] = v));
+        after();
+        if (!done) render();
+      };
+      const eEls = (es: number[]) => es.map((e) => edgeEls[e]);
+      const cands: { kind: string; hint: Hint }[] = [];
+      const add = (kind: string, text: string, why: Element[], es: number[], v: number) =>
+        cands.push({ kind, hint: { text, why, at: eEls(es), play: set(es, v) } });
+      const free = (es: number[]) => es.filter((e) => st[e] === 0);
+      clue.forEach((k, c) => {
+        if (k < 0) return;
+        const open = free(ce[c]);
+        if (!open.length) return;
+        const lines = ce[c].filter((e) => st[e] === 1).length;
+        const el = numEls[c]!;
+        if (k === 0)
+          add(
+            'zero',
+            L(
+              'A 0 has no line around it. Tap each side twice to cross it out with ✕.',
+              'Un 0 n’a aucune ligne autour. Touchez chaque côté deux fois pour le barrer d’un ✕.',
+            ),
+            [el],
+            open,
+            2,
+          );
+        else if (lines === k)
+          add(
+            'sat',
+            L(
+              `This ${k} already has its ${k} line${k > 1 ? 's' : ''}, so its other sides get ✕.`,
+              `Ce ${k} a déjà ${k > 1 ? `ses ${k} lignes` : 'sa ligne'} : ses autres côtés reçoivent un ✕.`,
+            ),
+            [el],
+            open,
+            2,
+          );
+        else if (lines + open.length === k)
+          add(
+            'fill',
+            L(
+              `This ${k} has exactly ${k} sides that aren’t crossed out, so the loop uses all of them.`,
+              `Ce ${k} a exactement ${k} côtés non barrés : la boucle les utilise tous.`,
+            ),
+            [el],
+            open,
+            1,
+          );
+        // A 3 or 1 in a board corner: the corner dot has just two sides, used together or not at all.
+        const r = Math.floor(c / n),
+          col = c % n;
+        if ((r === 0 || r === n - 1) && (col === 0 || col === n - 1) && (k === 3 || k === 1)) {
+          const outer = [r === 0 ? ce[c][0] : ce[c][2], col === 0 ? ce[c][3] : ce[c][1]];
+          const fo = free(outer);
+          if (fo.length === 2)
+            add(
+              'corner',
+              k === 3
+                ? L(
+                    'The loop can’t turn back at a corner dot, so its two sides go together. This 3 must use at least one, so it uses both.',
+                    'La boucle ne peut pas rebrousser chemin à un point de coin : ses deux côtés vont ensemble. Ce 3 en utilise au moins un, donc les deux.',
+                  )
+                : L(
+                    'The loop can’t turn back at a corner dot, so its two sides go together. This 1 can’t use both, so it uses neither.',
+                    'La boucle ne peut pas rebrousser chemin à un point de coin : ses deux côtés vont ensemble. Ce 1 ne peut pas utiliser les deux, donc aucun.',
+                  ),
+              [el],
+              fo,
+              k === 3 ? 1 : 2,
+            );
+        }
+        // Two 3s side by side share the line between them and use both far sides.
+        if (k === 3)
+          for (const [step, mid, a, b] of [
+            [1, 1, 3, 1],
+            [n, 2, 0, 2],
+          ] as const) {
+            const c2 = c + step;
+            if (c2 >= n * n || (step === 1 && col === n - 1) || clue[c2] !== 3) continue;
+            const es = free([ce[c][mid], ce[c][a], ce[c2][b]]);
+            if (es.length)
+              add(
+                'pair3',
+                L(
+                  'Two 3s side by side: the loop always uses the line between them and both their far sides.',
+                  'Deux 3 côte à côte : la boucle passe toujours entre eux et sur leurs deux côtés extérieurs.',
+                ),
+                [el, numEls[c2]!],
+                es,
+                1,
+              );
+          }
+      });
+      ve.forEach((es, v) => {
+        const open = free(es);
+        if (!open.length) return;
+        const lines = es.filter((e) => st[e] === 1).length;
+        const dot = dotEls[v];
+        if (lines === 2)
+          add(
+            'dot2',
+            L(
+              'This dot already has two lines. The loop never branches, so its other sides get ✕.',
+              'Ce point a déjà deux lignes. La boucle ne se divise jamais : ses autres côtés reçoivent un ✕.',
+            ),
+            [dot],
+            open,
+            2,
+          );
+        else if (lines === 1 && open.length === 1)
+          add(
+            'dot1',
+            L(
+              'The line reaching this dot has to keep going, and only one way is still open.',
+              'La ligne qui arrive à ce point doit continuer, et un seul chemin est encore libre.',
+            ),
+            [dot],
+            open,
+            1,
+          );
+        else if (lines === 0 && open.length === 1)
+          add(
+            'dot0',
+            L(
+              'A line here would hit a dead end at this dot, since every other way is crossed out: ✕ it.',
+              'Une ligne ici finirait en cul-de-sac à ce point, car les autres chemins sont barrés : mettez un ✕.',
+            ),
+            [dot],
+            open,
+            2,
+          );
+      });
+      // Dead ends are dull one by one: cross them all out together.
+      const dead = cands.filter((c) => c.kind === 'dot0');
+      if (dead.length > 1) {
+        const es = [...new Set(dead.flatMap((c) => c.hint.at.map((el) => edgeEls.indexOf(el as SVGGElement))))];
+        cands.splice(cands.indexOf(dead[0]), 1, {
+          kind: 'dot0',
+          hint: {
+            text: L(
+              'A line on any of these sides would end at a dot whose other ways are all crossed out. The loop can’t dead-end, so ✕ them.',
+              'Une ligne sur l’un de ces côtés finirait à un point dont les autres chemins sont barrés. La boucle n’a pas de cul-de-sac : mettez des ✕.',
+            ),
+            why: dead.flatMap((c) => c.hint.why ?? []),
+            at: eEls(es),
+            play: set(es, 2),
+          },
+        });
+        for (const c of dead.slice(1)) cands.splice(cands.indexOf(c), 1);
+      }
+      const order = ['zero', 'pair3', 'corner', 'sat', 'fill', 'dot1', 'dot2', 'dot0'];
+      cands.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+      const pick = cands.find((c) => c.kind !== lastKind) ?? cands[0];
+      if (pick) {
+        lastKind = pick.kind;
+        return pick.hint;
+      }
+      // One step deeper: assume the wrong choice for a side and follow the simple rules until something breaks.
+      const stuck = (t: number[]): { bad: Element; steps: number } | null => {
+        let steps = 0;
+        for (let changed = true; changed;) {
+          changed = false;
+          for (let c = 0; c < clue.length; c++) {
+            const k = clue[c];
+            if (k < 0) continue;
+            const lines = ce[c].filter((e) => t[e] === 1).length;
+            const open = ce[c].filter((e) => t[e] === 0);
+            if (lines > k || lines + open.length < k) return { bad: numEls[c]!, steps };
+            if (open.length && (lines === k || lines + open.length === k)) {
+              open.forEach((e) => (t[e] = lines === k ? 2 : 1));
+              steps += open.length;
+              changed = true;
+            }
+          }
+          for (let v = 0; v < ve.length; v++) {
+            const lines = ve[v].filter((e) => t[e] === 1).length;
+            const open = ve[v].filter((e) => t[e] === 0);
+            if (lines > 2 || (lines === 1 && !open.length)) return { bad: dotEls[v], steps };
+            if (open.length && (lines === 2 || open.length === 1)) {
+              open.forEach((e) => (t[e] = lines === 1 ? 1 : 2));
+              steps += open.length;
+              changed = true;
+            }
+          }
+        }
+        return null;
+      };
+      const touching = (e: number) => [ea[e], eb[e]].some((v) => ve[v].some((f) => st[f] === 1));
+      const tries = st.map((v, e) => (v === 0 ? e : -1)).filter((e) => e >= 0);
+      let best: { e: number; bad: Element; cost: number } | null = null;
+      for (const e of tries) {
+        const t = st.slice();
+        t[e] = sol[e] ? 2 : 1;
+        const r = stuck(t);
+        const cost = r ? r.steps * 2 + (touching(e) ? 0 : 1) : Infinity;
+        if (r && (!best || cost < best.cost)) best = { e, bad: r.bad, cost };
+      }
+      if (best) {
+        const { e, bad } = best;
+        lastKind = 'trial';
+        return {
+          text: sol[e]
+            ? L(
+                'Suppose this side had a ✕: following the simple rules from there, the outlined spot soon breaks. So it’s a line.',
+                'Supposez un ✕ sur ce côté : en suivant les règles simples, l’endroit encadré finit par coincer. C’est donc une ligne.',
+              )
+            : L(
+                'Suppose a line went here: following the simple rules from there, the outlined spot soon breaks. So it gets a ✕.',
+                'Supposez une ligne ici : en suivant les règles simples, l’endroit encadré finit par coincer. Ce côté reçoit donc un ✕.',
+              ),
+          why: [bad],
+          at: eEls([e]),
+          play: set([e], sol[e] ? 1 : 2),
+        };
+      }
+      lastKind = '';
+      // Nothing simple: extend the intended loop from a dot that already has a line.
+      const next = sol.findIndex((on, e) => on && st[e] === 0 && [ea[e], eb[e]].some((v) => ve[v].some((f) => st[f] === 1)));
+      const e = next >= 0 ? next : sol.findIndex((on, f) => on && st[f] === 0);
+      if (e < 0) return null;
+      const dots = [ea[e], eb[e]].filter((v) => ve[v].some((f) => st[f] === 1));
+      return {
+        text: L(
+          'No single rule decides here. Try both ways: only this line lets the loop close as one piece and keep every number right.',
+          'Aucune règle ne décide seule ici. Essayez les deux : seule cette ligne permet de fermer une seule boucle et de respecter les nombres.',
+        ),
+        why: dots.map((v) => dotEls[v]),
+        at: eEls([e]),
+        play: set([e], 1),
+      };
+    };
+    return { snapshot: () => ({ st }), hint };
   },
 };

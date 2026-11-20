@@ -1,8 +1,37 @@
 import './chess.css';
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h, shake } from '../core/ui';
 import { apply, bestDefence, forcesMate2, from, generate, isMate, legal, sqName, to, type Board } from './chesskit/chess';
+
+const NAME = () => [
+  '',
+  L('pawn', 'pion'),
+  L('knight', 'cavalier'),
+  L('bishop', 'fou'),
+  L('rook', 'tour'),
+  L('queen', 'dame'),
+  L('king', 'roi'),
+];
+/** Is `sq` attacked by the white piece on `f` (sliders look through empty squares only)? */
+function covers(b: Board, f: number, sq: number): boolean {
+  const p = b[f];
+  const dr = (sq >> 3) - (f >> 3),
+    dc = (sq & 7) - (f & 7);
+  const ar = Math.abs(dr),
+    ac = Math.abs(dc);
+  if (!ar && !ac) return false;
+  if (p === 1) return dr === -1 && ac === 1;
+  if (p === 2) return (ar === 1 && ac === 2) || (ar === 2 && ac === 1);
+  if (p === 6) return Math.max(ar, ac) === 1;
+  const orth = !ar || !ac,
+    diag = ar === ac;
+  if (!((p === 4 && orth) || (p === 3 && diag) || (p === 5 && (orth || diag)))) return false;
+  const sr = Math.sign(dr),
+    sc = Math.sign(dc);
+  for (let k = 1; k < Math.max(ar, ac); k++) if (b[f + (sr * 8 + sc) * k]) return false;
+  return true;
+}
 
 const GLYPH = ['', '♟', '♞', '♝', '♜', '♛', '♚'].map((g) => (g ? g + '\uFE0E' : ''));
 
@@ -175,6 +204,95 @@ export const chess: PuzzleDef = {
       ctx.solved();
     };
 
+    /** Guide: pick up the right piece, then play the move and show why the king has no way out. */
+    const hint = (): Hint | null => {
+      if (over) return null;
+      const target =
+        left() === 2 ? (moves.length === 0 ? puzzle.key : null) : (legal(cur, true).find((m) => isMate(apply(cur, m), false)) ?? null);
+      if (target == null) return null;
+      const f = from(target),
+        t = to(target);
+      const kSq = cur.indexOf(-6);
+      const name = (sq: number, b: Board = cur) => NAME()[Math.abs(b[sq])];
+      const fem = (sq: number) => (cur[sq] === 4 || cur[sq] === 5 ? 'la' : 'le');
+      if (sel !== f) {
+        return {
+          text:
+            left() === 2
+              ? L(
+                  `Mate in 2: first find a move after which every Black reply still allows a mate. It starts with your ${name(f)} on ${sqName(f)}: tap it to see where it can go.`,
+                  `Mat en 2 : trouvez d’abord un coup après lequel chaque réponse des noirs permet encore un mat. Il commence par votre ${name(f)} en ${sqName(f)} : touchez-${fem(f)} pour voir ses cases.`,
+                )
+              : L(
+                  `To mate, the king on ${sqName(kSq)} must be in check with no square to flee to. Your ${name(f)} on ${sqName(f)} can do it: tap it to see its moves.`,
+                  `Pour faire mat, le roi en ${sqName(kSq)} doit être en échec sans case où fuir. Votre ${name(f)} en ${sqName(f)} peut le faire : touchez-${fem(f)} pour voir ses cases.`,
+                ),
+          why: [cells[kSq]],
+          at: [cells[f]],
+          play: () => tap(f),
+        };
+      }
+      const nb = apply(cur, target);
+      if (left() === 2) {
+        return {
+          text: L(
+            `${name(t, nb)[0].toUpperCase() + name(t, nb).slice(1)} to ${sqName(t)}: a quiet move that takes away the king’s squares. Whatever Black replies, a mate follows.`,
+            `${name(t, nb)[0].toUpperCase() + name(t, nb).slice(1)} en ${sqName(t)} : un coup tranquille qui enlève ses cases au roi. Peu importe la réponse des noirs, le mat suit.`,
+          ),
+          why: [cells[kSq]],
+          at: [cells[t]],
+          play: () => tap(t),
+        };
+      }
+      // Why it's mate: each square around the king is either Black's own piece or covered by White.
+      const bk = nb.indexOf(-6);
+      const open = nb.slice();
+      open[bk] = 0; // the king can't hide behind itself along a line of attack
+      const own: number[] = [];
+      const by = new Map<number, number[]>();
+      for (let dr = -1; dr <= 1; dr++)
+        for (let dc = -1; dc <= 1; dc++) {
+          const r = (bk >> 3) + dr,
+            c = (bk & 7) + dc;
+          if ((!dr && !dc) || r < 0 || r > 7 || c < 0 || c > 7) continue;
+          const sq = r * 8 + c;
+          if (nb[sq] < 0) {
+            own.push(sq);
+            continue;
+          }
+          const w = [...Array(64).keys()].find((x) => nb[x] > 0 && x !== sq && covers(open, x, sq));
+          if (w != null) by.set(w, [...(by.get(w) ?? []), sq]);
+        }
+      const list = (sqs: number[]) =>
+        sqs.length < 2 ? sqName(sqs[0]) : `${sqs.slice(0, -1).map(sqName).join(', ')} ${L('and', 'et')} ${sqName(sqs[sqs.length - 1])}`;
+      const piece = name(t, nb);
+      const guard = [...by].find(([, sqs]) => sqs.includes(t))?.[0];
+      const fe = nb[t] === 4 || nb[t] === 5 ? 'e' : '';
+      const fes = (sqs: number[]) => (sqs.length > 1 ? 's' : '');
+      const parts = [
+        ...(own.length ? [L(`${list(own)} blocked by Black’s own pieces`, `${list(own)} occupée${fes(own)} par ses propres pièces`)] : []),
+        ...[...by]
+          .map(([w, sqs]) => [w, sqs.filter((x) => x !== t)] as const)
+          .filter(([, sqs]) => sqs.length)
+          .map(([w, sqs]) =>
+            L(`${list(sqs)} covered by your ${name(w, nb)}`, `${list(sqs)} contrôlée${fes(sqs)} par votre ${name(w, nb)}`),
+          ),
+        ...(guard != null
+          ? [L(`your ${piece} guarded by your ${name(guard, nb)}`, `votre ${piece} protégé${fe} par votre ${name(guard, nb)}`)]
+          : []),
+      ];
+      const cap = cur[t] < 0;
+      return {
+        text: L(
+          `Play the ${piece} to ${sqName(t)}${cap ? ', taking' : ''}: it’s check, and the king has no way out (${parts.join('; ')}). Checkmate!`,
+          `Jouez ${fe ? 'la' : 'le'} ${piece} en ${sqName(t)}${cap ? ' en prenant' : ''} : c’est échec, et le roi n’a aucune issue (${parts.join('; ')}). Échec et mat!`,
+        ),
+        why: [cells[bk], ...[...by.keys()].filter((w) => w !== t).map((w) => cells[w])],
+        at: [cells[t]],
+        play: () => tap(t),
+      };
+    };
+
     root.append(grid);
     render();
     if (moves.length) {
@@ -184,6 +302,7 @@ export const chess: PuzzleDef = {
 
     return {
       snapshot: () => ({ moves, sel }),
+      hint,
       onKey(e) {
         if (e.key === 'Escape' && sel >= 0) {
           sel = -1;
