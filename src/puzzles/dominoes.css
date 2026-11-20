@@ -1,0 +1,95 @@
+[data-puzzle='dominoes'] {
+  --accent: var(--p1);
+}
+[data-puzzle='dominoes'] .do-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+[data-puzzle='dominoes'] .do-grid {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+[data-puzzle='dominoes'] .do-grid .cell {
+  z-index: 1;
+  cursor: pointer;
+  border-style: dashed;
+  box-shadow: none;
+  background: var(--cell);
+}
+[data-puzzle='dominoes'] .do-grid .cell.in {
+  background: transparent;
+  border-color: transparent;
+  color: var(--on-tone);
+}
+[data-puzzle='dominoes'] .do-grid .cell.sel {
+  border-style: solid;
+  background: var(--accent-soft);
+}
+[data-puzzle='dominoes'] .do-tile {
+  position: relative;
+  background: var(--accent);
+  border: var(--cbw) solid var(--ink);
+  border-radius: var(--r-cell);
+  box-shadow: var(--csh) var(--csh) 0 var(--ink);
+  pointer-events: none;
+}
+[data-puzzle='dominoes'] .do-tile.err {
+  background: var(--bad);
+}
+/* the dividing line of a domino */
+[data-puzzle='dominoes'] .do-tile::after {
+  content: '';
+  position: absolute;
+  background: var(--ink);
+  opacity: 0.55;
+}
+[data-puzzle='dominoes'] .do-tile.h::after {
+  left: calc(50% - 1px);
+  top: 20%;
+  bottom: 20%;
+  width: 2px;
+}
+[data-puzzle='dominoes'] .do-tile.v::after {
+  top: calc(50% - 1px);
+  left: 20%;
+  right: 20%;
+  height: 2px;
+}
+[data-puzzle='dominoes'] .do-set {
+  width: var(--board);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+}
+[data-puzzle='dominoes'] .do-chip {
+  display: inline-flex;
+  border: 2px solid var(--ink);
+  border-radius: 5px;
+  background: var(--cell);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
+}
+[data-puzzle='dominoes'] .do-chip b {
+  padding: 3px 4px;
+}
+[data-puzzle='dominoes'] .do-chip b + b {
+  border-left: 1.5px solid color-mix(in srgb, var(--ink) 45%, transparent);
+}
+[data-puzzle='dominoes'] .do-chip.used {
+  opacity: 0.3;
+  background: var(--cell-alt);
+}
+[data-puzzle='dominoes'] .do-chip.dup {
+  background: var(--bad);
+  color: var(--on-tone);
+}

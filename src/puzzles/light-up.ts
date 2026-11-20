@@ -1,0 +1,139 @@
+import { L, P } from '../core/i18n';
+import { byLevel, type PuzzleDef } from '../core/types';
+import { board, h, s } from '../core/ui';
+import { genLightUp, nb4, sightLines } from './gridkit/lightup';
+import { tapOrHold } from './gridkit/press';
+import './light-up.css';
+
+const bulbSvg = () =>
+  s(
+    'svg',
+    { viewBox: '0 0 100 100', class: 'lu-bulb', 'aria-hidden': 'true' },
+    s('path', { d: 'M50 4v8M14 18l6 6M86 18l-6 6M4 46h8M96 46h-8', class: 'rays' }),
+    s('circle', { cx: 50, cy: 46, r: 23, class: 'glass' }),
+    s('rect', { x: 39, y: 70, width: 22, height: 16, rx: 4, class: 'base' }),
+  );
+
+export const lightUp: PuzzleDef = {
+  id: 'light-up',
+  get name() {
+    return L('Light Up', 'Ampoules');
+  },
+  category: 'logic',
+  get rules() {
+    return L('Light every cell. Bulbs never see each other.', 'Éclairez tout. Les ampoules ne se voient jamais.');
+  },
+  help: () => ({
+    goal: L(
+      'Place bulbs in the white cells so that every white cell is lit.',
+      'Placez des ampoules dans les cases blanches pour que toutes les cases blanches soient éclairées.',
+    ),
+    steps: [
+      L(
+        'A bulb lights its own cell and shines along its row and column until a wall (solid cell) stops it.',
+        'Une ampoule éclaire sa case et brille le long de sa rangée et de sa colonne jusqu’à un mur (case pleine).',
+      ),
+      L('Two bulbs may never shine on each other.', 'Deux ampoules ne doivent jamais s’éclairer l’une l’autre.'),
+      L(
+        'A number on a wall says how many bulbs touch it on its sides (not diagonally).',
+        'Un nombre sur un mur indique combien d’ampoules le touchent par un côté (pas en diagonale).',
+      ),
+      L(
+        'Tap a cell for a bulb, again for a dot (surely no bulb), and once more to clear it. Long-press (or right-click) to place a dot directly.',
+        'Touchez une case pour une ampoule, encore pour un point (aucune ampoule), et une autre fois pour l’effacer. Appuyez longuement (ou cliquez droit) pour mettre un point directement.',
+      ),
+      L(
+        'Bulbs that see each other turn red. A number fades when it has exactly enough bulbs (a 0 once its sides are dotted).',
+        'Les ampoules qui se voient deviennent rouges. Un nombre pâlit quand il a juste assez d’ampoules (un 0, quand ses côtés ont un point).',
+      ),
+    ],
+    tips: [
+      L(
+        'A 0 means no bulb beside it: dot its neighbours. A 4 means bulbs on all four sides.',
+        'Un 0 veut dire aucune ampoule autour : mettez des points à côté. Un 4, des ampoules sur les quatre côtés.',
+      ),
+      L(
+        'A dark cell that only one empty cell can reach must get its bulb from there.',
+        'Une case sombre qu’une seule case vide peut atteindre doit recevoir son ampoule de celle-là.',
+      ),
+    ],
+  }),
+  par: (d) => byLevel(d, [40, 70, 120, 180, 280]),
+  create(ctx) {
+    const { root, rng, difficulty: d } = ctx;
+    const n = byLevel(d, [6, 7, 8, 9, 10]);
+    const p = genLightUp(n, 0.2, byLevel(d, [0.75, 0.55, 0.35, 0.15, 0]), rng);
+    const { black, num } = p;
+    const sight = sightLines(n, black);
+
+    // 0 empty, 1 bulb, 2 dot
+    const st = new Array<number>(n * n).fill(0);
+    const grid = board(n, n, 'lu-grid');
+    const cells = st.map((_, i) => {
+      const el = black[i]
+        ? h('div', { class: 'cell blk', 'data-n': num[i] }, num[i] >= 0 ? num[i] : '')
+        : h('button', { type: 'button', class: 'cell', 'data-i': i, 'aria-label': L('Cell', 'Case') }, bulbSvg());
+      grid.append(el);
+      return el;
+    });
+
+    const render = () => {
+      let dark = 0,
+        ok = true,
+        bulbs = 0;
+      cells.forEach((el, i) => {
+        if (black[i]) {
+          if (num[i] < 0) return;
+          const k = nb4(i, n).filter((j) => st[j] === 1).length;
+          // A 0 only fades once every free side is dotted, so it stays visible as a hint.
+          const settled = num[i] > 0 || nb4(i, n).every((j) => black[j] || st[j] === 2);
+          el.classList.toggle('done', k === num[i] && settled);
+          el.classList.toggle('err', k > num[i]);
+          ok &&= k === num[i];
+          return;
+        }
+        const bulb = st[i] === 1;
+        const lit = sight[i].some((j) => st[j] === 1);
+        const clash = bulb && sight[i].some((j) => j !== i && st[j] === 1);
+        if (bulb) bulbs++;
+        if (!lit) dark++;
+        if (clash) ok = false;
+        el.classList.toggle('glow', lit);
+        el.classList.toggle('bulb', bulb);
+        el.classList.toggle('mark', st[i] === 2);
+        el.classList.toggle('err', clash);
+      });
+      ctx.status(
+        dark
+          ? L(
+              `${P(bulbs, ['bulb', 'bulbs'], ['ampoule', 'ampoules'])} · ${dark} dark`,
+              `${P(bulbs, ['bulb', 'bulbs'], ['ampoule', 'ampoules'])} · ${dark} dans le noir`,
+            )
+          : P(bulbs, ['bulb', 'bulbs'], ['ampoule', 'ampoules']),
+      );
+      return ok && !dark;
+    };
+
+    let done = false;
+    const set = (i: number, v: number) => {
+      if (done || black[i]) return;
+      ctx.touch();
+      st[i] = v;
+      if (render()) {
+        done = true;
+        ctx.solved();
+      }
+    };
+    const cleanup = tapOrHold(
+      grid,
+      (i) => set(i, (st[i] + 1) % 3),
+      (i) => set(i, st[i] === 2 ? 0 : 2),
+    );
+
+    const sv = ctx.saved as { st?: unknown } | undefined;
+    if (Array.isArray(sv?.st) && sv.st.length === st.length) sv.st.forEach((v, i) => (st[i] = !black[i] && (v === 1 || v === 2) ? v : 0));
+    root.append(grid);
+    render();
+    return { snapshot: () => ({ st }), destroy: cleanup };
+  },
+};

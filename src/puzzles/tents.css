@@ -45,7 +45,7 @@
   stroke-width: 6;
 }
 [data-puzzle='tents'] .lk-tree .trunk {
-  fill: var(--p8);
+  fill: color-mix(in srgb, var(--fg) 45%, var(--cell));
   stroke: var(--ink);
   stroke-width: 6;
 }

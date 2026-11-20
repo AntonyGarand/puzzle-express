@@ -1,5 +1,5 @@
 [data-puzzle='push'] {
-  --accent: var(--p8);
+  --accent: var(--p1);
 }
 [data-puzzle='push'] .push-grid {
   touch-action: none;

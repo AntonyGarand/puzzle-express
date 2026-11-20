@@ -1,0 +1,50 @@
+[data-puzzle='eclipse'] {
+  --accent: var(--p4);
+}
+[data-puzzle='eclipse'] .ecl {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+[data-puzzle='eclipse'] .ecl .cell .sym {
+  display: none;
+  position: absolute;
+  inset: 8%;
+  width: 84%;
+  height: 84%;
+  overflow: visible;
+  pointer-events: none;
+}
+[data-puzzle='eclipse'] .ecl .cell.is-sun .sun,
+[data-puzzle='eclipse'] .ecl .cell.is-moon .moon {
+  display: block;
+}
+[data-puzzle='eclipse'] .ecl .sun .disc {
+  fill: var(--p4);
+  stroke: var(--ink);
+  stroke-width: 6;
+}
+[data-puzzle='eclipse'] .ecl .sun .ray {
+  stroke: var(--ink);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+[data-puzzle='eclipse'] .ecl .moon .disc {
+  fill: var(--p5);
+  stroke: var(--ink);
+  stroke-width: 6;
+  stroke-linejoin: round;
+}
+[data-puzzle='eclipse'] .ecl .cell.given {
+  background: var(--cell-alt);
+  box-shadow: none;
+  border-style: dashed;
+}
+[data-puzzle='eclipse'] .ecl .cell.cur {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+  z-index: 1;
+}
+[data-puzzle='eclipse'] .ecl .cell.err .disc {
+  fill: var(--cell);
+}

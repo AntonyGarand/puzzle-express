@@ -1,0 +1,20 @@
+/* Shared look for the Latin-square number grids (skyscrapers, math-cages). */
+
+/* givens are ink, entries are tone-coloured */
+:is([data-puzzle='skyscrapers'], [data-puzzle='math-cages']) .lk-num .cell:not(.given) {
+  color: color-mix(in srgb, var(--accent) 65%, var(--fg));
+}
+:is([data-puzzle='skyscrapers'], [data-puzzle='math-cages']) .lk-num .cell.sel:not(.given) {
+  color: var(--on-tone);
+}
+:is([data-puzzle='skyscrapers'], [data-puzzle='math-cages']) .lk-num .cell.given:not(.sel, .same, .peer, .err) {
+  background: var(--cell-alt);
+}
+:is([data-puzzle='skyscrapers'], [data-puzzle='math-cages']) .lk-num .cell.given.peer {
+  background: color-mix(in srgb, var(--accent) 14%, var(--cell-alt));
+}
+:is([data-puzzle='skyscrapers'], [data-puzzle='math-cages']) .lk-num .cell .v {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+}

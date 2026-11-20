@@ -23,7 +23,7 @@
   --p5: #b98aff;
   --p6: #2ad4d9;
   --p7: #ff6fb5;
-  --p8: #9c6b3f;
+  --p8: #b6e04a; /* lime (was brown) */
 
   /* per-puzzle tone (overridden per card) */
   --accent: var(--hi);
@@ -60,9 +60,6 @@
 }
 
 /* puzzle tones */
-[data-puzzle='sequence'] {
-  --accent: var(--p6);
-}
 [data-puzzle='target'] {
   --accent: var(--p7);
 }
@@ -169,12 +166,10 @@ h3 {
 /* The core neo-brutalist block */
 .btn,
 .key,
-.level,
 .select,
 .seg,
 .stat,
 .chip.num,
-.term,
 .code-board,
 .maze-wrap,
 .grid.flood,
@@ -414,7 +409,6 @@ h3 {
   border-radius: 999px;
   background: var(--cell);
 }
-.level,
 .select {
   appearance: none;
   background-color: var(--cell);
@@ -431,7 +425,6 @@ h3 {
   background-size: 5px 5px;
   background-repeat: no-repeat;
 }
-.level option,
 .select option {
   background: var(--cell);
   color: var(--fg);
@@ -1036,32 +1029,6 @@ button.cell:active {
   border: var(--bw) solid var(--ink);
   border-radius: var(--r);
   box-shadow: var(--sh) var(--sh) 0 var(--ink);
-}
-
-/* sequence */
-.seq {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  max-width: 480px;
-}
-.term {
-  min-width: 52px;
-  height: 52px;
-  padding: 0 10px;
-  background: var(--cell);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 21px;
-  font-variant-numeric: tabular-nums;
-  box-shadow: 3px 3px 0 var(--ink);
-}
-.term.q {
-  background: var(--accent);
-  color: var(--on-tone);
 }
 
 /* anagram */
@@ -1804,4 +1771,52 @@ dialog.sheet::backdrop {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* new-version banner + toast */
+.update-banner {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: calc(var(--tabs) + 12px);
+  max-width: 520px;
+  margin: 0 auto;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px 10px 16px;
+  background: var(--hi);
+  color: var(--on-tone);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  box-shadow: var(--sh) var(--sh) 0 var(--ink);
+  font-size: 14px;
+  animation: sheet-up 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.update-banner .btn.ghost {
+  color: var(--on-tone);
+}
+.toast {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: fit-content;
+  margin: 0 auto;
+  bottom: calc(var(--tabs) + 12px);
+  z-index: 60;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--cell);
+  border: var(--bw) solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 3px 3px 0 var(--ink);
+  animation: sheet-up 0.25s ease;
+}
+.app-version {
+  margin-top: 28px;
+  text-align: center;
 }

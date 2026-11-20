@@ -60,6 +60,30 @@
 .ctable .pc.red {
   color: var(--pc-red);
 }
+/* Four-colour deck: each suit has its own ink and a light tint on the face (♠ ink, ♥ red, ♦ blue, ♣ green). */
+.ctable .pc.s0 {
+  --suit: var(--fg);
+  --tint: var(--p5);
+}
+.ctable .pc.s1 {
+  --suit: var(--pc-red);
+  --tint: var(--bad);
+}
+.ctable .pc.s2 {
+  --suit: color-mix(in srgb, var(--p2) 72%, var(--fg));
+  --tint: var(--p2);
+}
+.ctable .pc.s3 {
+  --suit: color-mix(in srgb, var(--p3) 62%, var(--fg));
+  --tint: var(--p3);
+}
+.ctable .pc.s0,
+.ctable .pc.s1,
+.ctable .pc.s2,
+.ctable .pc.s3 {
+  color: var(--suit);
+  background: color-mix(in srgb, var(--tint) 13%, var(--cell));
+}
 .ctable .pc-r {
   position: absolute;
   left: calc(var(--cw) * 0.07);

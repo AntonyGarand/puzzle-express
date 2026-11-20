@@ -1,6 +1,6 @@
 import { L, P } from '../core/i18n';
 import { byLevel, type PuzzleDef } from '../core/types';
-import { board, h, shake } from '../core/ui';
+import { board, btn, h, s as svg, shake } from '../core/ui';
 import { adjacent, findPath, makeGrid, points } from './wordkit/hunt-solver';
 import { dictReady, isWord, letterKey, whenDict } from './wordkit/lexicon';
 import './hunt.css';
@@ -65,16 +65,72 @@ export const hunt: PuzzleDef = {
     let score = 0;
     let won = false;
 
+    // Stars: ★ at the goal (counts as solved), ★★ halfway to perfect, ★★★ = every listed word found.
+    // Listed words = the common words hidden in the grid; rarer dictionary words still score as bonus.
+    const listed = [...grid0.words];
+    const perfect = Math.max(target + 2, grid0.pts);
+    const milestones = [target, Math.round((target + perfect) / 2), perfect];
+    const stars = () => {
+      const allListed = listed.every((w) => found.includes(w));
+      return allListed || score >= perfect ? 3 : score >= milestones[1] ? 2 : score >= milestones[0] ? 1 : 0;
+    };
+    let shownStars = 0;
+
     const word = h('div', { class: 'hunt-word' });
     const fill = h('div', { class: 'hunt-fill' });
-    const bar = h('div', { class: 'hunt-bar' }, fill);
+    const starEls = milestones.map((_, k) => h('span', { class: 'hunt-star', title: '★'.repeat(k + 1) }, '★'));
+    const bar = h('div', { class: 'hunt-bar' }, fill, ...starEls);
+    const remainingEl = h('div', { class: 'hunt-left' });
     const foundEl = h('div', { class: 'hunt-found' });
+    const finish = btn(
+      L('Finish ✓', 'Terminer ✓'),
+      () => {
+        if (!won) {
+          won = true;
+          ctx.solved();
+        }
+      },
+      'primary',
+    );
+    finish.hidden = true;
+    ctx.controls(finish);
     const grid = board(n, n, 'hunt-grid');
     const cells = letters.map((ch, i) => {
       const el = h('div', { class: 'cell', 'data-i': i }, ch);
       grid.append(el);
       return el;
     });
+    // The current path drawn as a line through the letters, so diagonal links are unambiguous.
+    const under = svg('polyline', { class: 'hunt-line-under' });
+    const over = svg('polyline', { class: 'hunt-line' });
+    const startDot = svg('circle', { class: 'hunt-start', r: 0 });
+    const endDot = svg('circle', { class: 'hunt-end', r: 0 });
+    const overlay = svg('svg', { class: 'hunt-path', 'aria-hidden': 'true' }, under, over, startDot, endDot);
+    const wrap = h('div', { class: 'hunt-wrap' }, grid, overlay);
+    const drawPath = () => {
+      const w = wrap.clientWidth;
+      const hgt = wrap.clientHeight;
+      overlay.setAttribute('viewBox', `0 0 ${w} ${hgt}`);
+      const pts = path.map((i) => {
+        const el = cells[i];
+        return [el.offsetLeft + el.offsetWidth / 2, el.offsetTop + el.offsetHeight / 2] as const;
+      });
+      const cell = cells[0].offsetWidth || 40;
+      const str = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+      for (const line of [under, over]) line.setAttribute('points', str);
+      overlay.style.setProperty('--lw', `${(cell * 0.11).toFixed(1)}px`);
+      const dot = (c: SVGCircleElement, p: readonly [number, number] | undefined, r: number) => {
+        c.setAttribute('r', p ? String(r) : '0');
+        if (p) {
+          c.setAttribute('cx', p[0].toFixed(1));
+          c.setAttribute('cy', p[1].toFixed(1));
+        }
+      };
+      dot(startDot, pts[0], cell * 0.36);
+      dot(endDot, pts.length > 1 ? pts[pts.length - 1] : undefined, cell * 0.08);
+    };
+    const pathResize = new ResizeObserver(() => drawPath());
+    pathResize.observe(grid);
 
     let msg = '';
     let msgTimer = 0;
@@ -98,12 +154,45 @@ export const hunt: PuzzleDef = {
         const k = path.indexOf(i);
         el.className = `cell${k >= 0 ? (k === path.length - 1 ? ' sel' : ' on') : ''}`;
       });
+      drawPath();
       renderWord();
-      const pct = Math.min(100, Math.round((score / target) * 100));
-      fill.style.width = `${pct}%`;
-      bar.setAttribute('data-label', `${score} / ${target}`);
-      foundEl.replaceChildren(...[...found].reverse().map((w) => h('span', null, w)));
-      ctx.status(`${P(found.length, ['word', 'words'], ['mot', 'mots'])} · ${score}/${target} pts`);
+      // Bar runs to "perfect"; stars sit at the milestones.
+      const scale = Math.max(perfect, score);
+      fill.style.width = `${Math.min(100, (score / scale) * 100)}%`;
+      bar.setAttribute('data-label', `${score} pts`);
+      const st = stars();
+      starEls.forEach((el, k) => {
+        el.style.left = `${Math.min(100, (milestones[k] / scale) * 100)}%`;
+        el.classList.toggle('on', st > k);
+      });
+      // Remaining listed words, by length.
+      const left = new Map<number, number>();
+      for (const w of listed) if (!found.includes(w)) left.set(w.length, (left.get(w.length) ?? 0) + 1);
+      const lens = [...new Set(listed.map((w) => w.length))].sort((a, b) => a - b);
+      remainingEl.replaceChildren(
+        ...lens.map((len) =>
+          h(
+            'span',
+            {
+              class: `hunt-len ${(left.get(len) ?? 0) === 0 ? 'done' : ''}`,
+              title: L(`${len}-letter words left`, `mots de ${len} lettres restants`),
+            },
+            h('b', null, L(`${len}L`, `${len} l.`)),
+            String(left.get(len) ?? 0),
+          ),
+        ),
+      );
+      foundEl.replaceChildren(...[...found].reverse().map((w) => h('span', { class: listed.includes(w) ? '' : 'bonus' }, w)));
+      finish.hidden = won || st < 1 || st >= 3;
+      ctx.status(
+        st >= 1
+          ? L(`${'★'.repeat(st)} · keep going for ★★★ or finish`, `${'★'.repeat(st)} · continuez vers ★★★ ou terminez`)
+          : `${P(found.length, ['word', 'words'], ['mot', 'mots'])} · ${L('★ at', '★ à')} ${target} pts`,
+      );
+      if (st > shownStars) {
+        if (shownStars > 0 || st === 1) starEls[st - 1]?.classList.add('pop');
+        shownStars = st;
+      }
     };
 
     const submit = () => {
@@ -140,8 +229,9 @@ export const hunt: PuzzleDef = {
       score += points(w.length);
       render();
       say(`+${points(w.length)} ${w}`);
-      if (score >= target && !won) {
+      if (stars() >= 3 && !won) {
         won = true;
+        render();
         ctx.solved();
       }
     };
@@ -211,7 +301,7 @@ export const hunt: PuzzleDef = {
     if (sv && Array.isArray(sv.f)) {
       for (const w of sv.f) {
         if (typeof w !== 'string' || !/^[a-z]+$/.test(w) || w.length < minLen || found.includes(w)) continue;
-        if (score + points(w.length) >= target) break; // never resume already solved
+        if (score + points(w.length) >= perfect) break; // three stars ends the game: never resume a finished one
         found.push(w);
         score += points(w.length);
       }
@@ -225,7 +315,8 @@ export const hunt: PuzzleDef = {
       }
     }
 
-    root.append(h('div', { class: 'hunt-top' }, word, bar), grid, foundEl);
+    shownStars = stars(); // no star pop for progress restored from a save
+    root.append(h('div', { class: 'hunt-top' }, word, bar, remainingEl), wrap, foundEl);
     render();
     whenDict(() => renderWord());
 
@@ -268,6 +359,7 @@ export const hunt: PuzzleDef = {
       },
       destroy() {
         clearTimeout(msgTimer);
+        pathResize.disconnect();
         window.removeEventListener('pointerup', onUp);
         window.removeEventListener('pointercancel', onUp);
       },
