@@ -12,7 +12,12 @@ import { ANSWERS_FR, OTHER_FR } from './common-fr';
 
 /** Lowercase and strip diacritics: "Œuvre" → "oeuvre", "Ç" → "c". */
 export const fold = (s: string) =>
-  s.toLowerCase().replace(/œ/g, 'oe').replace(/æ/g, 'ae').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  s
+    .toLowerCase()
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
 /** A single typed letter folded to a–z ("É" → "e"), or null. */
 export function letterKey(key: string): string | null {
@@ -52,8 +57,13 @@ function english(): Lang {
   const has = (s: string) => s.length >= 3 && common.has(s);
   const isInflected = (w: string) => {
     if (w.endsWith('s') && !w.endsWith('ss') && (has(w.slice(0, -1)) || (w.endsWith('es') && has(w.slice(0, -2))))) return true;
-    if (w.endsWith('ed') && (has(w.slice(0, -2)) || has(w.slice(0, -1)) || (w[w.length - 3] === w[w.length - 4] && has(w.slice(0, -3))))) return true;
-    if (w.endsWith('ing') && (has(w.slice(0, -3)) || has(w.slice(0, -3) + 'e') || (w[w.length - 4] === w[w.length - 5] && has(w.slice(0, -4))))) return true;
+    if (w.endsWith('ed') && (has(w.slice(0, -2)) || has(w.slice(0, -1)) || (w[w.length - 3] === w[w.length - 4] && has(w.slice(0, -3)))))
+      return true;
+    if (
+      w.endsWith('ing') &&
+      (has(w.slice(0, -3)) || has(w.slice(0, -3) + 'e') || (w[w.length - 4] === w[w.length - 5] && has(w.slice(0, -4))))
+    )
+      return true;
     return false;
   };
   return {
@@ -70,11 +80,11 @@ function english(): Lang {
 }
 
 function french(): Lang {
-  const answers = new Set(split(ANSWERS_FR));
-  const common = new Set([...answers, ...split(OTHER_FR)]);
+  const answerSet = new Set(split(ANSWERS_FR));
+  const common = new Set([...answerSet, ...split(OTHER_FR)]);
   return {
     common,
-    isAnswer: (w) => answers.has(w),
+    isAnswer: (w) => answerSet.has(w),
     answers: new Map(),
     ofLength: new Map(),
     dict: null,
@@ -113,8 +123,6 @@ export function commonOfLength(len: number): string[] {
   return a;
 }
 
-export const isAnswerSafe = (w: string) => (locale() === 'fr' ? lang().isAnswer(w) : !NOT_ANSWERS.has(w));
-
 // ---------- full dictionary (lazy chunk) ----------
 
 function decode(packed: string): Set<string> {
@@ -133,9 +141,15 @@ function ensure(L: Lang) {
   if (L.started) return;
   L.started = true;
   L.load()
-    .then((m) => { L.dict = decode(m.default); })
-    .catch(() => { L.failed = true; })
-    .finally(() => { for (const f of L.waiters.splice(0)) f(); });
+    .then((m) => {
+      L.dict = decode(m.default);
+    })
+    .catch(() => {
+      L.failed = true;
+    })
+    .finally(() => {
+      for (const f of L.waiters.splice(0)) f();
+    });
 }
 ensure(lang());
 

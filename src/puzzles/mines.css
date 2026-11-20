@@ -1,5 +1,9 @@
-[data-puzzle='mines'] { --accent: var(--p1); }
-[data-puzzle='mines'] .lk-mines { -webkit-touch-callout: none; }
+[data-puzzle='mines'] {
+  --accent: var(--p1);
+}
+[data-puzzle='mines'] .lk-mines {
+  -webkit-touch-callout: none;
+}
 [data-puzzle='mines'] .lk-mines .cell {
   background: var(--accent-soft);
   border-radius: 4px;
@@ -12,14 +16,28 @@
   box-shadow: none;
   cursor: default;
 }
-[data-puzzle='mines'] .lk-mines .cell.m1 { color: color-mix(in srgb, var(--p2) 75%, var(--fg)); }
-[data-puzzle='mines'] .lk-mines .cell.m2 { color: color-mix(in srgb, var(--p3) 60%, var(--fg)); }
-[data-puzzle='mines'] .lk-mines .cell.m3 { color: color-mix(in srgb, var(--bad) 85%, var(--fg)); }
-[data-puzzle='mines'] .lk-mines .cell.m4 { color: color-mix(in srgb, var(--p5) 70%, var(--fg)); }
-[data-puzzle='mines'] .lk-mines .cell.m5 { color: color-mix(in srgb, var(--p8) 80%, var(--fg)); }
-[data-puzzle='mines'] .lk-mines .cell.m6 { color: color-mix(in srgb, var(--p6) 60%, var(--fg)); }
+[data-puzzle='mines'] .lk-mines .cell.m1 {
+  color: color-mix(in srgb, var(--p2) 75%, var(--fg));
+}
+[data-puzzle='mines'] .lk-mines .cell.m2 {
+  color: color-mix(in srgb, var(--p3) 60%, var(--fg));
+}
+[data-puzzle='mines'] .lk-mines .cell.m3 {
+  color: color-mix(in srgb, var(--bad) 85%, var(--fg));
+}
+[data-puzzle='mines'] .lk-mines .cell.m4 {
+  color: color-mix(in srgb, var(--p5) 70%, var(--fg));
+}
+[data-puzzle='mines'] .lk-mines .cell.m5 {
+  color: color-mix(in srgb, var(--p8) 80%, var(--fg));
+}
+[data-puzzle='mines'] .lk-mines .cell.m6 {
+  color: color-mix(in srgb, var(--p6) 60%, var(--fg));
+}
 [data-puzzle='mines'] .lk-mines .cell.m7,
-[data-puzzle='mines'] .lk-mines .cell.m8 { color: var(--fg); }
+[data-puzzle='mines'] .lk-mines .cell.m8 {
+  color: var(--fg);
+}
 [data-puzzle='mines'] .lk-mines .cell.flag::after {
   content: '';
   width: 46%;
@@ -27,12 +45,16 @@
   background: var(--ink);
   clip-path: polygon(12% 0, 100% 28%, 26% 56%, 26% 100%, 12% 100%);
 }
-[data-puzzle='mines'] .lk-mines .cell.mine { background: var(--cell); }
+[data-puzzle='mines'] .lk-mines .cell.mine {
+  background: var(--cell);
+}
 [data-puzzle='mines'] .lk-mines .cell.mine::after {
   content: '';
   width: 44%;
   height: 44%;
   border-radius: 50%;
   background: var(--ink);
-  box-shadow: 0 0 0 2px var(--cell), 0 0 0 4px color-mix(in srgb, var(--ink) 40%, transparent);
+  box-shadow:
+    0 0 0 2px var(--cell),
+    0 0 0 4px color-mix(in srgb, var(--ink) 40%, transparent);
 }

@@ -7,16 +7,23 @@ import { digHoles, lineUnits, solve, type Problem } from './sudokukit/solver';
 
 export const jigsawSudoku: PuzzleDef = {
   id: 'jigsaw-sudoku',
-  get name() { return L('Jigsaw Sudoku', 'Sudoku irrégulier'); },
+  get name() {
+    return L('Jigsaw Sudoku', 'Sudoku irrégulier');
+  },
   category: 'logic',
-  get rules() { return L('Each number once per row, column and outlined shape.', 'Chaque chiffre une fois par rangée, colonne et forme.'); },
+  get rules() {
+    return L('Each number once per row, column and outlined shape.', 'Chaque chiffre une fois par rangée, colonne et forme.');
+  },
   help: () => ({
     goal: L(
       'Fill the grid so every row, column and outlined shape holds each number exactly once.',
       'Remplissez la grille pour que chaque rangée, chaque colonne et chaque forme encadrée contienne chaque chiffre une seule fois.',
     ),
     steps: [
-      L('Use the numbers 1 up to the grid size (1 to 5 on a 5×5 grid).', 'Utilisez les chiffres de 1 jusqu’à la taille de la grille (1 à 5 sur une grille 5 × 5).'),
+      L(
+        'Use the numbers 1 up to the grid size (1 to 5 on a 5×5 grid).',
+        'Utilisez les chiffres de 1 jusqu’à la taille de la grille (1 à 5 sur une grille 5 × 5).',
+      ),
       L(
         'No number repeats in a row, a column or a shape with a thick outline. Shapes are irregular, not boxes.',
         'Aucun chiffre ne se répète dans une rangée, une colonne ou une forme au contour épais. Les formes sont irrégulières.',
@@ -24,7 +31,10 @@ export const jigsawSudoku: PuzzleDef = {
       ...entryHelpSteps(),
     ],
     tips: [
-      L('Look for a row, column or shape missing just one or two numbers.', 'Cherchez une rangée, une colonne ou une forme où il ne manque qu’un ou deux chiffres.'),
+      L(
+        'Look for a row, column or shape missing just one or two numbers.',
+        'Cherchez une rangée, une colonne ou une forme où il ne manque qu’un ou deux chiffres.',
+      ),
       L(
         'When a shape’s only spots for a number sit in one row, that number can’t go elsewhere in that row.',
         'Si une forme ne peut placer un chiffre que dans une seule rangée, ce chiffre est exclu du reste de cette rangée.',
@@ -47,7 +57,11 @@ export const jigsawSudoku: PuzzleDef = {
       const p: Problem = { size: n * n, maxDigit: n, units };
       const g = new Array(n * n).fill(0);
       const r = solve(p, g, 1, 3000, rng);
-      if (r.count === 1 && !r.aborted) { problem = p; sol = g; break; }
+      if (r.count === 1 && !r.aborted) {
+        problem = p;
+        sol = g;
+        break;
+      }
     }
     if (!problem) {
       // Fallback: rows as regions trivially fail; use a cyclic Latin square with row-band regions shifted.

@@ -17,9 +17,10 @@ const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 const load = (levels) => {
   const s = new Set();
-  for (const l of levels) for (const v of ['english', 'american']) {
-    for (const w of require(`wordlist-english/${v}-words-${l}.json`)) if (/^[a-z]{3,8}$/.test(w)) s.add(w);
-  }
+  for (const l of levels)
+    for (const v of ['english', 'american']) {
+      for (const w of require(`wordlist-english/${v}-words-${l}.json`)) if (/^[a-z]{3,8}$/.test(w)) s.add(w);
+    }
   return s;
 };
 

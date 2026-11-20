@@ -64,7 +64,9 @@ ok('auto-advance scrolls to the next card', scrolled > 300, `scrollTop=${scrolle
 // ---- Odd shade
 await open('oddshade', 5);
 for (let r = 0; r < 3; r++) {
-  const bgs = await card().locator('.cell').evaluateAll((els) => els.map((e) => e.style.background));
+  const bgs = await card()
+    .locator('.cell')
+    .evaluateAll((els) => els.map((e) => e.style.background));
   const odd = bgs.findIndex((b) => bgs.filter((x) => x === b).length === 1);
   await card().locator('.cell').nth(odd).click();
 }
@@ -103,7 +105,13 @@ for (const lv of [1, 3, 5]) {
         const row = new Array(N + 1).fill(0);
         const r = Math.floor(i / n);
         const c = i % n;
-        for (const [dr, dc] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        for (const [dr, dc] of [
+          [0, 0],
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ]) {
           const rr = r + dr;
           const cc = c + dc;
           if (rr >= 0 && rr < n && cc >= 0 && cc < n) row[rr * n + cc] = 1;
@@ -209,7 +217,11 @@ for (const lv of [1, 5]) {
 // ---- Code breaker: run out of guesses, code must be revealed
 await open('codebreaker', 1);
 for (let k = 0; k < 8 && (await state()) === 'open'; k++) {
-  for (let p = 0; p < 3; p++) await card().locator('.pad .key').nth((k + p) % 4).click();
+  for (let p = 0; p < 3; p++)
+    await card()
+      .locator('.pad .key')
+      .nth((k + p) % 4)
+      .click();
   await card().getByRole('button', { name: 'Guess' }).click();
 }
 const cb = await state();
@@ -226,12 +238,18 @@ ok('skip advances to the next card', (await page.evaluate(() => document.querySe
 await open('lights', 3);
 await card().locator('.cell').nth(0).click();
 await card().locator('.cell').nth(7).click();
-const before = await card().locator('.cell').evaluateAll((els) => els.map((e) => e.classList.contains('on')).join(''));
+const before = await card()
+  .locator('.cell')
+  .evaluateAll((els) => els.map((e) => e.classList.contains('on')).join(''));
 await page.goto(`${base}#/labs`);
 await page.waitForSelector('.lab-tile');
 // The unfinished game appears in "Continue" (first) and again in its category.
 const lightsTile = page.locator('.lab-tile[data-puzzle="lights"]').first();
-ok('games tab lists the unfinished puzzle under Continue', (await lightsTile.locator('.badge').count()) === 1 && (await page.locator('.cat').first().locator('h3').innerText()).toLowerCase().startsWith('continue'));
+ok(
+  'games tab lists the unfinished puzzle under Continue',
+  (await lightsTile.locator('.badge').count()) === 1 &&
+    (await page.locator('.cat').first().locator('h3').innerText()).toLowerCase().startsWith('continue'),
+);
 await lightsTile.getByRole('link', { name: 'Resume' }).click();
 await page.waitForSelector('.lab .card .cell');
 const after = await page.locator('.lab .card .cell').evaluateAll((els) => els.map((e) => e.classList.contains('on')).join(''));
@@ -245,7 +263,10 @@ const sudokuTile = page.locator('.lab-tile[data-puzzle="sudoku"]').last();
 await sudokuTile.locator('select').selectOption('4');
 await sudokuTile.getByRole('button', { name: /Play|New/ }).click();
 await page.waitForSelector('.lab .card .cell');
-ok('labs starts a new puzzle at the picked level', (await page.locator('.lab .card .cell').count()) === 81 && /#\/game\/sudoku$/.test(page.url()));
+ok(
+  'labs starts a new puzzle at the picked level',
+  (await page.locator('.lab .card .cell').count()) === 81 && page.url().endsWith('#/game/sudoku'),
+);
 const firstEmpty = page.locator('.lab .card .cell:not(.given)').first();
 await firstEmpty.click();
 await page.keyboard.press('5');

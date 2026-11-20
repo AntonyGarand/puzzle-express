@@ -17,12 +17,13 @@ function graph(len: number) {
   if (g) return g;
   const words = commonOfLength(len);
   const buckets = new Map<string, string[]>();
-  for (const w of words) for (let i = 0; i < len; i++) {
-    const k = w.slice(0, i) + '_' + w.slice(i + 1);
-    const b = buckets.get(k);
-    if (b) b.push(w);
-    else buckets.set(k, [w]);
-  }
+  for (const w of words)
+    for (let i = 0; i < len; i++) {
+      const k = w.slice(0, i) + '_' + w.slice(i + 1);
+      const b = buckets.get(k);
+      if (b) b.push(w);
+      else buckets.set(k, [w]);
+    }
   g = new Map();
   for (const w of words) {
     const nb: string[] = [];
@@ -48,7 +49,12 @@ export function makeLadder(rng: Rng, len: number, steps: number): string[] {
     let frontier = [start];
     for (let depth = 0; depth < steps && frontier.length; depth++) {
       const next: string[] = [];
-      for (const u of frontier) for (const v of g.get(u)!) if (!prev.has(v)) { prev.set(v, u); next.push(v); }
+      for (const u of frontier)
+        for (const v of g.get(u)!)
+          if (!prev.has(v)) {
+            prev.set(v, u);
+            next.push(v);
+          }
       frontier = next;
     }
     const pathTo = (w: string) => {
@@ -64,7 +70,10 @@ export function makeLadder(rng: Rng, len: number, steps: number): string[] {
     for (const w of prev.keys()) {
       if (!ends.has(w)) continue;
       const dl = pathTo(w).length - 1;
-      if (dl > farD) { far = w; farD = dl; }
+      if (dl > farD) {
+        far = w;
+        farD = dl;
+      }
     }
     if (farD + 1 > best.length) best = pathTo(far);
   }

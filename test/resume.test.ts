@@ -4,7 +4,10 @@ import { Rng } from '../src/core/rng';
 import type { Difficulty, PuzzleCtx, PuzzleDef } from '../src/core/types';
 import { PUZZLES } from '../src/puzzles';
 
-(globalThis as any).ResizeObserver ??= class { observe() {} disconnect() {} };
+(globalThis as any).ResizeObserver ??= class {
+  observe() {}
+  disconnect() {}
+};
 (globalThis as any).matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 
 function make(def: PuzzleDef, d: Difficulty, seed: number, saved?: unknown) {

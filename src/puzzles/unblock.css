@@ -1,4 +1,6 @@
-[data-puzzle='unblock'] { --accent: var(--p7); }
+[data-puzzle='unblock'] {
+  --accent: var(--p7);
+}
 [data-puzzle='unblock'] .ub-board {
   --pad: 6px;
   position: relative;
@@ -16,8 +18,7 @@
   height: 100%;
   touch-action: none;
   user-select: none;
-  background-image:
-    radial-gradient(circle, color-mix(in srgb, var(--ink) 22%, transparent) 2px, transparent 2.5px);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--ink) 22%, transparent) 2px, transparent 2.5px);
   background-size: calc(100% / var(--n)) calc(100% / var(--n));
 }
 /* exit: a tab sticking out of the frame on the key's row */
@@ -41,7 +42,9 @@
   height: calc(100% / var(--n) * var(--h));
   padding: 4px;
   cursor: grab;
-  transition: left 0.12s ease, top 0.12s ease;
+  transition:
+    left 0.12s ease,
+    top 0.12s ease;
 }
 [data-puzzle='unblock'] .ub-blk::before {
   content: '';
@@ -52,7 +55,9 @@
   border-radius: var(--r-cell);
   box-shadow: 3px 3px 0 var(--ink);
 }
-[data-puzzle='unblock'] .ub-blk.key::before { background: var(--accent); }
+[data-puzzle='unblock'] .ub-blk.key::before {
+  background: var(--accent);
+}
 [data-puzzle='unblock'] .ub-blk.key::after {
   content: '→';
   position: absolute;
@@ -64,6 +69,15 @@
   font-size: calc(var(--board) / 12);
   color: var(--on-tone);
 }
-[data-puzzle='unblock'] .ub-blk.sel::before { border-style: dashed; box-shadow: 5px 5px 0 var(--ink); }
-[data-puzzle='unblock'] .ub-blk.drag { transition: none; z-index: 2; cursor: grabbing; }
-[data-puzzle='unblock'] .ub-blk.drag::before { box-shadow: 6px 6px 0 var(--ink); }
+[data-puzzle='unblock'] .ub-blk.sel::before {
+  border-style: dashed;
+  box-shadow: 5px 5px 0 var(--ink);
+}
+[data-puzzle='unblock'] .ub-blk.drag {
+  transition: none;
+  z-index: 2;
+  cursor: grabbing;
+}
+[data-puzzle='unblock'] .ub-blk.drag::before {
+  box-shadow: 6px 6px 0 var(--ink);
+}

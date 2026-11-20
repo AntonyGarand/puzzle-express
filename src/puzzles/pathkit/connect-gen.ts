@@ -9,14 +9,17 @@ export interface ConnectPuzzle {
 }
 
 /** Random Hamiltonian path on an n x n grid: serpentine start, then many backbite moves. */
-export function hamiltonPath(rng: Rng, n: number, moves: number): number[] {
+function hamiltonPath(rng: Rng, n: number, moves: number): number[] {
   let path: number[] = [];
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) path.push(r * n + (r % 2 ? n - 1 - c : c));
   const pos = new Int32Array(n * n);
   const reindex = () => path.forEach((v, i) => (pos[v] = i));
   reindex();
   for (let m = 0; m < moves; m++) {
-    if (rng.chance(0.5)) path.reverse(), reindex();
+    if (rng.chance(0.5)) {
+      path.reverse();
+      reindex();
+    }
     // backbite at the head (index 0)
     const head = path[0];
     const opts = nbrs(head, n, n).filter((x) => x !== path[1]);

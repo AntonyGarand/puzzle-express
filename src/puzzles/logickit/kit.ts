@@ -6,7 +6,8 @@ export const tint = (i: number, pct = 40) => `color-mix(in srgb, var(--p${(((i %
 
 /** Orthogonal neighbours of cell `i` on a cols×rows grid. */
 export function nb4(i: number, cols: number, rows: number): number[] {
-  const r = Math.floor(i / cols), c = i % cols;
+  const r = Math.floor(i / cols),
+    c = i % cols;
   const out: number[] = [];
   if (r > 0) out.push(i - cols);
   if (c < cols - 1) out.push(i + 1);
@@ -17,13 +18,16 @@ export function nb4(i: number, cols: number, rows: number): number[] {
 
 /** All 8 surrounding cells of `i`. */
 export function nb8(i: number, cols: number, rows: number): number[] {
-  const r = Math.floor(i / cols), c = i % cols;
+  const r = Math.floor(i / cols),
+    c = i % cols;
   const out: number[] = [];
-  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-    if (!dr && !dc) continue;
-    const rr = r + dr, cc = c + dc;
-    if (rr >= 0 && rr < rows && cc >= 0 && cc < cols) out.push(rr * cols + cc);
-  }
+  for (let dr = -1; dr <= 1; dr++)
+    for (let dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc) continue;
+      const rr = r + dr,
+        cc = c + dc;
+      if (rr >= 0 && rr < rows && cc >= 0 && cc < cols) out.push(rr * cols + cc);
+    }
   return out;
 }
 
@@ -33,7 +37,9 @@ export function nb8(i: number, cols: number, rows: number): number[] {
  */
 export function edgeClasses(cols: number, rows: number, group: (i: number) => number): string[] {
   return Array.from({ length: cols * rows }, (_, i) => {
-    const r = Math.floor(i / cols), c = i % cols, g = group(i);
+    const r = Math.floor(i / cols),
+      c = i % cols,
+      g = group(i);
     const out: string[] = [];
     if (r === 0 || group(i - cols) !== g) out.push('bt');
     if (c === cols - 1 || group(i + 1) !== g) out.push('br');
@@ -63,7 +69,10 @@ export function regionAdjacency(region: number[], cols: number, rows: number, co
     if (g < 0) return;
     for (const j of nb4(i, cols, rows)) {
       const h = region[j];
-      if (h >= 0 && h !== g) { adj[g].add(h); adj[h].add(g); }
+      if (h >= 0 && h !== g) {
+        adj[g].add(h);
+        adj[h].add(g);
+      }
     }
   });
   return adj;
@@ -77,7 +86,10 @@ export function matchingSize(opts: number[][]): number {
       if (seen.has(b)) continue;
       seen.add(b);
       const o = owner.get(b);
-      if (o === undefined || tryA(o, seen)) { owner.set(b, a); return true; }
+      if (o === undefined || tryA(o, seen)) {
+        owner.set(b, a);
+        return true;
+      }
     }
     return false;
   };

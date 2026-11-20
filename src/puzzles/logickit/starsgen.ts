@@ -29,22 +29,28 @@ function placeStars(n: number, rng: Rng): number[] {
 }
 
 /** Solutions (up to `cap`) of a region layout, within a node budget. */
-export function solveStars(n: number, region: number[], cap: number, budget = 200000): { sols: number[][]; complete: boolean } {
+function solveStars(n: number, region: number[], cap: number, budget = 200000): { sols: number[][]; complete: boolean } {
   const sols: number[][] = [];
   const cols: number[] = [];
   let nodes = 0;
-  let usedC = 0, usedR = 0;
+  let usedC = 0,
+    usedR = 0;
   const rec = (r: number): boolean => {
     if (++nodes > budget) return false;
-    if (r === n) { sols.push([...cols]); return sols.length < cap; }
+    if (r === n) {
+      sols.push([...cols]);
+      return sols.length < cap;
+    }
     for (let c = 0; c < n; c++) {
       const g = region[r * n + c];
       if (usedC & (1 << c) || usedR & (1 << g)) continue;
       if (r > 0 && Math.abs(cols[r - 1] - c) < 2) continue;
       cols[r] = c;
-      usedC |= 1 << c; usedR |= 1 << g;
+      usedC |= 1 << c;
+      usedR |= 1 << g;
       const go = rec(r + 1);
-      usedC &= ~(1 << c); usedR &= ~(1 << g);
+      usedC &= ~(1 << c);
+      usedR &= ~(1 << g);
       if (!go) return false;
     }
     return true;
@@ -60,7 +66,11 @@ function connectedWithout(region: number[], n: number, g: number, skip: number):
   const stack = [cells[0]];
   while (stack.length) {
     const i = stack.pop()!;
-    for (const j of nb4(i, n, n)) if (j !== skip && region[j] === g && !seen.has(j)) { seen.add(j); stack.push(j); }
+    for (const j of nb4(i, n, n))
+      if (j !== skip && region[j] === g && !seen.has(j)) {
+        seen.add(j);
+        stack.push(j);
+      }
   }
   return seen.size === cells.length;
 }
@@ -88,7 +98,10 @@ export function genStars(n: number, rng: Rng): StarsPuzzle {
     let unique = false;
     for (let step = 0; step < 120; step++) {
       const { sols, complete } = solveStars(n, region, 2);
-      if (complete && sols.length === 1) { unique = true; break; }
+      if (complete && sols.length === 1) {
+        unique = true;
+        break;
+      }
       const alt = sols.find((s) => s.join(',') !== key);
       if (!alt) break;
       const rows = rng.shuffle(alt.map((_, r) => r).filter((r) => alt[r] !== sol[r]));
@@ -96,7 +109,13 @@ export function genStars(n: number, rng: Rng): StarsPuzzle {
       for (const r of rows) {
         const i = r * n + alt[r];
         const g = region[i];
-        const others = rng.shuffle([...new Set(nb4(i, n, n).map((j) => region[j]).filter((h) => h !== g))]);
+        const others = rng.shuffle([
+          ...new Set(
+            nb4(i, n, n)
+              .map((j) => region[j])
+              .filter((h) => h !== g),
+          ),
+        ]);
         if (!others.length || !connectedWithout(region, n, g, i)) continue;
         region[i] = others[0];
         moved = true;

@@ -1,1 +1,3 @@
-[data-puzzle='freecell'] { --accent: var(--p6); }
+[data-puzzle='freecell'] {
+  --accent: var(--p6);
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Games are discovered with import.meta.glob('./*.ts'), so every top-level puzzle module is an entry.
+  "entry": ["src/puzzles/*.ts", "scripts/*.mjs", "src/puzzles/wordkit/build-dict*.mjs"],
+  "project": ["src/**/*.ts", "scripts/**/*.mjs", "test/**/*.ts"],
+  "ignoreDependencies": [
+    // Word-list data, loaded by the dictionary build scripts through computed require() paths.
+    "wordlist-english",
+    "@zxcvbn-ts/language-fr",
+    "french-badwords-list",
+  ],
+}

@@ -35,8 +35,13 @@ function combo(): Uint16Array {
   if (COMBO) return COMBO;
   const t = new Uint16Array(512 * 10 * 46);
   for (let m = 0; m < 512; m++) {
-    let k = 0, s = 0;
-    for (let b = 0; b < 9; b++) if (m & (1 << b)) { k++; s += b + 1; }
+    let k = 0,
+      s = 0;
+    for (let b = 0; b < 9; b++)
+      if (m & (1 << b)) {
+        k++;
+        s += b + 1;
+      }
     for (let a = m; a < 512; a = (a + 1) | m) t[(a * 10 + k) * 46 + s] |= m;
   }
   return (COMBO = t);
@@ -53,7 +58,10 @@ export function solve(p: Problem, grid: number[], limit: number, budget: number,
   const full = (1 << maxDigit) - 1;
   const g = grid;
   const nu = units.length;
-  const used = new Int32Array(nu), filled = new Int32Array(nu), empty = new Int32Array(nu), target = new Int32Array(nu);
+  const used = new Int32Array(nu),
+    filled = new Int32Array(nu),
+    empty = new Int32Array(nu),
+    target = new Int32Array(nu);
   const cellUnits: number[][] = Array.from({ length: size }, () => []);
   units.forEach((u, k) => {
     target[k] = u.sum ?? -1;
@@ -61,16 +69,26 @@ export function solve(p: Problem, grid: number[], limit: number, budget: number,
   });
   const res: SolveResult = { count: 0, aborted: false, solutions: [] };
   // static bounds from < chains
-  const lo = new Array(size).fill(1), hi = new Array(size).fill(maxDigit);
+  const lo = new Array(size).fill(1),
+    hi = new Array(size).fill(maxDigit);
   const less: number[][] = Array.from({ length: size }, () => []); // cells that must be greater than i
   const more: number[][] = Array.from({ length: size }, () => []); // cells that must be smaller than i
-  for (const [a, b] of p.lt ?? []) { less[a].push(b); more[b].push(a); }
+  for (const [a, b] of p.lt ?? []) {
+    less[a].push(b);
+    more[b].push(a);
+  }
   if (p.lt?.length) {
     for (let it = 0, ch = true; ch && it < maxDigit + 1; it++) {
       ch = false;
       for (const [a, b] of p.lt) {
-        if (lo[b] < lo[a] + 1) { lo[b] = lo[a] + 1; ch = true; }
-        if (hi[a] > hi[b] - 1) { hi[a] = hi[b] - 1; ch = true; }
+        if (lo[b] < lo[a] + 1) {
+          lo[b] = lo[a] + 1;
+          ch = true;
+        }
+        if (hi[a] > hi[b] - 1) {
+          hi[a] = hi[b] - 1;
+          ch = true;
+        }
       }
     }
   }
@@ -110,9 +128,15 @@ export function solve(p: Problem, grid: number[], limit: number, budget: number,
     }
     if (!m) return 0;
     const ls = less[i];
-    for (let j = 0; j < ls.length; j++) { const v = g[ls[j]]; if (v > 0) m &= (1 << (v - 1)) - 1; }
+    for (let j = 0; j < ls.length; j++) {
+      const v = g[ls[j]];
+      if (v > 0) m &= (1 << (v - 1)) - 1;
+    }
     const mr = more[i];
-    for (let j = 0; j < mr.length; j++) { const v = g[mr[j]]; if (v > 0) m &= ~((1 << v) - 1); }
+    for (let j = 0; j < mr.length; j++) {
+      const v = g[mr[j]];
+      if (v > 0) m &= ~((1 << v) - 1);
+    }
     return m;
   };
 
@@ -122,14 +146,24 @@ export function solve(p: Problem, grid: number[], limit: number, budget: number,
   let nodes = 0;
   const digits = Array.from({ length: maxDigit }, (_, i) => i + 1);
   const rec = (): boolean => {
-    if (++nodes > budget) { res.aborted = true; return true; }
-    let best = -1, bestMask = 0, bestN = 99;
+    if (++nodes > budget) {
+      res.aborted = true;
+      return true;
+    }
+    let best = -1,
+      bestMask = 0,
+      bestN = 99;
     for (let e = 0; e < empties.length; e++) {
       const i = empties[e];
       if (g[i]) continue;
       const m = (cm[i] = cand(i));
       const k = popcount(m);
-      if (k < bestN) { best = i; bestMask = m; bestN = k; if (k <= 1) break; }
+      if (k < bestN) {
+        best = i;
+        bestMask = m;
+        bestN = k;
+        if (k <= 1) break;
+      }
     }
     if (best === -1) {
       res.count++;
@@ -140,14 +174,26 @@ export function solve(p: Problem, grid: number[], limit: number, budget: number,
     if (bestN > 1) {
       for (const k of fullUnits) {
         const cells = units[k].cells;
-        let once = 0, twice = 0;
-        for (const c of cells) { if (g[c]) continue; const m = cm[c]; twice |= once & m; once |= m; }
+        let once = 0,
+          twice = 0;
+        for (const c of cells) {
+          if (g[c]) continue;
+          const m = cm[c];
+          twice |= once & m;
+          once |= m;
+        }
         const missing = full & ~used[k];
         if (missing & ~once) return false;
         const hs = missing & ~twice;
         if (hs) {
           const b = hs & -hs;
-          for (const c of cells) if (!g[c] && cm[c] & b) { best = c; bestMask = b; bestN = 1; break; }
+          for (const c of cells)
+            if (!g[c] && cm[c] & b) {
+              best = c;
+              bestMask = b;
+              bestN = 1;
+              break;
+            }
           break;
         }
       }
@@ -158,11 +204,19 @@ export function solve(p: Problem, grid: number[], limit: number, budget: number,
       const b = 1 << (v - 1);
       if (!(bestMask & b)) continue;
       g[best] = v;
-      for (const k of cu) { used[k] |= b; filled[k] += v; empty[k]--; }
+      for (const k of cu) {
+        used[k] |= b;
+        filled[k] += v;
+        empty[k]--;
+      }
       const stop = rec();
       if (stop && rng && !res.aborted) return true; // keep the random fill in place
       g[best] = 0;
-      for (const k of cu) { used[k] &= ~b; filled[k] -= v; empty[k]++; }
+      for (const k of cu) {
+        used[k] &= ~b;
+        filled[k] -= v;
+        empty[k]++;
+      }
       if (stop) return true;
     }
     return false;
@@ -216,20 +270,30 @@ export function conflicts(p: Problem, vals: number[]): Set<number> {
   const bad = new Set<number>();
   for (const u of p.units) {
     const seen = new Map<number, number>();
-    let s = 0, open = 0;
+    let s = 0,
+      open = 0;
     for (const c of u.cells) {
       const v = vals[c];
-      if (v <= 0) { open++; continue; }
+      if (v <= 0) {
+        open++;
+        continue;
+      }
       s += v;
       const o = seen.get(v);
-      if (o != null) { bad.add(o); bad.add(c); } else seen.set(v, c);
+      if (o != null) {
+        bad.add(o);
+        bad.add(c);
+      } else seen.set(v, c);
     }
     if (u.sum != null && ((open === 0 && s !== u.sum) || (open > 0 && s + open > u.sum))) {
       for (const c of u.cells) if (vals[c] > 0) bad.add(c);
     }
   }
   for (const [a, b] of p.lt ?? []) {
-    if (vals[a] > 0 && vals[b] > 0 && vals[a] >= vals[b]) { bad.add(a); bad.add(b); }
+    if (vals[a] > 0 && vals[b] > 0 && vals[a] >= vals[b]) {
+      bad.add(a);
+      bad.add(b);
+    }
   }
   return bad;
 }

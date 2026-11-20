@@ -5,14 +5,27 @@ import type { Rng } from './rng';
 export type Difficulty = 1 | 2 | 3 | 4 | 5;
 export const LEVELS: Difficulty[] = [1, 2, 3, 4, 5];
 export const LEVEL_NAMES: Record<Difficulty, string> = {
-  get 1() { return L('Easy', 'Facile'); },
-  get 2() { return L('Medium', 'Moyen'); },
-  get 3() { return L('Hard', 'Difficile'); },
-  get 4() { return L('Expert', 'Expert'); },
-  get 5() { return L('Master', 'Maître'); },
+  get 1() {
+    return L('Easy', 'Facile');
+  },
+  get 2() {
+    return L('Medium', 'Moyen');
+  },
+  get 3() {
+    return L('Hard', 'Difficile');
+  },
+  get 4() {
+    return L('Expert', 'Expert');
+  },
+  get 5() {
+    return L('Master', 'Maître');
+  },
 };
 
-/** How-to-play content shown behind the card's "?" button. Write it with L(en, fr). */
+/**
+ * How-to-play content shown behind the card's "?" button. Write it with L(en, fr).
+ * @public
+ */
 export interface Help {
   /** One or two sentences: what you're trying to achieve. */
   goal: string;

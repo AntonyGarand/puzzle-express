@@ -35,7 +35,12 @@ export class LabView {
       const card = new Card(def, (c) => start(c.level, undefined), { lab: true, level: lvl ?? prefs(def.id).level, resume });
       this.card = card;
       this.el.replaceChildren(
-        h('div', { class: 'lab-bar' }, h('a', { class: 'btn ghost', href: '#/games' }, L('← Games', '← Jeux')), h('span', { class: 'small muted' }, resume ? L('Resumed', 'Reprise') : L('New puzzle', 'Nouvelle partie'))),
+        h(
+          'div',
+          { class: 'lab-bar' },
+          h('a', { class: 'btn ghost', href: '#/games' }, L('← Games', '← Jeux')),
+          h('span', { class: 'small muted' }, resume ? L('Resumed', 'Reprise') : L('New puzzle', 'Nouvelle partie')),
+        ),
         card.el,
       );
       card.mount();

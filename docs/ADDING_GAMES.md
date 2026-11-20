@@ -35,9 +35,9 @@ Read these first:
 ## Checking your work
 
 ```sh
-npx tsc --noEmit -p .        # only errors in your own files matter
-npx vitest run               # generation speed, not-solved-at-start, resume round-trip, registry
-IDS=<id1>,<id2> LEVELS=1,3,5 node scripts/shots.mjs http://localhost:5180/ shots-<name>
+npm run check               # fmt:check, lint, typecheck (tsrs), knip, tests — must pass
+npm run fix                 # (or `mise run fix`) format + lint autofixes
+IDS=<id1>,<id2> LEVELS=1,3,5 npm run e2e:shots   # screenshots of your games (needs `npm run dev`)
 ```
 
 The screenshot script writes contact sheets (`sheet-*.png`) into the output folder. Look at them.
@@ -58,4 +58,5 @@ The screenshot script writes contact sheets (`sheet-*.png`) into the output fold
   - `tips`: 1 to 3 strategy hints for a beginner.
 
   It shows in a dialog behind the "?" next to the title. Keep it concrete, short and friendly, and make it match what the game actually does.
+
 - Word games whose content depends on the language set `localized: true` and must generate from the current locale's word list.

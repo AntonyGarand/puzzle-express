@@ -17,7 +17,9 @@ function validState(v: unknown): v is PState {
 
 export const pyramid: PuzzleDef = {
   id: 'pyramid',
-  get name() { return L('Pyramid', 'Pyramide'); },
+  get name() {
+    return L('Pyramid', 'Pyramide');
+  },
   category: 'cards',
   get rules() {
     return L('Pair open cards that add to 13 (K alone). Clear the top.', 'Retirez des paires qui font 13 (R seul). Videz la pyramide.');
@@ -143,7 +145,11 @@ export const pyramid: PuzzleDef = {
     const draw = () => {
       sel = null;
       const n = { ...s, stock: s.stock.slice(), waste: s.waste.slice() };
-      if (!drawP(n, passes)) { bump('s'); render(); return; }
+      if (!drawP(n, passes)) {
+        bump('s');
+        render();
+        return;
+      }
       hist.push(s);
       s = n;
       after();
@@ -151,7 +157,10 @@ export const pyramid: PuzzleDef = {
 
     const pick = (p: string) => {
       const c = cardAt(s, p);
-      if (c == null) { bump(p); return; }
+      if (c == null) {
+        bump(p);
+        return;
+      }
       if (rank(c) === 13) {
         hist.push(s);
         removeP(s, p);
@@ -180,7 +189,10 @@ export const pyramid: PuzzleDef = {
       tap(p, i) {
         if (over) return;
         ctx.touch();
-        if (p === 's') { draw(); return; }
+        if (p === 's') {
+          draw();
+          return;
+        }
         if (p === 'w' && i !== 0) return;
         pick(p);
       },
@@ -213,8 +225,17 @@ export const pyramid: PuzzleDef = {
     return {
       snapshot: () => ({ s, hist: hist.stack, sel }),
       onKey(e) {
-        if (e.key === 'z' || e.key === 'Backspace') { undo(); return true; }
-        if (e.key === ' ' || e.key === 'd') { if (!over) { ctx.touch(); draw(); } return true; }
+        if (e.key === 'z' || e.key === 'Backspace') {
+          undo();
+          return true;
+        }
+        if (e.key === ' ' || e.key === 'd') {
+          if (!over) {
+            ctx.touch();
+            draw();
+          }
+          return true;
+        }
         return false;
       },
     };

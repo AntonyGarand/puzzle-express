@@ -1,14 +1,24 @@
-[data-puzzle='chess'] { --accent: var(--p2); }
+[data-puzzle='chess'] {
+  --accent: var(--p2);
+}
 [data-puzzle='chess'] .chess .cell {
   font-size: calc(var(--board) / 8 * 0.74);
   line-height: 1;
   border-radius: 4px;
   cursor: pointer;
 }
-[data-puzzle='chess'] .chess .cell.dk { background: color-mix(in srgb, var(--accent) 48%, var(--cell)); }
-[data-puzzle='chess'] .chess .cell.last { background: color-mix(in srgb, var(--hi) 50%, var(--cell)); }
-[data-puzzle='chess'] .chess .cell.last.dk { background: color-mix(in srgb, var(--hi) 62%, var(--cell-alt)); }
-[data-puzzle='chess'] .chess .cell.sel { background: var(--accent); }
+[data-puzzle='chess'] .chess .cell.dk {
+  background: color-mix(in srgb, var(--accent) 48%, var(--cell));
+}
+[data-puzzle='chess'] .chess .cell.last {
+  background: color-mix(in srgb, var(--hi) 50%, var(--cell));
+}
+[data-puzzle='chess'] .chess .cell.last.dk {
+  background: color-mix(in srgb, var(--hi) 62%, var(--cell-alt));
+}
+[data-puzzle='chess'] .chess .cell.sel {
+  background: var(--accent);
+}
 [data-puzzle='chess'] .chess .cell.tgt::after {
   content: '';
   position: absolute;
@@ -34,6 +44,14 @@
   pointer-events: none;
   transform: translateY(-3%);
 }
-[data-puzzle='chess'] .chess .pw { color: var(--cell); -webkit-text-stroke: 1.6px var(--ink); paint-order: stroke fill; }
-[data-puzzle='chess'] .chess .pb { color: var(--fg); }
-.card.is-solved[data-puzzle='chess'] .grid { animation: pop 0.45s ease; }
+[data-puzzle='chess'] .chess .pw {
+  color: var(--cell);
+  -webkit-text-stroke: 1.6px var(--ink);
+  paint-order: stroke fill;
+}
+[data-puzzle='chess'] .chess .pb {
+  color: var(--fg);
+}
+.card.is-solved[data-puzzle='chess'] .grid {
+  animation: pop 0.45s ease;
+}

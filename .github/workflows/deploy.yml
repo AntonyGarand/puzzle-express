@@ -15,16 +15,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check:
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
+      - uses: jdx/mise-action@v3
       - run: npm ci
-      - run: npx vitest run
       - run: npm run build
       - uses: actions/upload-pages-artifact@v4
         with:

@@ -1,5 +1,9 @@
-[data-puzzle='gems'] { --accent: var(--p6); }
-[data-puzzle='gems'] .puzzle { --board: min(90vw, calc(100dvh - var(--head) - var(--tabs) - 320px), 420px); }
+[data-puzzle='gems'] {
+  --accent: var(--p6);
+}
+[data-puzzle='gems'] .puzzle {
+  --board: min(90vw, calc(100dvh - var(--head) - var(--tabs) - 320px), 420px);
+}
 
 [data-puzzle='gems'] .gems-grid {
   position: relative;
@@ -12,7 +16,9 @@
   box-shadow: var(--sh) var(--sh) 0 var(--ink);
   touch-action: none;
 }
-[data-puzzle='gems'] .pad { width: min(var(--board), 300px); }
+[data-puzzle='gems'] .pad {
+  width: min(var(--board), 300px);
+}
 [data-puzzle='gems'] .gems-grid .cell {
   border: 0;
   border-radius: 0;

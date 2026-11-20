@@ -7,16 +7,23 @@ import './mines.css';
 
 export const mines: PuzzleDef = {
   id: 'mines',
-  get name() { return L('Mines', 'Démineur'); },
+  get name() {
+    return L('Mines', 'Démineur');
+  },
   category: 'logic',
-  get rules() { return L('Open every safe tile. Numbers count mines around.', 'Ouvrez toutes les cases sûres. Un chiffre = mines autour.'); },
+  get rules() {
+    return L('Open every safe tile. Numbers count mines around.', 'Ouvrez toutes les cases sûres. Un chiffre = mines autour.');
+  },
   help: () => ({
     goal: L(
       'Open every tile that doesn’t hide a mine. Numbers tell you how many mines touch each tile.',
       'Ouvrez toutes les cases qui ne cachent pas de mine. Les chiffres indiquent combien de mines touchent chaque case.',
     ),
     steps: [
-      L('Tap a tile to open it. Your first tap is always safe.', 'Touchez une case pour l’ouvrir. Votre première case est toujours sans danger.'),
+      L(
+        'Tap a tile to open it. Your first tap is always safe.',
+        'Touchez une case pour l’ouvrir. Votre première case est toujours sans danger.',
+      ),
       L(
         'A number counts the mines in the 8 tiles around it. Opening a mine ends the game.',
         'Un chiffre compte les mines dans les 8 cases autour. Ouvrir une mine met fin à la partie.',
@@ -78,7 +85,10 @@ export const mines: PuzzleDef = {
         let txt = '';
         if (open[i]) {
           cls.push('open');
-          if (count[i]) { cls.push(`m${count[i]}`); txt = String(count[i]); }
+          if (count[i]) {
+            cls.push(`m${count[i]}`);
+            txt = String(count[i]);
+          }
         } else if (over === 'lost' && mine[i]) {
           cls.push('mine');
           if (i === hit) cls.push('err');
@@ -89,7 +99,11 @@ export const mines: PuzzleDef = {
         if (el.textContent !== txt) el.textContent = txt;
       });
       const flags = flag.filter(Boolean).length;
-      ctx.status(first < 0 ? L(`${total} mines · tap any tile`, `${total} mines à trouver`) : P(total - flags, ['mine left', 'mines left'], ['mine restante', 'mines restantes']));
+      ctx.status(
+        first < 0
+          ? L(`${total} mines · tap any tile`, `${total} mines à trouver`)
+          : P(total - flags, ['mine left', 'mines left'], ['mine restante', 'mines restantes']),
+      );
     };
 
     const won = () => open.filter(Boolean).length === N - total;
@@ -135,18 +149,26 @@ export const mines: PuzzleDef = {
     };
 
     // Long-press / right-click flags.
-    let pressTimer = 0, pressCell = -1, px = 0, py = 0, suppress = false;
+    let pressTimer = 0,
+      pressCell = -1,
+      px = 0,
+      py = 0,
+      suppress = false;
     const cellOf = (e: Event) => {
       const t = (e.target as Element | null)?.closest?.('[data-i]') as HTMLElement | null;
       return t && grid.contains(t) ? Number(t.dataset.i) : -1;
     };
-    const cancelPress = () => { clearTimeout(pressTimer); pressTimer = 0; };
+    const cancelPress = () => {
+      clearTimeout(pressTimer);
+      pressTimer = 0;
+    };
     grid.addEventListener('pointerdown', (e) => {
       suppress = false;
       cancelPress();
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       pressCell = cellOf(e);
-      px = e.clientX; py = e.clientY;
+      px = e.clientX;
+      py = e.clientY;
       if (pressCell < 0) return;
       pressTimer = window.setTimeout(() => {
         pressTimer = 0;
@@ -156,7 +178,9 @@ export const mines: PuzzleDef = {
         navigator.vibrate?.(12);
       }, 380);
     });
-    grid.addEventListener('pointermove', (e) => { if (pressTimer && Math.hypot(e.clientX - px, e.clientY - py) > 10) cancelPress(); });
+    grid.addEventListener('pointermove', (e) => {
+      if (pressTimer && Math.hypot(e.clientX - px, e.clientY - py) > 10) cancelPress();
+    });
     grid.addEventListener('pointerup', cancelPress);
     grid.addEventListener('pointercancel', cancelPress);
     grid.addEventListener('pointerleave', cancelPress);
@@ -169,18 +193,26 @@ export const mines: PuzzleDef = {
     });
 
     const tap = (i: number) => {
-      if (suppress) { suppress = false; return; }
+      if (suppress) {
+        suppress = false;
+        return;
+      }
       if (over) return;
       ctx.touch();
       if (mode === 'flag' && !open[i]) toggleFlag(i);
       else dig(i);
     };
 
-    const digLabel = L('Tap: dig', 'Touche : creuser'), flagLabel = L('Tap: flag', 'Touche : drapeau');
-    const modeBtn = btn(digLabel, () => {
-      mode = mode === 'dig' ? 'flag' : 'dig';
-      modeBtn.textContent = mode === 'dig' ? digLabel : flagLabel;
-    }, 'ghost');
+    const digLabel = L('Tap: dig', 'Touche : creuser'),
+      flagLabel = L('Tap: flag', 'Touche : drapeau');
+    const modeBtn = btn(
+      digLabel,
+      () => {
+        mode = mode === 'dig' ? 'flag' : 'dig';
+        modeBtn.textContent = mode === 'dig' ? digLabel : flagLabel;
+      },
+      'ghost',
+    );
     ctx.controls(modeBtn);
 
     const sv = ctx.saved as { first?: unknown; open?: unknown; flag?: unknown; mode?: unknown } | undefined;
@@ -198,7 +230,10 @@ export const mines: PuzzleDef = {
     return {
       snapshot: () => ({ first, open: list(open), flag: list(flag), mode }),
       onKey(e) {
-        if (e.key === 'f' || e.key === ' ') { modeBtn.click(); return true; }
+        if (e.key === 'f' || e.key === ' ') {
+          modeBtn.click();
+          return true;
+        }
         return false;
       },
       destroy: cancelPress,

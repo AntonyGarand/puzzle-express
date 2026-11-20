@@ -7,7 +7,10 @@ import { LEVELS, type Difficulty, type PuzzleCtx, type PuzzleDef } from '../src/
 import { PUZZLES } from '../src/puzzles';
 import { answers, commonOfLength, fold, isWord, letterKey, whenDict } from '../src/puzzles/wordkit/lexicon';
 
-(globalThis as any).ResizeObserver ??= class { observe() {} disconnect() {} };
+(globalThis as any).ResizeObserver ??= class {
+  observe() {}
+  disconnect() {}
+};
 (globalThis as any).matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 
 const IDS = ['anagram', 'word-guess', 'hunt', 'tower'];

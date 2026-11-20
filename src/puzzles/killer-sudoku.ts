@@ -10,9 +10,13 @@ const BOX: Record<number, [number, number]> = { 4: [2, 2], 6: [2, 3], 9: [3, 3] 
 
 export const killerSudoku: PuzzleDef = {
   id: 'killer-sudoku',
-  get name() { return L('Killer Sudoku', 'Sudoku killer'); },
+  get name() {
+    return L('Killer Sudoku', 'Sudoku killer');
+  },
   category: 'logic',
-  get rules() { return L('Sudoku; dashed cages add up to their sum, no repeats.', 'Sudoku; chaque cage pointillée fait sa somme, sans doublon.'); },
+  get rules() {
+    return L('Sudoku; dashed cages add up to their sum, no repeats.', 'Sudoku; chaque cage pointillée fait sa somme, sans doublon.');
+  },
   help: () => ({
     goal: L(
       'Fill the grid like a sudoku, and make the digits in each dashed cage add up to the small number in its corner.',
@@ -96,7 +100,7 @@ export const killerSudoku: PuzzleDef = {
     revealUntilUnique(problem, puzzle, sol, 50000, rng);
     for (let k = 0; k < extraGivens; k++) {
       const open = [...puzzle.keys()].filter((i) => !puzzle[i]);
-      if (open.length <= n * n / 2) break;
+      if (open.length <= (n * n) / 2) break;
       const c = rng.pick(open);
       puzzle[c] = sol[c];
     }
@@ -112,7 +116,9 @@ export const killerSudoku: PuzzleDef = {
       boardClass: 'slab killer',
       cellClass: (i) => edgeClasses(box, n, n, i),
       decorate(el, i) {
-        const r = Math.floor(i / n), c = i % n, k = cage[i];
+        const r = Math.floor(i / n),
+          c = i % n,
+          k = cage[i];
         const side = (cond: boolean, cls: string) => (cond ? cls : '');
         const cls = [
           side(r === 0 || cage[i - n] !== k, 'ct'),

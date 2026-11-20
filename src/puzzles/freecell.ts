@@ -50,7 +50,8 @@ function generate(d: Difficulty, rng: Rng): FState {
 
 function validState(v: unknown): v is FState {
   const s = v as FState;
-  if (!s || !Array.isArray(s.cells) || !Array.isArray(s.found) || !Array.isArray(s.cas) || s.cas.length !== 8 || s.found.length !== 4) return false;
+  if (!s || !Array.isArray(s.cells) || !Array.isArray(s.found) || !Array.isArray(s.cas) || s.cas.length !== 8 || s.found.length !== 4)
+    return false;
   if (!s.cas.every(Array.isArray) || typeof s.moves !== 'number') return false;
   const n = s.cells.filter((c) => c >= 0).length + s.found.reduce((a, b) => a + b, 0) + s.cas.reduce((a, c) => a + c.length, 0);
   return n === 52;
@@ -58,7 +59,9 @@ function validState(v: unknown): v is FState {
 
 export const freecell: PuzzleDef = {
   id: 'freecell',
-  get name() { return L('FreeCell', 'FreeCell'); },
+  get name() {
+    return L('FreeCell', 'FreeCell');
+  },
   category: 'cards',
   get rules() {
     return L('Use free cells to sort every suit home, A→K.', 'Rangez chaque sorte de A à R grâce aux cellules libres.');
@@ -115,7 +118,9 @@ export const freecell: PuzzleDef = {
 
     const status = () => {
       const home = s.found.reduce((a, b) => a + b, 0);
-      ctx.status(`${L('Home', 'Fondations')} ${home}/52 · ${L('Moves', 'Coups')} ${s.moves}${nc < 4 ? ` · ${P(nc, ['cell', 'cells'], ['cellule', 'cellules'])}` : ''}`);
+      ctx.status(
+        `${L('Home', 'Fondations')} ${home}/52 · ${L('Moves', 'Coups')} ${s.moves}${nc < 4 ? ` · ${P(nc, ['cell', 'cells'], ['cellule', 'cellules'])}` : ''}`,
+      );
     };
 
     const render = () => {
@@ -182,7 +187,10 @@ export const freecell: PuzzleDef = {
         if (over || i < 0) return;
         ctx.touch();
         const to = bestDestF(s, p, i);
-        if (!to) { bump(p, i); return; }
+        if (!to) {
+          bump(p, i);
+          return;
+        }
         hist.push(s);
         moveF(s, p, i, to);
         after();
@@ -193,7 +201,8 @@ export const freecell: PuzzleDef = {
         const dest = to[0] === 'f' ? 'f' : to;
         if (!moveF(s, p, i, dest, true)) {
           const n = pickedF(s, p, i)?.length ?? 0;
-          if (n > 1 && to[0] === 't') ctx.status(L(`Not enough free space to move ${n} cards`, `Pas assez d’espace libre pour déplacer ${n} cartes`));
+          if (n > 1 && to[0] === 't')
+            ctx.status(L(`Not enough free space to move ${n} cards`, `Pas assez d’espace libre pour déplacer ${n} cartes`));
           return false;
         }
         hist.push(s);
@@ -220,7 +229,10 @@ export const freecell: PuzzleDef = {
     return {
       snapshot: () => ({ s, hist: hist.stack }),
       onKey(e) {
-        if (e.key === 'z' || e.key === 'Backspace') { undo(); return true; }
+        if (e.key === 'z' || e.key === 'Backspace') {
+          undo();
+          return true;
+        }
         return false;
       },
     };

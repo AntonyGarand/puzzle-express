@@ -6,21 +6,29 @@ import { genTents, tentsMatch } from './logickit/tentsgen';
 import './tents.css';
 
 const treeSvg = () =>
-  s('svg', { viewBox: '0 0 100 100', class: 'lk-tree', 'aria-hidden': 'true' },
+  s(
+    'svg',
+    { viewBox: '0 0 100 100', class: 'lk-tree', 'aria-hidden': 'true' },
     s('rect', { x: 43, y: 56, width: 14, height: 32, rx: 3, class: 'trunk' }),
     s('circle', { cx: 50, cy: 40, r: 27, class: 'crown' }),
   );
 const tentSvg = () =>
-  s('svg', { viewBox: '0 0 100 100', class: 'lk-tent', 'aria-hidden': 'true' },
+  s(
+    'svg',
+    { viewBox: '0 0 100 100', class: 'lk-tent', 'aria-hidden': 'true' },
     s('polygon', { points: '50,14 90,84 10,84', class: 'canvas' }),
     s('polygon', { points: '50,46 63,84 37,84', class: 'door' }),
   );
 
 export const tents: PuzzleDef = {
   id: 'tents',
-  get name() { return L('Tents', 'Tentes'); },
+  get name() {
+    return L('Tents', 'Tentes');
+  },
   category: 'logic',
-  get rules() { return L('A tent beside each tree. Tents never touch. Match counts.', 'Une tente près de chaque arbre, sans contact. Totaux exacts.'); },
+  get rules() {
+    return L('A tent beside each tree. Tents never touch. Match counts.', 'Une tente près de chaque arbre, sans contact. Totaux exacts.');
+  },
   help: () => ({
     goal: L(
       'Pitch one tent next to each tree, so the numbers on the edges match the tents in every row and column.',
@@ -79,8 +87,12 @@ export const tents: PuzzleDef = {
 
     const render = () => {
       const placed = st.map((v, i) => (v === 2 ? i : -1)).filter((i) => i >= 0);
-      const rows = new Array<number>(n).fill(0), cols = new Array<number>(n).fill(0);
-      for (const t of placed) { rows[Math.floor(t / n)]++; cols[t % n]++; }
+      const rows = new Array<number>(n).fill(0),
+        cols = new Array<number>(n).fill(0);
+      for (const t of placed) {
+        rows[Math.floor(t / n)]++;
+        cols[t % n]++;
+      }
       cells.forEach((el, i) => {
         if (isTree[i]) return;
         const tent = st[i] === 2;
@@ -106,7 +118,10 @@ export const tents: PuzzleDef = {
       if (done) return;
       ctx.touch();
       st[i] = (st[i] + 1) % 3;
-      if (render()) { done = true; ctx.solved(); }
+      if (render()) {
+        done = true;
+        ctx.solved();
+      }
     };
 
     const sv = ctx.saved as { st?: unknown } | undefined;

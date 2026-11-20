@@ -11,7 +11,7 @@ function seenSet(): Set<string> {
     return new Set();
   }
 }
-export const helpSeen = (id: string) => seenSet().has(id);
+const helpSeen = (id: string) => seenSet().has(id);
 function markSeen(id: string) {
   const s = seenSet();
   s.add(id);
@@ -25,7 +25,7 @@ function markSeen(id: string) {
 let dialog: HTMLDialogElement | null = null;
 
 /** Show the how-to-play dialog for a game. */
-export function openHelp(def: PuzzleDef, onClose?: () => void) {
+function openHelp(def: PuzzleDef, onClose?: () => void) {
   markSeen(def.id);
   dialog?.remove();
   const help = def.help?.();
@@ -43,9 +43,16 @@ export function openHelp(def: PuzzleDef, onClose?: () => void) {
     ),
     h('p', { class: 'help-goal' }, help?.goal ?? def.rules),
     help?.steps.length
-      ? h('section', null, h('h3', null, L('How to play', 'Comment jouer')), h('ol', { class: 'help-steps' }, ...help.steps.map((s) => h('li', null, s))))
+      ? h(
+          'section',
+          null,
+          h('h3', null, L('How to play', 'Comment jouer')),
+          h('ol', { class: 'help-steps' }, ...help.steps.map((s) => h('li', null, s))),
+        )
       : null,
-    help?.tips?.length ? h('section', null, h('h3', null, L('Tips', 'Astuces')), h('ul', { class: 'help-tips' }, ...help.tips.map((s) => h('li', null, s)))) : null,
+    help?.tips?.length
+      ? h('section', null, h('h3', null, L('Tips', 'Astuces')), h('ul', { class: 'help-tips' }, ...help.tips.map((s) => h('li', null, s))))
+      : null,
     h(
       'p',
       { class: 'help-levels muted small' },

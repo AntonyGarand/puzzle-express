@@ -6,7 +6,10 @@ import { PUZZLES } from '../src/puzzles';
 import { WORDS } from '../src/puzzles/words';
 
 // happy-dom lacks a few APIs some puzzles touch.
-(globalThis as any).ResizeObserver ??= class { observe() {} disconnect() {} };
+(globalThis as any).ResizeObserver ??= class {
+  observe() {}
+  disconnect() {}
+};
 (globalThis as any).matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
 
 function ctx(d: (typeof LEVELS)[number], seed: number) {

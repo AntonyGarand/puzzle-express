@@ -10,29 +10,54 @@ const TONES = [PALETTE[1], PALETTE[2], PALETTE[3], PALETTE[4], PALETTE[5], PALET
 
 export const unblock: PuzzleDef = {
   id: 'unblock',
-  get name() { return L('Unblock', 'Débloquer'); },
+  get name() {
+    return L('Unblock', 'Débloquer');
+  },
   category: 'moves',
-  get rules() { return L('Slide blocks along their lanes to free the key block.', 'Glissez les blocs dans leur axe pour libérer le bloc clé.'); },
+  get rules() {
+    return L('Slide blocks along their lanes to free the key block.', 'Glissez les blocs dans leur axe pour libérer le bloc clé.');
+  },
   help: () => ({
     goal: L(
       'Get the key block out through the exit on the right side of its row.',
       'Faites sortir le bloc clé par la sortie, à droite de sa rangée.',
     ),
     steps: [
-      L('Drag a block along its lane: horizontal blocks move left and right, vertical ones up and down.', 'Glissez un bloc dans son axe : les blocs horizontaux vont à gauche et à droite, les verticaux, en haut et en bas.'),
+      L(
+        'Drag a block along its lane: horizontal blocks move left and right, vertical ones up and down.',
+        'Glissez un bloc dans son axe : les blocs horizontaux vont à gauche et à droite, les verticaux, en haut et en bas.',
+      ),
       L('Blocks can’t turn or pass through each other.', 'Les blocs ne tournent pas et ne passent pas à travers les autres.'),
-      L('Moving the same block again counts as one move. “best” is the fewest moves possible.', 'Déplacer le même bloc de suite compte pour un seul coup. « min. » indique le plus petit nombre de coups possible.'),
-      L('Keyboard: Tab or Space picks a block, arrow keys move it, Z undoes.', 'Au clavier : Tab ou Espace choisit un bloc, les flèches le déplacent, Z annule.'),
-      L('Undo steps back; Restart puts every block back where it started.', 'Annuler revient d’un coup; Repartir remet tous les blocs à leur place de départ.'),
+      L(
+        'Moving the same block again counts as one move. “best” is the fewest moves possible.',
+        'Déplacer le même bloc de suite compte pour un seul coup. « min. » indique le plus petit nombre de coups possible.',
+      ),
+      L(
+        'Keyboard: Tab or Space picks a block, arrow keys move it, Z undoes.',
+        'Au clavier : Tab ou Espace choisit un bloc, les flèches le déplacent, Z annule.',
+      ),
+      L(
+        'Undo steps back; Restart puts every block back where it started.',
+        'Annuler revient d’un coup; Repartir remet tous les blocs à leur place de départ.',
+      ),
     ],
     tips: [
-      L('Work backwards: find what blocks the key block’s row, then what blocks those.', 'Raisonnez à rebours : trouvez ce qui bloque la rangée du bloc clé, puis ce qui bloque ces blocs-là.'),
+      L(
+        'Work backwards: find what blocks the key block’s row, then what blocks those.',
+        'Raisonnez à rebours : trouvez ce qui bloque la rangée du bloc clé, puis ce qui bloque ces blocs-là.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [20, 45, 80, 130, 200]),
   create(ctx) {
     const { root, rng, difficulty: d } = ctx;
-    const [lo, hi] = byLevel<[number, number]>(d, [[3, 5], [6, 9], [10, 13], [13, 17], [18, 60]]);
+    const [lo, hi] = byLevel<[number, number]>(d, [
+      [3, 5],
+      [6, 9],
+      [10, 13],
+      [13, 17],
+      [18, 60],
+    ]);
     const lay = generateUnblock(rng, lo, hi, byLevel(d, [60000, 100000, 120000, 140000, 140000]));
     const { blocks, optimal } = lay;
     const start = lay.pos.slice();
@@ -84,7 +109,8 @@ export const unblock: PuzzleDef = {
 
     const place = (i: number, p: number) => {
       const b = blocks[i];
-      const x = b.hz ? p : b.line, y = b.hz ? b.line : p;
+      const x = b.hz ? p : b.line,
+        y = b.hz ? b.line : p;
       els[i].style.setProperty('--x', String(x));
       els[i].style.setProperty('--y', String(y));
       els[i].style.setProperty('--w', String(b.hz ? b.len : 1));
@@ -197,10 +223,17 @@ export const unblock: PuzzleDef = {
           render();
           return true;
         }
-        if (e.key === 'z' || e.key === 'Backspace') { undo(); return true; }
+        if (e.key === 'z' || e.key === 'Backspace') {
+          undo();
+          return true;
+        }
         const k = keyDir(e);
         if (k == null) return false;
-        if (sel < 0) { sel = 0; render(); return true; }
+        if (sel < 0) {
+          sel = 0;
+          render();
+          return true;
+        }
         const b = blocks[sel];
         if (b.hz !== (k === 1 || k === 3)) return true;
         const step = k === 1 || k === 2 ? 1 : -1;

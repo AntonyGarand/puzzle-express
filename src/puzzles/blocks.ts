@@ -9,23 +9,45 @@ const colour = (p: Piece) => PALETTE[p.fam % PALETTE.length];
 
 export const blocks: PuzzleDef = {
   id: 'blocks',
-  get name() { return L('Blocks', 'Blocs'); },
+  get name() {
+    return L('Blocks', 'Blocs');
+  },
   category: 'moves',
-  get rules() { return L('Place the pieces. Fill rows or columns to clear them.', 'Placez les pièces. Une ligne ou colonne pleine s’efface.'); },
+  get rules() {
+    return L('Place the pieces. Fill rows or columns to clear them.', 'Placez les pièces. Une ligne ou colonne pleine s’efface.');
+  },
   help: () => ({
     goal: L(
       'Clear the target number of lines by filling complete rows or columns with pieces.',
       'Effacez le nombre de lignes demandé en remplissant des rangées ou des colonnes complètes.',
     ),
     steps: [
-      L('Drag a piece from the tray onto the grid; a preview shows where it lands and which lines will clear.', 'Glissez une pièce du bac vers la grille : un aperçu montre où elle se pose et quelles lignes s’effaceront.'),
-      L('Or tap a piece (or press 1, 2 or 3), then tap a cell to centre it there.', 'Ou touchez une pièce (ou appuyez sur 1, 2 ou 3), puis touchez une case pour la centrer là.'),
-      L('A full row or column disappears and counts towards the goal.', 'Une rangée ou une colonne pleine disparaît et compte pour l’objectif.'),
-      L('Pieces don’t rotate. When all three are placed, three new ones arrive.', 'Les pièces ne tournent pas. Une fois les trois placées, trois nouvelles arrivent.'),
-      L('Faded pieces fit nowhere. If none of your pieces fit, the game is over.', 'Les pièces pâlies ne rentrent nulle part. Si aucune ne rentre, la partie est finie.'),
+      L(
+        'Drag a piece from the tray onto the grid; a preview shows where it lands and which lines will clear.',
+        'Glissez une pièce du bac vers la grille : un aperçu montre où elle se pose et quelles lignes s’effaceront.',
+      ),
+      L(
+        'Or tap a piece (or press 1, 2 or 3), then tap a cell to centre it there.',
+        'Ou touchez une pièce (ou appuyez sur 1, 2 ou 3), puis touchez une case pour la centrer là.',
+      ),
+      L(
+        'A full row or column disappears and counts towards the goal.',
+        'Une rangée ou une colonne pleine disparaît et compte pour l’objectif.',
+      ),
+      L(
+        'Pieces don’t rotate. When all three are placed, three new ones arrive.',
+        'Les pièces ne tournent pas. Une fois les trois placées, trois nouvelles arrivent.',
+      ),
+      L(
+        'Faded pieces fit nowhere. If none of your pieces fit, the game is over.',
+        'Les pièces pâlies ne rentrent nulle part. Si aucune ne rentre, la partie est finie.',
+      ),
     ],
     tips: [
-      L('Keep the board open and leave room for the big pieces.', 'Gardez la grille dégagée et laissez de la place pour les grosses pièces.'),
+      L(
+        'Keep the board open and leave room for the big pieces.',
+        'Gardez la grille dégagée et laissez de la place pour les grosses pièces.',
+      ),
       L('Filling a row and a column at once clears both.', 'Remplir une rangée et une colonne d’un coup efface les deux.'),
     ],
   }),
@@ -65,7 +87,12 @@ export const blocks: PuzzleDef = {
     };
 
     const sv = ctx.saved as { cells?: unknown; tray?: unknown; batch?: unknown; cleared?: unknown; sel?: unknown } | undefined;
-    if (isIntArr(sv?.cells, n * n) && isIntArr(sv?.tray, 3) && sv.tray.every((p) => p >= -1 && p < PIECES.length) && sv.tray.some((p) => p >= 0)) {
+    if (
+      isIntArr(sv?.cells, n * n) &&
+      isIntArr(sv?.tray, 3) &&
+      sv.tray.every((p) => p >= -1 && p < PIECES.length) &&
+      sv.tray.some((p) => p >= 0)
+    ) {
       cells = sv.cells.map((v) => Math.max(0, Math.min(9, v)));
       tray = sv.tray.slice();
       batch = int(sv.batch, 1);
@@ -95,7 +122,10 @@ export const blocks: PuzzleDef = {
       if (preview) {
         const { p, r, c } = preview;
         const tmp = cells.slice();
-        for (const [dr, dc] of p.cells) { pv.add((r + dr) * n + c + dc); tmp[(r + dr) * n + c + dc] = 1; }
+        for (const [dr, dc] of p.cells) {
+          pv.add((r + dr) * n + c + dc);
+          tmp[(r + dr) * n + c + dc] = 1;
+        }
         const { rows, cols } = fullLines(tmp, n);
         for (const rr of rows) for (let j = 0; j < n; j++) clr.add(rr * n + j);
         for (const cc of cols) for (let j = 0; j < n; j++) clr.add(j * n + cc);
@@ -111,13 +141,19 @@ export const blocks: PuzzleDef = {
       slots.forEach((el, k) => {
         const p = tray[k];
         el.className = `key blk-slot ${k === sel ? 'sel' : ''} ${p < 0 ? 'used' : ''}`.replace(/\s+/g, ' ').trim();
-        if (p < 0) { el.replaceChildren(); return; }
+        if (p < 0) {
+          el.replaceChildren();
+          return;
+        }
         const pc = PIECES[p];
         const fitsNow = fitsAnywhere(cells, n, pc);
         el.classList.toggle('nofit', !fitsNow);
         el.replaceChildren(
-          h('span', { class: 'blk-mini', style: `--w:${pc.w};--h:${pc.h}` },
-            ...pc.cells.map(([r, c]) => h('i', { style: `grid-row:${r + 1};grid-column:${c + 1};--c:${colour(pc)}` }))),
+          h(
+            'span',
+            { class: 'blk-mini', style: `--w:${pc.w};--h:${pc.h}` },
+            ...pc.cells.map(([r, c]) => h('i', { style: `grid-row:${r + 1};grid-column:${c + 1};--c:${colour(pc)}` })),
+          ),
         );
       });
       ctx.status(L(`Lines ${Math.min(cleared, goal)}/${goal}`, `Lignes ${Math.min(cleared, goal)}/${goal}`));
@@ -143,7 +179,11 @@ export const blocks: PuzzleDef = {
       render();
       for (const i of placed) if (!gone.has(i)) anim(els[i], [{ transform: 'scale(0.8)' }, { transform: 'scale(1)' }], 140);
       gone.forEach((i) => anim(els[i], [{ background: 'var(--accent)' }, { background: 'var(--cell)' }], 320));
-      if (cleared >= goal) { over = true; ctx.solved(); return true; }
+      if (cleared >= goal) {
+        over = true;
+        ctx.solved();
+        return true;
+      }
       if (!tray.some((x) => x >= 0 && fitsAnywhere(cells, n, PIECES[x]))) {
         over = true;
         shake(grid);
@@ -155,7 +195,10 @@ export const blocks: PuzzleDef = {
 
     let suppressClick = false;
     const tapSlot = (k: number) => {
-      if (suppressClick) { suppressClick = false; return; }
+      if (suppressClick) {
+        suppressClick = false;
+        return;
+      }
       if (over || tray[k] < 0) return;
       ctx.touch();
       sel = sel === k ? -1 : k;
@@ -173,7 +216,8 @@ export const blocks: PuzzleDef = {
     // Drag from the tray: a ghost follows the pointer (lifted above the finger on touch) and snaps to the grid.
     let drag: { k: number; id: number; sx: number; sy: number; active: boolean; ghost: HTMLElement | null; lift: number } | null = null;
     const geom = () => {
-      const a = els[0].getBoundingClientRect(), b = els[1].getBoundingClientRect();
+      const a = els[0].getBoundingClientRect(),
+        b = els[1].getBoundingClientRect();
       return { ox: a.left, oy: a.top, cs: a.width, pitch: b.left - a.left };
     };
     const startDrag = (k: number, e: PointerEvent) => {
@@ -189,17 +233,26 @@ export const blocks: PuzzleDef = {
         if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
         drag.active = true;
         sel = drag.k;
-        drag.ghost = h('div', { class: 'blk-ghost', style: `--cs:${g.cs}px;--gap:${g.pitch - g.cs}px;--w:${p.w};--h:${p.h}` },
-          ...p.cells.map(([r, c]) => h('i', { style: `grid-row:${r + 1};grid-column:${c + 1};--c:${colour(p)}` })));
+        drag.ghost = h(
+          'div',
+          { class: 'blk-ghost', style: `--cs:${g.cs}px;--gap:${g.pitch - g.cs}px;--w:${p.w};--h:${p.h}` },
+          ...p.cells.map(([r, c]) => h('i', { style: `grid-row:${r + 1};grid-column:${c + 1};--c:${colour(p)}` })),
+        );
         root.append(drag.ghost);
       }
-      const gw = p.w * g.pitch, gh = p.h * g.pitch;
-      const gx = e.clientX - gw / 2, gy = e.clientY - gh / 2 - drag.lift * (gh / 2 + g.pitch * 1.2);
+      const gw = p.w * g.pitch,
+        gh = p.h * g.pitch;
+      const gx = e.clientX - gw / 2,
+        gy = e.clientY - gh / 2 - drag.lift * (gh / 2 + g.pitch * 1.2);
       drag.ghost!.style.left = `${gx}px`;
       drag.ghost!.style.top = `${gy}px`;
-      const r = Math.round((gy - g.oy) / g.pitch), c = Math.round((gx - g.ox) / g.pitch);
+      const r = Math.round((gy - g.oy) / g.pitch),
+        c = Math.round((gx - g.ox) / g.pitch);
       const next = fits(cells, n, p, r, c) ? { p, r, c } : null;
-      if (next?.r !== preview?.r || next?.c !== preview?.c || !next !== !preview) { preview = next; render(); }
+      if (next?.r !== preview?.r || next?.c !== preview?.c || !next !== !preview) {
+        preview = next;
+        render();
+      }
     };
     const endDrag = (e: PointerEvent, cancel = false) => {
       if (!drag || e.pointerId !== drag.id) return;
@@ -227,11 +280,20 @@ export const blocks: PuzzleDef = {
       snapshot: () => ({ cells, tray, batch, cleared, sel }),
       onKey(e) {
         const k = Number(e.key) - 1;
-        if (k >= 0 && k <= 2 && e.key.length === 1) { tapSlot(k); return true; }
-        if (e.key === 'Escape') { sel = -1; render(); return true; }
+        if (k >= 0 && k <= 2 && e.key.length === 1) {
+          tapSlot(k);
+          return true;
+        }
+        if (e.key === 'Escape') {
+          sel = -1;
+          render();
+          return true;
+        }
         return false;
       },
-      destroy() { drag?.ghost?.remove(); },
+      destroy() {
+        drag?.ghost?.remove();
+      },
     };
   },
 };

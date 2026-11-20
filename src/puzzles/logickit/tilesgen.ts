@@ -1,6 +1,11 @@
 import type { Rng } from '../../core/rng';
 
-export interface Rect { r0: number; c0: number; r1: number; c1: number }
+export interface Rect {
+  r0: number;
+  c0: number;
+  r1: number;
+  c1: number;
+}
 export interface TilesPuzzle {
   n: number;
   /** Clue value per cell (0 = none). */
@@ -17,12 +22,14 @@ export const rectCells = (q: Rect, n: number) => {
 };
 
 /** Count solutions up to `cap` within a node budget (exact cover over clue rectangles). */
-export function solveTiles(n: number, clue: number[], cap: number, budget = 40000): { count: number; complete: boolean } {
+function solveTiles(n: number, clue: number[], cap: number, budget = 40000): { count: number; complete: boolean } {
   const clues = clue.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
   const isClue = clue.map((v) => v > 0);
   // Candidate rectangles per clue, as cell lists.
   const cands = clues.map((p) => {
-    const a = clue[p], pr = Math.floor(p / n), pc = p % n;
+    const a = clue[p],
+      pr = Math.floor(p / n),
+      pc = p % n;
     const out: number[][] = [];
     for (let hgt = 1; hgt <= a; hgt++) {
       if (a % hgt) continue;
@@ -38,18 +45,26 @@ export function solveTiles(n: number, clue: number[], cap: number, budget = 4000
   });
   const used = new Uint8Array(n * n);
   const done = new Array<boolean>(clues.length).fill(false);
-  let count = 0, nodes = 0;
+  let count = 0,
+    nodes = 0;
   const fits = (cells: number[]) => cells.every((i) => !used[i]);
   const rec = (left: number): boolean => {
     if (++nodes > budget) return false;
-    if (left === 0) { count++; return count < cap; }
-    let best = -1, bestN = Infinity;
+    if (left === 0) {
+      count++;
+      return count < cap;
+    }
+    let best = -1,
+      bestN = Infinity;
     for (let k = 0; k < clues.length; k++) {
       if (done[k]) continue;
       let m = 0;
       for (const cs of cands[k]) if (fits(cs)) m++;
       if (m === 0) return true;
-      if (m < bestN) { bestN = m; best = k; }
+      if (m < bestN) {
+        bestN = m;
+        best = k;
+      }
     }
     done[best] = true;
     for (const cs of cands[best]) {
@@ -57,7 +72,10 @@ export function solveTiles(n: number, clue: number[], cap: number, budget = 4000
       for (const i of cs) used[i] = 1;
       const go = rec(left - 1);
       for (const i of cs) used[i] = 0;
-      if (!go) { done[best] = false; return false; }
+      if (!go) {
+        done[best] = false;
+        return false;
+      }
     }
     done[best] = false;
     return true;
@@ -73,8 +91,10 @@ export function genTiles(n: number, maxArea: number, rng: Rng): TilesPuzzle {
     const rects: Rect[] = [];
     for (let i = 0; i < n * n; i++) {
       if (owner[i] >= 0) continue;
-      const r0 = Math.floor(i / n), c0 = i % n;
-      const opts: Rect[] = [], all: Rect[] = [];
+      const r0 = Math.floor(i / n),
+        c0 = i % n;
+      const opts: Rect[] = [],
+        all: Rect[] = [];
       let maxW = 0;
       while (c0 + maxW < n && owner[i + maxW] < 0) maxW++;
       for (let w = 1; w <= maxW; w++)

@@ -1,0 +1,35 @@
+# Toolchain + task runner. `mise install` once, then `mise run <task>` (or the npm scripts directly).
+[tools]
+node = "24"
+
+[tasks.install]
+description = "Install dependencies"
+run = "npm ci"
+
+[tasks.dev]
+description = "Dev server on all interfaces (http://localhost:5173)"
+run = "npm run dev"
+
+[tasks.build]
+description = "Production build into dist/"
+run = "npm run build"
+
+[tasks.fmt]
+description = "Format everything with oxfmt"
+run = "npm run fmt"
+
+[tasks.fix]
+description = "Format and apply lint autofixes"
+run = ["npm run fmt", "npm run lint:fix"]
+
+[tasks.check]
+description = "Everything CI runs: format, lint, types, unused code, tests"
+run = "npm run check"
+
+[tasks.e2e]
+description = "Play-through audit in Chrome against a running dev server (pass the URL as an argument)"
+run = "node scripts/audit.mjs"
+
+[tasks.dict]
+description = "Rebuild the word dictionaries from the npm word lists"
+run = "npm run dict"

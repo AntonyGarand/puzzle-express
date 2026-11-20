@@ -9,14 +9,12 @@ export interface PState {
   moves: number;
 }
 
-export const ROW = (i: number) => Math.floor((Math.sqrt(8 * i + 1) - 1) / 2);
+const ROW = (i: number) => Math.floor((Math.sqrt(8 * i + 1) - 1) / 2);
 export const idx = (r: number, k: number) => (r * (r + 1)) / 2 + k;
 
 export function dealP(cards: Card[]): PState {
   return { pyr: cards.slice(0, 28), stock: cards.slice(28), waste: [], passes: 0, moves: 0 };
 }
-export const cloneP = (s: PState): PState => ({ pyr: s.pyr.slice(), stock: s.stock.slice(), waste: s.waste.slice(), passes: s.passes, moves: s.moves });
-
 export function exposed(pyr: number[], i: number): boolean {
   if (pyr[i] < 0) return false;
   const r = ROW(i);
@@ -46,17 +44,25 @@ export function removeP(s: PState, a: string, b?: string, dry = false): boolean 
   if (ca == null) return false;
   if (b == null) {
     if (rank(ca) !== 13) return false;
-    if (!dry) { take(s, a); s.moves++; }
+    if (!dry) {
+      take(s, a);
+      s.moves++;
+    }
     return true;
   }
   if (a === b) return false;
   const cb = cardAt(s, b);
   if (cb == null || rank(ca) + rank(cb) !== 13) return false;
-  if (!dry) { take(s, a); take(s, b); s.moves++; }
+  if (!dry) {
+    take(s, a);
+    take(s, b);
+    s.moves++;
+  }
   return true;
 }
 
-export const canRecycle = (s: PState, maxPasses: number) => !s.stock.length && s.waste.length > 0 && (maxPasses < 0 || s.passes < maxPasses - 1);
+export const canRecycle = (s: PState, maxPasses: number) =>
+  !s.stock.length && s.waste.length > 0 && (maxPasses < 0 || s.passes < maxPasses - 1);
 
 export function drawP(s: PState, maxPasses: number): boolean {
   if (s.stock.length) s.waste.push(s.stock.pop()!);
@@ -71,14 +77,14 @@ export function drawP(s: PState, maxPasses: number): boolean {
 
 export const clearedP = (s: PState) => s.pyr.every((c) => c < 0);
 
-export function availableP(s: PState): string[] {
+function availableP(s: PState): string[] {
   const out: string[] = [];
   for (let i = 0; i < 28; i++) if (exposed(s.pyr, i)) out.push('p' + i);
   if (s.waste.length) out.push('w');
   return out;
 }
 
-export function anyPairP(s: PState): boolean {
+function anyPairP(s: PState): boolean {
   const av = availableP(s);
   for (let x = 0; x < av.length; x++) {
     const cx = cardAt(s, av[x])!;
@@ -110,7 +116,7 @@ export function solveP(s0: PState, passes: number, budget = 20000): boolean {
   const rec = (ptr: number, pass: number, left: number): boolean => {
     if (left === 0) return true;
     if (++nodes > budget) return false;
-    const key = (pm * 16777216 + tm) + ':' + (ptr * 8 + pass);
+    const key = pm * 16777216 + tm + ':' + (ptr * 8 + pass);
     if (seen.has(key)) return false;
     seen.add(key);
     // waste top
@@ -121,27 +127,38 @@ export function solveP(s0: PState, passes: number, budget = 20000): boolean {
     // kings
     for (const i of av) {
       if (rank(pyr[i]) === 13) {
-        const c = pyr[i]; pyr[i] = -1; pm += 2 ** i;
+        const c = pyr[i];
+        pyr[i] = -1;
+        pm += 2 ** i;
         const ok = rec(ptr, pass, left - 1);
-        pyr[i] = c; pm -= 2 ** i;
+        pyr[i] = c;
+        pm -= 2 ** i;
         return ok; // removing a king is always safe
       }
     }
     if (w >= 0 && rank(talon[w]) === 13) {
-      tal[w] = true; tm += 2 ** w;
+      tal[w] = true;
+      tm += 2 ** w;
       const ok = rec(ptr, pass, left);
-      tal[w] = false; tm -= 2 ** w;
+      tal[w] = false;
+      tm -= 2 ** w;
       return ok;
     }
     // pyramid pairs
     for (let x = 0; x < av.length; x++) {
       for (let y = x + 1; y < av.length; y++) {
-        const a = av[x], b = av[y];
+        const a = av[x],
+          b = av[y];
         if (rank(pyr[a]) + rank(pyr[b]) !== 13) continue;
-        const ca = pyr[a], cb = pyr[b];
-        pyr[a] = -1; pyr[b] = -1; pm += 2 ** a + 2 ** b;
+        const ca = pyr[a],
+          cb = pyr[b];
+        pyr[a] = -1;
+        pyr[b] = -1;
+        pm += 2 ** a + 2 ** b;
         const ok = rec(ptr, pass, left - 2);
-        pyr[a] = ca; pyr[b] = cb; pm -= 2 ** a + 2 ** b;
+        pyr[a] = ca;
+        pyr[b] = cb;
+        pm -= 2 ** a + 2 ** b;
         if (ok) return true;
       }
     }
@@ -150,9 +167,15 @@ export function solveP(s0: PState, passes: number, budget = 20000): boolean {
       for (const a of av) {
         if (rank(pyr[a]) + rank(talon[w]) !== 13) continue;
         const ca = pyr[a];
-        pyr[a] = -1; tal[w] = true; pm += 2 ** a; tm += 2 ** w;
+        pyr[a] = -1;
+        tal[w] = true;
+        pm += 2 ** a;
+        tm += 2 ** w;
         const ok = rec(ptr, pass, left - 1);
-        pyr[a] = ca; tal[w] = false; pm -= 2 ** a; tm -= 2 ** w;
+        pyr[a] = ca;
+        tal[w] = false;
+        pm -= 2 ** a;
+        tm -= 2 ** w;
         if (ok) return true;
       }
     }

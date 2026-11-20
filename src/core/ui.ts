@@ -67,7 +67,9 @@ export function btn(label: string, onclick: (e: MouseEvent) => void, variant: ''
 export function pad(keys: { label: string; value: string; class?: string; style?: string }[], onkey: (v: string) => void): HTMLDivElement {
   const el = h('div', { class: 'pad' });
   for (const k of keys) {
-    el.append(h('button', { class: `key ${k.class ?? ''}`.trim(), type: 'button', style: k.style, onclick: () => onkey(k.value) }, k.label));
+    el.append(
+      h('button', { class: `key ${k.class ?? ''}`.trim(), type: 'button', style: k.style, onclick: () => onkey(k.value) }, k.label),
+    );
   }
   return el;
 }
@@ -76,11 +78,6 @@ export function shake(el: Element) {
   el.classList.remove('shake');
   void (el as HTMLElement).offsetWidth;
   el.classList.add('shake');
-}
-
-export function flash(el: Element, cls = 'flash-bad', ms = 450) {
-  el.classList.add(cls);
-  setTimeout(() => el.classList.remove(cls), ms);
 }
 
 /** Shared colour palette (CSS vars --p1..--p8). */

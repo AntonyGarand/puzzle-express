@@ -3,7 +3,10 @@ import { byLevel, type PuzzleDef } from '../core/types';
 import { h } from '../core/ui';
 
 // Passage bits
-const N = 1, E = 2, S = 4, W = 8;
+const N = 1,
+  E = 2,
+  S = 4,
+  W = 8;
 const DIRS = [
   { bit: N, dr: -1, dc: 0, opp: S },
   { bit: E, dr: 0, dc: 1, opp: W },
@@ -13,9 +16,13 @@ const DIRS = [
 
 export const maze: PuzzleDef = {
   id: 'maze',
-  get name() { return L('Maze', 'Labyrinthe'); },
+  get name() {
+    return L('Maze', 'Labyrinthe');
+  },
   category: 'paths',
-  get rules() { return L('Reach the far corner. Drag, swipe or arrow keys.', 'Atteignez le coin opposé. Glissez, balayez ou flèches.'); },
+  get rules() {
+    return L('Reach the far corner. Drag, swipe or arrow keys.', 'Atteignez le coin opposé. Glissez, balayez ou flèches.');
+  },
   help: () => ({
     goal: L(
       'Lead the dot from the top-left corner to the coloured square in the bottom-right corner.',
@@ -23,13 +30,25 @@ export const maze: PuzzleDef = {
     ),
     steps: [
       L('Drag your finger along the corridors: the dot follows it.', 'Glissez le doigt dans les couloirs : le point le suit.'),
-      L('Or swipe in a direction: the dot runs until it reaches a junction or a wall.', 'Ou balayez dans une direction : le point avance jusqu’au prochain embranchement ou mur.'),
-      L('Keyboard: arrow keys or W A S D move one step; hold Shift to run.', 'Clavier : flèches ou W A S D pour un pas; maintenez Maj pour courir.'),
-      L('Going back over your trail erases it. Mazes grow from 6×6 to 19×19.', 'Revenir sur vos pas efface la trace. Les labyrinthes vont de 6×6 à 19×19.'),
+      L(
+        'Or swipe in a direction: the dot runs until it reaches a junction or a wall.',
+        'Ou balayez dans une direction : le point avance jusqu’au prochain embranchement ou mur.',
+      ),
+      L(
+        'Keyboard: arrow keys or W A S D move one step; hold Shift to run.',
+        'Clavier : flèches ou W A S D pour un pas; maintenez Maj pour courir.',
+      ),
+      L(
+        'Going back over your trail erases it. Mazes grow from 6×6 to 19×19.',
+        'Revenir sur vos pas efface la trace. Les labyrinthes vont de 6×6 à 19×19.',
+      ),
     ],
     tips: [
       L('Dead ends are cheap: just back out the way you came.', 'Un cul-de-sac ne coûte rien : revenez simplement sur vos pas.'),
-      L('Glance ahead from the goal back toward the start to spot the right branch.', 'Remontez du but vers le départ du regard pour repérer le bon embranchement.'),
+      L(
+        'Glance ahead from the goal back toward the start to spot the right branch.',
+        'Remontez du but vers le départ du regard pour repérer le bon embranchement.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [10, 18, 30, 45, 70]),
@@ -44,12 +63,17 @@ export const maze: PuzzleDef = {
     seen[0] = true;
     while (stack.length) {
       const i = stack[stack.length - 1];
-      const r = Math.floor(i / n), c = i % n;
+      const r = Math.floor(i / n),
+        c = i % n;
       const opts = DIRS.filter((dd) => {
-        const rr = r + dd.dr, cc = c + dd.dc;
+        const rr = r + dd.dr,
+          cc = c + dd.dc;
         return rr >= 0 && rr < n && cc >= 0 && cc < n && !seen[rr * n + cc];
       });
-      if (!opts.length) { stack.pop(); continue; }
+      if (!opts.length) {
+        stack.pop();
+        continue;
+      }
       const dd = rng.pick(opts);
       const j = (r + dd.dr) * n + (c + dd.dc);
       open[i] |= dd.bit;
@@ -76,7 +100,8 @@ export const maze: PuzzleDef = {
       g.clearRect(0, 0, size, size);
       const pad = 3;
       const cs = (size - pad * 2) / n;
-      const X = (c: number) => pad + c * cs, Y = (r: number) => pad + r * cs;
+      const X = (c: number) => pad + c * cs,
+        Y = (r: number) => pad + r * cs;
       g.fillStyle = css('--cell');
       g.fillRect(0, 0, size, size);
       // goal
@@ -89,8 +114,10 @@ export const maze: PuzzleDef = {
       g.globalAlpha = 0.55;
       g.beginPath();
       path.forEach((i, k) => {
-        const x = X(i % n) + cs / 2, y = Y(Math.floor(i / n)) + cs / 2;
-        if (k) g.lineTo(x, y); else g.moveTo(x, y);
+        const x = X(i % n) + cs / 2,
+          y = Y(Math.floor(i / n)) + cs / 2;
+        if (k) g.lineTo(x, y);
+        else g.moveTo(x, y);
       });
       g.stroke();
       g.globalAlpha = 1;
@@ -100,11 +127,25 @@ export const maze: PuzzleDef = {
       g.lineCap = 'square';
       g.beginPath();
       for (let i = 0; i < n * n; i++) {
-        const r = Math.floor(i / n), c = i % n, o = open[i];
-        if (!(o & N)) { g.moveTo(X(c), Y(r)); g.lineTo(X(c + 1), Y(r)); }
-        if (!(o & W)) { g.moveTo(X(c), Y(r)); g.lineTo(X(c), Y(r + 1)); }
-        if (r === n - 1 && !(o & S)) { g.moveTo(X(c), Y(r + 1)); g.lineTo(X(c + 1), Y(r + 1)); }
-        if (c === n - 1 && !(o & E)) { g.moveTo(X(c + 1), Y(r)); g.lineTo(X(c + 1), Y(r + 1)); }
+        const r = Math.floor(i / n),
+          c = i % n,
+          o = open[i];
+        if (!(o & N)) {
+          g.moveTo(X(c), Y(r));
+          g.lineTo(X(c + 1), Y(r));
+        }
+        if (!(o & W)) {
+          g.moveTo(X(c), Y(r));
+          g.lineTo(X(c), Y(r + 1));
+        }
+        if (r === n - 1 && !(o & S)) {
+          g.moveTo(X(c), Y(r + 1));
+          g.lineTo(X(c + 1), Y(r + 1));
+        }
+        if (c === n - 1 && !(o & E)) {
+          g.moveTo(X(c + 1), Y(r));
+          g.lineTo(X(c + 1), Y(r + 1));
+        }
       }
       g.stroke();
       // player
@@ -123,7 +164,8 @@ export const maze: PuzzleDef = {
       if (finished) return false;
       const p = path[path.length - 1];
       if (!(open[p] & dir.bit)) return false;
-      const r = Math.floor(p / n) + dir.dr, c = (p % n) + dir.dc;
+      const r = Math.floor(p / n) + dir.dr,
+        c = (p % n) + dir.dc;
       const j = r * n + c;
       ctx.touch();
       if (path.length > 1 && path[path.length - 2] === j) path.pop();
@@ -134,6 +176,8 @@ export const maze: PuzzleDef = {
     /** Keep moving in one direction until a junction or wall. */
     const run = (dir: (typeof DIRS)[number]) => {
       if (!step(dir)) return;
+      // `finished` is set inside step().
+      // oxlint-disable-next-line no-unmodified-loop-condition
       for (let guard = 0; guard < n * n && !finished; guard++) {
         const p = path[path.length - 1];
         const exits = DIRS.filter((dd) => open[p] & dd.bit);
@@ -147,14 +191,20 @@ export const maze: PuzzleDef = {
     };
 
     // Pointer: drag along the corridor (moves to adjacent open cells under the finger), or swipe.
-    let dragging = false, sx = 0, sy = 0, moved = false;
+    let dragging = false,
+      sx = 0,
+      sy = 0,
+      moved = false;
     const cellAt = (e: PointerEvent) => {
       const rect = canvas.getBoundingClientRect();
       const cs = rect.width / n;
       return { r: Math.floor((e.clientY - rect.top) / cs), c: Math.floor((e.clientX - rect.left) / cs) };
     };
     canvas.addEventListener('pointerdown', (e) => {
-      dragging = true; moved = false; sx = e.clientX; sy = e.clientY;
+      dragging = true;
+      moved = false;
+      sx = e.clientX;
+      sy = e.clientY;
       canvas.setPointerCapture(e.pointerId);
     });
     canvas.addEventListener('pointermove', (e) => {
@@ -164,19 +214,24 @@ export const maze: PuzzleDef = {
       let changed = false;
       for (let guard = 0; guard < n * 2; guard++) {
         const p = path[path.length - 1];
-        const dr = r - Math.floor(p / n), dc = c - (p % n);
+        const dr = r - Math.floor(p / n),
+          dc = c - (p % n);
         if (!dr && !dc) break;
         const dir = Math.abs(dc) >= Math.abs(dr) ? DIRS[dc > 0 ? 1 : 3] : DIRS[dr > 0 ? 2 : 0];
         if (!step(dir)) break;
         changed = true;
       }
-      if (changed) { moved = true; after(); }
+      if (changed) {
+        moved = true;
+        after();
+      }
     });
     canvas.addEventListener('pointerup', (e) => {
       if (!dragging) return;
       dragging = false;
       if (moved) return;
-      const dx = e.clientX - sx, dy = e.clientY - sy;
+      const dx = e.clientX - sx,
+        dy = e.clientY - sy;
       if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
       const dir = Math.abs(dx) > Math.abs(dy) ? DIRS[dx > 0 ? 1 : 3] : DIRS[dy > 0 ? 2 : 0];
       run(dir);
@@ -200,7 +255,8 @@ export const maze: PuzzleDef = {
         const map: Record<string, number> = { ArrowUp: 0, w: 0, ArrowRight: 1, d: 1, ArrowDown: 2, s: 2, ArrowLeft: 3, a: 3 };
         const k = map[e.key];
         if (k == null) return false;
-        if (e.shiftKey) run(DIRS[k]); else step(DIRS[k]);
+        if (e.shiftKey) run(DIRS[k]);
+        else step(DIRS[k]);
         after();
         return true;
       },

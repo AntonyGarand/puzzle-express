@@ -1,7 +1,10 @@
 import { isRed, rank, suit, type Card } from './cards';
 
 /** Klondike rules engine (pure; no DOM). */
-export interface KCol { d: Card[]; u: Card[] }
+interface KCol {
+  d: Card[];
+  u: Card[];
+}
 export interface KState {
   stock: Card[]; // top = end
   waste: Card[]; // top = end
@@ -27,7 +30,7 @@ export function dealK(cards: Card[]): KState {
   return { stock: c, waste: [], found: [0, 0, 0, 0], tab, redeals: 0, moves: 0 };
 }
 
-export const cloneK = (s: KState): KState => ({
+const cloneK = (s: KState): KState => ({
   stock: s.stock.slice(),
   waste: s.waste.slice(),
   found: s.found.slice(),
@@ -36,10 +39,9 @@ export const cloneK = (s: KState): KState => ({
   moves: s.moves,
 });
 
-export const fitsFound = (s: KState, c: Card) => s.found[suit(c)] === rank(c) - 1;
-export const fitsOn = (c: Card, top: Card) => rank(top) === rank(c) + 1 && isRed(top) !== isRed(c);
-export const fitsCol = (col: KCol, c: Card) =>
-  col.u.length ? fitsOn(c, col.u[col.u.length - 1]) : col.d.length === 0 && rank(c) === 13;
+const fitsFound = (s: KState, c: Card) => s.found[suit(c)] === rank(c) - 1;
+const fitsOn = (c: Card, top: Card) => rank(top) === rank(c) + 1 && isRed(top) !== isRed(c);
+const fitsCol = (col: KCol, c: Card) => (col.u.length ? fitsOn(c, col.u[col.u.length - 1]) : col.d.length === 0 && rank(c) === 13);
 export const wonK = (s: KState) => s.found.every((f) => f === 13);
 export const canRedeal = (s: KState, r: KRules) => r.redeals < 0 || s.redeals < r.redeals;
 export const canDraw = (s: KState, r: KRules) => s.stock.length > 0 || (s.waste.length > 0 && canRedeal(s, r));
@@ -123,7 +125,7 @@ export function bestDest(s: KState, p: string, i: number): string | null {
 }
 
 /** Cards that will show on top of the waste (in order) if the player just keeps drawing. */
-export function talonTops(s: KState, r: KRules): Card[] {
+function talonTops(s: KState, r: KRules): Card[] {
   const out: Card[] = [];
   if (s.waste.length) out.push(s.waste[s.waste.length - 1]);
   const st = s.stock.slice();
@@ -210,7 +212,11 @@ export function finishK(s: KState) {
     let moved = false;
     for (const col of s.tab) {
       const c = col.u[col.u.length - 1];
-      if (c != null && fitsFound(s, c)) { col.u.pop(); s.found[suit(c)]++; moved = true; }
+      if (c != null && fitsFound(s, c)) {
+        col.u.pop();
+        s.found[suit(c)]++;
+        moved = true;
+      }
     }
     if (!moved) break;
   }
@@ -231,12 +237,19 @@ export function greedyK(s0: KState, r: KRules, maxSteps = 900): boolean {
     if (!did && s.waste.length && fitsFound(s, s.waste[s.waste.length - 1])) did = moveK(s, 'w', s.waste.length - 1, 'f');
     // 2. whole face-up run that frees a face-down card (most face-down first)
     if (!did) {
-      let bestA = -1, bestB = -1, bestD = -1;
+      let bestA = -1,
+        bestB = -1,
+        bestD = -1;
       for (let a = 0; a < 7; a++) {
         const col = s.tab[a];
         if (!col.u.length || !col.d.length || col.d.length <= bestD) continue;
         for (let b = 0; b < 7; b++) {
-          if (b !== a && fitsCol(s.tab[b], col.u[0])) { bestA = a; bestB = b; bestD = col.d.length; break; }
+          if (b !== a && fitsCol(s.tab[b], col.u[0])) {
+            bestA = a;
+            bestB = b;
+            bestD = col.d.length;
+            break;
+          }
         }
       }
       if (bestA >= 0) did = moveK(s, 't' + bestA, s.tab[bestA].d.length, 't' + bestB);
@@ -252,11 +265,15 @@ export function greedyK(s0: KState, r: KRules, maxSteps = 900): boolean {
         const col = s.tab[a];
         for (let j = 1; j < col.u.length && !did; j++) {
           if (!fitsFound(s, col.u[j - 1])) continue;
-          for (let b = 0; b < 7 && !did; b++) if (b !== a && s.tab[b].u.length && fitsCol(s.tab[b], col.u[j])) did = moveK(s, 't' + a, col.d.length + j, 't' + b);
+          for (let b = 0; b < 7 && !did; b++)
+            if (b !== a && s.tab[b].u.length && fitsCol(s.tab[b], col.u[j])) did = moveK(s, 't' + a, col.d.length + j, 't' + b);
         }
       }
     }
-    if (did) { idle = 0; continue; }
+    if (did) {
+      idle = 0;
+      continue;
+    }
     // 5. draw
     if (!draw(s, r)) return false;
     idle++;

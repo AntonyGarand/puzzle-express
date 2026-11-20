@@ -7,17 +7,27 @@ type Op = '+' | '−' | '×' | '÷';
 
 function apply(a: number, op: Op, b: number): number | null {
   switch (op) {
-    case '+': return a + b;
-    case '−': return a - b > 0 ? a - b : null;
-    case '×': return a * b;
-    case '÷': return b !== 0 && a % b === 0 ? a / b : null;
+    case '+':
+      return a + b;
+    case '−':
+      return a - b > 0 ? a - b : null;
+    case '×':
+      return a * b;
+    case '÷':
+      return b !== 0 && a % b === 0 ? a / b : null;
   }
 }
 
 function generate(d: Difficulty, r: Rng) {
   const count = byLevel(d, [3, 4, 4, 5, 5]);
   const max = byLevel(d, [9, 10, 12, 13, 25]);
-  const ops: Op[] = byLevel<Op[]>(d, [['+', '−'], ['+', '−', '×'], ['+', '−', '×', '÷'], ['+', '−', '×', '÷'], ['+', '−', '×', '÷']]);
+  const ops: Op[] = byLevel<Op[]>(d, [
+    ['+', '−'],
+    ['+', '−', '×'],
+    ['+', '−', '×', '÷'],
+    ['+', '−', '×', '÷'],
+    ['+', '−', '×', '÷'],
+  ]);
   const cap = byLevel(d, [40, 100, 200, 400, 999]);
   for (let tries = 0; tries < 500; tries++) {
     const nums = Array.from({ length: count }, () => r.int(1, max));
@@ -30,7 +40,10 @@ function generate(d: Difficulty, r: Rng) {
       const b = items.splice(j, 1)[0];
       const op = r.pick(ops);
       const v = apply(Math.max(a, b), op, Math.min(a, b));
-      if (v == null || v > cap) { ok = false; break; }
+      if (v == null || v > cap) {
+        ok = false;
+        break;
+      }
       items.push(v);
     }
     const target = items[0];
@@ -42,23 +55,45 @@ function generate(d: Difficulty, r: Rng) {
 
 export const target: PuzzleDef = {
   id: 'target',
-  get name() { return L('Target', 'Cible'); },
+  get name() {
+    return L('Target', 'Cible');
+  },
   category: 'numbers',
-  get rules() { return L('Combine every number to hit the target.', 'Combinez tous les nombres pour atteindre la cible.'); },
+  get rules() {
+    return L('Combine every number to hit the target.', 'Combinez tous les nombres pour atteindre la cible.');
+  },
   help: () => ({
     goal: L(
       'Use every number exactly once with + − × ÷ so that the last one left equals the target.',
       'Utilisez chaque nombre une seule fois avec + − × ÷ pour que le dernier qui reste égale la cible.',
     ),
     steps: [
-      L('Tap a number, then an operator, then a second number: the two merge into the result.', 'Touchez un nombre, puis un opérateur, puis un deuxième nombre : les deux fusionnent en leur résultat.'),
-      L('The result stays selected, so you can chain the next operation right away.', 'Le résultat reste sélectionné : vous pouvez enchaîner l’opération suivante.'),
-      L('Subtraction must stay above zero and division must come out even.', 'Une soustraction doit rester au-dessus de zéro et une division doit tomber juste.'),
-      L('When one number is left, it must be the target. Undo steps back one merge; Reset starts over.', 'Quand il reste un seul nombre, ce doit être la cible. Annuler défait une fusion; Recommencer repart de zéro.'),
-      L('Keyboard: 1 to 5 pick numbers, + - * / pick operators, Backspace or Z undoes.', 'Clavier : 1 à 5 choisissent les nombres, + - * / les opérateurs, Retour arrière ou Z annule.'),
+      L(
+        'Tap a number, then an operator, then a second number: the two merge into the result.',
+        'Touchez un nombre, puis un opérateur, puis un deuxième nombre : les deux fusionnent en leur résultat.',
+      ),
+      L(
+        'The result stays selected, so you can chain the next operation right away.',
+        'Le résultat reste sélectionné : vous pouvez enchaîner l’opération suivante.',
+      ),
+      L(
+        'Subtraction must stay above zero and division must come out even.',
+        'Une soustraction doit rester au-dessus de zéro et une division doit tomber juste.',
+      ),
+      L(
+        'When one number is left, it must be the target. Undo steps back one merge; Reset starts over.',
+        'Quand il reste un seul nombre, ce doit être la cible. Annuler défait une fusion; Recommencer repart de zéro.',
+      ),
+      L(
+        'Keyboard: 1 to 5 pick numbers, + - * / pick operators, Backspace or Z undoes.',
+        'Clavier : 1 à 5 choisissent les nombres, + - * / les opérateurs, Retour arrière ou Z annule.',
+      ),
     ],
     tips: [
-      L('Work backwards: which product or sum gets close to the target?', 'Partez de la cible : quel produit ou quelle somme s’en approche?'),
+      L(
+        'Work backwards: which product or sum gets close to the target?',
+        'Partez de la cible : quel produit ou quelle somme s’en approche?',
+      ),
       L('Keep a small number for a final + or − adjustment.', 'Gardez un petit nombre pour un ajustement final avec + ou −.'),
     ],
   }),
@@ -98,7 +133,12 @@ export const target: PuzzleDef = {
         render();
         return;
       }
-      if (id === sel) { sel = null; op = null; render(); return; }
+      if (id === sel) {
+        sel = null;
+        op = null;
+        render();
+        return;
+      }
       const a = chips.find((c) => c.id === sel)!;
       const b = chips.find((c) => c.id === id)!;
       const v = apply(a.v, op, b.v);
@@ -117,7 +157,10 @@ export const target: PuzzleDef = {
       render();
       if (chips.length === 1) {
         if (v === goal) ctx.solved();
-        else { shake(chipRow); ctx.status(L('Not quite — undo and try again', 'Raté — annulez et réessayez')); }
+        else {
+          shake(chipRow);
+          ctx.status(L('Not quite — undo and try again', 'Raté — annulez et réessayez'));
+        }
       }
     };
     const tapOp = (o: Op) => {
@@ -159,10 +202,19 @@ export const target: PuzzleDef = {
       snapshot: () => ({ chips, history, nextId, sel }),
       onKey(e) {
         const map: Record<string, Op> = { '+': '+', '-': '−', '*': '×', x: '×', '/': '÷' };
-        if (map[e.key]) { tapOp(map[e.key]); return true; }
-        if (e.key === 'Backspace' || (e.key === 'z')) { undo(); return true; }
+        if (map[e.key]) {
+          tapOp(map[e.key]);
+          return true;
+        }
+        if (e.key === 'Backspace' || e.key === 'z') {
+          undo();
+          return true;
+        }
         const n = Number(e.key);
-        if (n >= 1 && n <= chips.length) { tapChip(chips[n - 1].id); return true; }
+        if (n >= 1 && n <= chips.length) {
+          tapChip(chips[n - 1].id);
+          return true;
+        }
         return false;
       },
     };

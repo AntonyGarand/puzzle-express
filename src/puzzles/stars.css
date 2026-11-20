@@ -1,5 +1,10 @@
-[data-puzzle='stars'] { --accent: var(--p4); }
-[data-puzzle='stars'] .lk-plate .cell.x::after { font-size: 0.6em; color: color-mix(in srgb, var(--fg) 55%, transparent); }
+[data-puzzle='stars'] {
+  --accent: var(--p4);
+}
+[data-puzzle='stars'] .lk-plate .cell.x::after {
+  font-size: 0.6em;
+  color: color-mix(in srgb, var(--fg) 55%, transparent);
+}
 [data-puzzle='stars'] .lk-plate .cell.star::after {
   content: '';
   width: 66%;

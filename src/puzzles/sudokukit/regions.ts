@@ -1,7 +1,8 @@
 import type { Rng } from '../../core/rng';
 
 export function neighbours(n: number, i: number): number[] {
-  const r = Math.floor(i / n), c = i % n;
+  const r = Math.floor(i / n),
+    c = i % n;
   const out: number[] = [];
   if (r > 0) out.push(i - n);
   if (r < n - 1) out.push(i + n);
@@ -11,14 +12,23 @@ export function neighbours(n: number, i: number): number[] {
 }
 
 function connected(n: number, region: number[], id: number): boolean {
-  let start = -1, total = 0;
-  for (let i = 0; i < region.length; i++) if (region[i] === id) { total++; if (start < 0) start = i; }
+  let start = -1,
+    total = 0;
+  for (let i = 0; i < region.length; i++)
+    if (region[i] === id) {
+      total++;
+      if (start < 0) start = i;
+    }
   if (start < 0) return true;
   const seen = new Set([start]);
   const stack = [start];
   while (stack.length) {
     const i = stack.pop()!;
-    for (const j of neighbours(n, i)) if (region[j] === id && !seen.has(j)) { seen.add(j); stack.push(j); }
+    for (const j of neighbours(n, i))
+      if (region[j] === id && !seen.has(j)) {
+        seen.add(j);
+        stack.push(j);
+      }
   }
   return seen.size === total;
 }
@@ -44,11 +54,17 @@ export function jigsawRegions(n: number, rng: Rng): number[] {
       if (region[c] !== A || c === b) continue;
       if (neighbours(n, c).some((j) => region[j] === B)) pool.push(c);
     }
-    if (!pool.length) { region[b] = B; continue; }
+    if (!pool.length) {
+      region[b] = B;
+      continue;
+    }
     const c = rng.pick(pool);
     region[c] = B;
     if (connected(n, region, A) && connected(n, region, B)) done++;
-    else { region[c] = A; region[b] = B; }
+    else {
+      region[c] = A;
+      region[b] = B;
+    }
   }
   return region;
 }

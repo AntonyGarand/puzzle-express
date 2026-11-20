@@ -12,13 +12,20 @@ export interface Piece {
 }
 
 const norm = (cs: [number, number][]): [number, number][] => {
-  const r0 = Math.min(...cs.map((c) => c[0])), c0 = Math.min(...cs.map((c) => c[1]));
+  const r0 = Math.min(...cs.map((c) => c[0])),
+    c0 = Math.min(...cs.map((c) => c[1]));
   return cs.map(([r, c]) => [r - r0, c - c0] as [number, number]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 };
 const rot = (cs: [number, number][]) => norm(cs.map(([r, c]) => [c, -r] as [number, number]));
 const flip = (cs: [number, number][]) => norm(cs.map(([r, c]) => [r, -c] as [number, number]));
 const parse = (art: string): [number, number][] =>
-  norm(art.split('/').flatMap((row, r) => [...row].map((ch, c) => (ch === '#' ? ([r, c] as [number, number]) : null)).filter((x): x is [number, number] => !!x)));
+  norm(
+    art
+      .split('/')
+      .flatMap((row, r) =>
+        [...row].map((ch, c) => (ch === '#' ? ([r, c] as [number, number]) : null)).filter((x): x is [number, number] => !!x),
+      ),
+  );
 
 /** Families: art, tier, whether mirror images count as separate pieces. */
 const FAMILIES: [string, number, boolean][] = [
@@ -85,9 +92,11 @@ export function fitsAnywhere(board: number[], n: number, p: Piece) {
 
 /** Full rows and columns of a board. */
 export function fullLines(board: number[], n: number) {
-  const rows: number[] = [], cols: number[] = [];
+  const rows: number[] = [],
+    cols: number[] = [];
   for (let k = 0; k < n; k++) {
-    let rf = true, cf = true;
+    let rf = true,
+      cf = true;
     for (let j = 0; j < n; j++) {
       if (!board[k * n + j]) rf = false;
       if (!board[j * n + k]) cf = false;

@@ -4,22 +4,32 @@ import { board, h } from '../core/ui';
 
 export const memory: PuzzleDef = {
   id: 'memory',
-  get name() { return L('Memory', 'Mémoire'); },
+  get name() {
+    return L('Memory', 'Mémoire');
+  },
   category: 'memory',
-  get rules() { return L('Memorise the lit tiles, then tap them. Three lives.', 'Retenez les cases allumées, puis touchez-les. Trois vies.'); },
+  get rules() {
+    return L('Memorise the lit tiles, then tap them. Three lives.', 'Retenez les cases allumées, puis touchez-les. Trois vies.');
+  },
   help: () => ({
-    goal: L(
-      'Remember which tiles light up, then find them all again.',
-      'Retenez quelles cases s’allument, puis retrouvez-les toutes.',
-    ),
+    goal: L('Remember which tiles light up, then find them all again.', 'Retenez quelles cases s’allument, puis retrouvez-les toutes.'),
     steps: [
       L('When the game appears, some tiles light up for a moment.', 'Quand le jeu s’affiche, quelques cases s’allument un instant.'),
       L('Once they go dark, tap every tile that was lit.', 'Une fois éteintes, touchez toutes les cases qui étaient allumées.'),
-      L('A wrong tile is marked and costs one of your three lives (●).', 'Une mauvaise case est marquée et vous coûte une de vos trois vies (●).'),
-      L('Lose all three and the tiles you missed are shown. Higher levels mean a bigger grid and more tiles.', 'Si vous les perdez toutes, les cases manquées sont révélées. Plus le niveau monte, plus la grille et le nombre de cases grandissent.'),
+      L(
+        'A wrong tile is marked and costs one of your three lives (●).',
+        'Une mauvaise case est marquée et vous coûte une de vos trois vies (●).',
+      ),
+      L(
+        'Lose all three and the tiles you missed are shown. Higher levels mean a bigger grid and more tiles.',
+        'Si vous les perdez toutes, les cases manquées sont révélées. Plus le niveau monte, plus la grille et le nombre de cases grandissent.',
+      ),
     ],
     tips: [
-      L('See the lit tiles as a shape or pattern instead of remembering them one by one.', 'Voyez les cases allumées comme une forme plutôt que de les retenir une par une.'),
+      L(
+        'See the lit tiles as a shape or pattern instead of remembering them one by one.',
+        'Voyez les cases allumées comme une forme plutôt que de les retenir une par une.',
+      ),
       L('Tap the ones you’re sure of first.', 'Touchez d’abord celles dont vous êtes sûr.'),
     ],
   }),
@@ -41,7 +51,14 @@ export const memory: PuzzleDef = {
       grid.append(el);
       return el;
     });
-    const status = () => ctx.status(phase === 'play' ? `${L(`${k - found.size} to find`, `${k - found.size} à trouver`)} · ${'●'.repeat(lives)}${'○'.repeat(3 - lives)}` : phase === 'show' ? L('Remember…', 'Mémorisez…') : L('Get ready', 'Préparez-vous'));
+    const status = () =>
+      ctx.status(
+        phase === 'play'
+          ? `${L(`${k - found.size} to find`, `${k - found.size} à trouver`)} · ${'●'.repeat(lives)}${'○'.repeat(3 - lives)}`
+          : phase === 'show'
+            ? L('Remember…', 'Mémorisez…')
+            : L('Get ready', 'Préparez-vous'),
+      );
     const reveal = (on: boolean) => targets.forEach((i) => cells[i].classList.toggle('on', on));
 
     const start = () => {
@@ -64,7 +81,10 @@ export const memory: PuzzleDef = {
         found.add(i);
         cells[i].classList.add('on');
         status();
-        if (found.size === k) { phase = 'over'; ctx.solved(); }
+        if (found.size === k) {
+          phase = 'over';
+          ctx.solved();
+        }
       } else {
         lives--;
         ctx.mistake();

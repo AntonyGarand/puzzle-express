@@ -16,22 +16,26 @@ function score(guess: string, answer: string): KeyState[] {
   for (let i = 0; i < guess.length; i++) {
     if (res[i] === 'hit') continue;
     const n = left.get(guess[i]) ?? 0;
-    if (n > 0) { res[i] = 'near'; left.set(guess[i], n - 1); }
+    if (n > 0) {
+      res[i] = 'near';
+      left.set(guess[i], n - 1);
+    }
   }
   return res;
 }
 
 export const wordGuess: PuzzleDef = {
   id: 'word-guess',
-  get name() { return L('Word Guess', 'Mot mystère'); },
+  get name() {
+    return L('Word Guess', 'Mot mystère');
+  },
   category: 'words',
-  get rules() { return L('Guess the word. Green: right spot · yellow: elsewhere.', 'Trouvez le mot. Vert : bien placé · jaune : ailleurs.'); },
+  get rules() {
+    return L('Guess the word. Green: right spot · yellow: elsewhere.', 'Trouvez le mot. Vert : bien placé · jaune : ailleurs.');
+  },
   localized: true,
   help: () => ({
-    goal: L(
-      'Find the hidden word before you run out of guesses.',
-      'Trouvez le mot caché avant d’avoir épuisé vos essais.',
-    ),
+    goal: L('Find the hidden word before you run out of guesses.', 'Trouvez le mot caché avant d’avoir épuisé vos essais.'),
     steps: [
       L(
         'Type a real word of the right length and press Enter. Each row is one guess.',
@@ -52,8 +56,14 @@ export const wordGuess: PuzzleDef = {
       ),
     ],
     tips: [
-      L('Open with a word full of common letters, like E, A, R, S and T.', 'Commencez par un mot plein de lettres courantes, comme E, A, S, R et T.'),
-      L('Keep green letters in place and try yellow ones in new spots.', 'Gardez les lettres vertes en place et essayez les jaunes à d’autres endroits.'),
+      L(
+        'Open with a word full of common letters, like E, A, R, S and T.',
+        'Commencez par un mot plein de lettres courantes, comme E, A, S, R et T.',
+      ),
+      L(
+        'Keep green letters in place and try yellow ones in new spots.',
+        'Gardez les lettres vertes en place et essayez les jaunes à d’autres endroits.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [60, 80, 110, 140, 180]),
@@ -100,10 +110,21 @@ export const wordGuess: PuzzleDef = {
 
     const rowEl = () => grid; // shake the whole board (keeps cell classes clean for resume)
     const submit = () => {
-      if (cur.length < len) { shake(rowEl()); status(L('Not enough letters', 'Pas assez de lettres')); return; }
+      if (cur.length < len) {
+        shake(rowEl());
+        status(L('Not enough letters', 'Pas assez de lettres'));
+        return;
+      }
       const ok = isWord(cur);
-      if (ok === null) { status(L('loading words…', 'chargement des mots…')); return; }
-      if (!ok) { shake(rowEl()); status(L('Not in word list', 'Mot inconnu')); return; }
+      if (ok === null) {
+        status(L('loading words…', 'chargement des mots…'));
+        return;
+      }
+      if (!ok) {
+        shake(rowEl());
+        status(L('Not in word list', 'Mot inconnu'));
+        return;
+      }
       guesses.push(cur);
       cur = '';
       if (guesses[guesses.length - 1] === answer) {
@@ -115,7 +136,10 @@ export const wordGuess: PuzzleDef = {
       if (guesses.length >= max) {
         over = true;
         render();
-        root.replaceChildren(grid, h('div', { class: 'wg-answer' }, h('span', { class: 'label' }, L('The word was', 'Le mot était')), board(len, 1, 'wg wg-reveal')));
+        root.replaceChildren(
+          grid,
+          h('div', { class: 'wg-answer' }, h('span', { class: 'label' }, L('The word was', 'Le mot était')), board(len, 1, 'wg wg-reveal')),
+        );
         const rev = root.querySelector('.wg-reveal')!;
         for (const ch of answer) rev.append(h('div', { class: 'cell wg-hit' }, ch));
         ctx.failed();
@@ -129,20 +153,30 @@ export const wordGuess: PuzzleDef = {
       if (over) return;
       ctx.touch();
       if (k === 'enter') submit();
-      else if (k === 'back') { cur = cur.slice(0, -1); render(); status(); }
-      else if (cur.length < len) { cur += k; render(); }
+      else if (k === 'back') {
+        cur = cur.slice(0, -1);
+        render();
+        status();
+      } else if (cur.length < len) {
+        cur += k;
+        render();
+      }
     };
 
     const sv = ctx.saved as { g?: unknown; cur?: unknown } | undefined;
     if (sv && Array.isArray(sv.g)) {
-      guesses = sv.g.filter((w): w is string => typeof w === 'string' && w.length === len && /^[a-z]+$/.test(w) && w !== answer).slice(0, max - 1);
+      guesses = sv.g
+        .filter((w): w is string => typeof w === 'string' && w.length === len && /^[a-z]+$/.test(w) && w !== answer)
+        .slice(0, max - 1);
       if (typeof sv.cur === 'string' && /^[a-z]*$/.test(sv.cur)) cur = sv.cur.slice(0, len);
     }
 
     root.append(grid, kb.el);
     render();
     status();
-    whenDict(() => { if (!over) status(); });
+    whenDict(() => {
+      if (!over) status();
+    });
     return {
       snapshot: () => ({ g: guesses, cur }),
       onKey(e) {

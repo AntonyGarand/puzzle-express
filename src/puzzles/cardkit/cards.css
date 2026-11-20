@@ -50,9 +50,14 @@
   line-height: 1;
   cursor: pointer;
   overflow: hidden;
-  transition: transform 0.06s, background 0.1s, box-shadow 0.06s;
+  transition:
+    transform 0.06s,
+    background 0.1s,
+    box-shadow 0.06s;
 }
-.ctable .pc.red { color: var(--pc-red); }
+.ctable .pc.red {
+  color: var(--pc-red);
+}
 .ctable .pc-r {
   position: absolute;
   left: calc(var(--cw) * 0.07);
@@ -64,7 +69,11 @@
   letter-spacing: -0.06em;
   white-space: nowrap;
 }
-.ctable .pc-r i { font-style: normal; font-size: 0.92em; letter-spacing: 0; }
+.ctable .pc-r i {
+  font-style: normal;
+  font-size: 0.92em;
+  letter-spacing: 0;
+}
 .ctable .pc-s {
   position: absolute;
   left: 0;
@@ -74,7 +83,11 @@
   font-size: calc(var(--cw) * 0.62);
 }
 .ctable .pc.down {
-  background: repeating-linear-gradient(45deg, var(--accent) 0 calc(var(--cw) * 0.09), var(--accent-soft) calc(var(--cw) * 0.09) calc(var(--cw) * 0.18));
+  background: repeating-linear-gradient(
+    45deg,
+    var(--accent) 0 calc(var(--cw) * 0.09),
+    var(--accent-soft) calc(var(--cw) * 0.09) calc(var(--cw) * 0.18)
+  );
   cursor: default;
 }
 .ctable .pc.sel {
@@ -84,17 +97,31 @@
   transform: translate(-1px, -2px);
   box-shadow: 3px 4px 0 var(--ink);
 }
-.ctable .pc.hint { background: var(--accent-soft); }
-.ctable .pc.lock { cursor: default; }
-.ctable .pc.lock::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--cell-alt) 45%, transparent); }
+.ctable .pc.hint {
+  background: var(--accent-soft);
+}
+.ctable .pc.lock {
+  cursor: default;
+}
+.ctable .pc.lock::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--cell-alt) 45%, transparent);
+}
 .ctable .pc.lift {
   z-index: 50;
   pointer-events: none;
   transition: none;
   box-shadow: 4px 5px 0 var(--ink);
 }
-.ctable .pc:active:not(.down):not(.lift) { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink); }
-.ctable .pc.stock { cursor: pointer; }
+.ctable .pc:active:not(.down):not(.lift) {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+.ctable .pc.stock {
+  cursor: pointer;
+}
 .ctable .badge {
   position: absolute;
   right: calc(var(--cw) * -0.12);
@@ -111,5 +138,11 @@
   z-index: 5;
   pointer-events: none;
 }
-.card.is-solved .ctable { animation: pop 0.45s ease; }
-.ctable .pile > * { --x: 0; --y: 0; --dx: 0; }
+.card.is-solved .ctable {
+  animation: pop 0.45s ease;
+}
+.ctable .pile > * {
+  --x: 0;
+  --y: 0;
+  --dx: 0;
+}

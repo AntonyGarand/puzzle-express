@@ -7,9 +7,13 @@ import './hunt.css';
 
 export const hunt: PuzzleDef = {
   id: 'hunt',
-  get name() { return L('Hunt', 'Chasse aux mots'); },
+  get name() {
+    return L('Hunt', 'Chasse aux mots');
+  },
   category: 'words',
-  get rules() { return L('Drag through touching letters to spell words.', 'Glissez sur des lettres voisines pour former des mots.'); },
+  get rules() {
+    return L('Drag through touching letters to spell words.', 'Glissez sur des lettres voisines pour former des mots.');
+  },
   localized: true,
   help: () => ({
     goal: L(
@@ -39,7 +43,10 @@ export const hunt: PuzzleDef = {
       ),
     ],
     tips: [
-      L('Once you find a word, try adding S, ED or ER to it.', 'Un mot trouvé? Essayez-le au pluriel, au féminin ou conjugué : ils comptent aussi.'),
+      L(
+        'Once you find a word, try adding S, ED or ER to it.',
+        'Un mot trouvé? Essayez-le au pluriel, au féminin ou conjugué : ils comptent aussi.',
+      ),
       L('Scan for short common chunks like TH, ING or ER first.', 'Repérez d’abord les groupes courants comme ER, ON, QU ou ENT.'),
     ],
   }),
@@ -53,7 +60,7 @@ export const hunt: PuzzleDef = {
     const letters = grid0.letters;
     const target = Math.max(8, Math.round(grid0.pts * frac));
 
-    let found: string[] = [];
+    const found: string[] = [];
     let path: number[] = [];
     let score = 0;
     let won = false;
@@ -74,12 +81,16 @@ export const hunt: PuzzleDef = {
     const say = (m: string) => {
       msg = m;
       clearTimeout(msgTimer);
-      msgTimer = window.setTimeout(() => { msg = ''; renderWord(); }, 1100);
+      msgTimer = window.setTimeout(() => {
+        msg = '';
+        renderWord();
+      }, 1100);
       renderWord();
     };
     const renderWord = () => {
       const w = path.map((i) => letters[i]).join('');
-      word.textContent = w || msg || (dictReady() ? L(`${minLen}+ letters`, `${minLen} lettres et +`) : L('loading words…', 'chargement des mots…'));
+      word.textContent =
+        w || msg || (dictReady() ? L(`${minLen}+ letters`, `${minLen} lettres et +`) : L('loading words…', 'chargement des mots…'));
       word.classList.toggle('typing', !!w);
     };
     const render = () => {
@@ -99,16 +110,40 @@ export const hunt: PuzzleDef = {
       const w = path.map((i) => letters[i]).join('');
       path = [];
       if (!w) return render();
-      if (w.length < minLen) { render(); if (w.length > 1) { shake(word); say(L('Too short', 'Trop court')); } return; }
-      if (found.includes(w)) { render(); shake(word); say(L('Already found', 'Déjà trouvé')); return; }
+      if (w.length < minLen) {
+        render();
+        if (w.length > 1) {
+          shake(word);
+          say(L('Too short', 'Trop court'));
+        }
+        return;
+      }
+      if (found.includes(w)) {
+        render();
+        shake(word);
+        say(L('Already found', 'Déjà trouvé'));
+        return;
+      }
       const ok = isWord(w);
-      if (ok === null) { render(); say(L('loading words…', 'chargement des mots…')); return; }
-      if (!ok) { render(); shake(word); say(L('Not a word', 'Mot inconnu')); return; }
+      if (ok === null) {
+        render();
+        say(L('loading words…', 'chargement des mots…'));
+        return;
+      }
+      if (!ok) {
+        render();
+        shake(word);
+        say(L('Not a word', 'Mot inconnu'));
+        return;
+      }
       found.push(w);
       score += points(w.length);
       render();
       say(`+${points(w.length)} ${w}`);
-      if (score >= target && !won) { won = true; ctx.solved(); }
+      if (score >= target && !won) {
+        won = true;
+        ctx.solved();
+      }
     };
 
     // Pointer: drag to trace (release submits); or tap cells one by one and tap the last again to submit.
@@ -119,7 +154,8 @@ export const hunt: PuzzleDef = {
       const c = el?.closest<HTMLElement>('[data-i]');
       if (!c || !grid.contains(c)) return -1;
       const r = c.getBoundingClientRect();
-      const dx = x - (r.left + r.width / 2), dy = y - (r.top + r.height / 2);
+      const dx = x - (r.left + r.width / 2),
+        dy = y - (r.top + r.height / 2);
       // only count the inner part of a cell so diagonal drags don't clip neighbours
       return dx * dx + dy * dy <= (r.width * 0.42) ** 2 ? Number(c.dataset.i) : -1;
     };
@@ -127,7 +163,10 @@ export const hunt: PuzzleDef = {
       if (i < 0) return false;
       const lastI = path[path.length - 1];
       if (i === lastI) return false;
-      if (path.length >= 2 && i === path[path.length - 2]) { path.pop(); return true; } // back up
+      if (path.length >= 2 && i === path[path.length - 2]) {
+        path.pop();
+        return true;
+      } // back up
       if (path.includes(i) || (path.length && !adjacent(n, lastI, i))) return false;
       path.push(i);
       return true;
@@ -141,7 +180,11 @@ export const hunt: PuzzleDef = {
       e.preventDefault();
       dragging = true;
       moved = false;
-      if (path.length && i === path[path.length - 1]) { dragging = false; submit(); return; }
+      if (path.length && i === path[path.length - 1]) {
+        dragging = false;
+        submit();
+        return;
+      }
       const k = path.indexOf(i);
       if (k >= 0) path = path.slice(0, k + 1);
       else if (!(path.length && adjacent(n, path[path.length - 1], i))) path = [i];
@@ -150,7 +193,10 @@ export const hunt: PuzzleDef = {
     });
     const onMove = (e: PointerEvent) => {
       if (!dragging) return;
-      if (extend(cellAt(e.clientX, e.clientY))) { moved = true; render(); }
+      if (extend(cellAt(e.clientX, e.clientY))) {
+        moved = true;
+        render();
+      }
     };
     const onUp = () => {
       if (!dragging) return;
@@ -188,10 +234,22 @@ export const hunt: PuzzleDef = {
       snapshot: () => ({ f: found, p: path }),
       onKey(e) {
         if (won) return false;
-        if (e.key === 'Enter') { typed = ''; submit(); return true; }
-        if (e.key === 'Escape') { typed = ''; path = []; render(); return true; }
+        if (e.key === 'Enter') {
+          typed = '';
+          submit();
+          return true;
+        }
+        if (e.key === 'Escape') {
+          typed = '';
+          path = [];
+          render();
+          return true;
+        }
         if (e.key === 'Backspace') {
-          typed = path.map((i) => letters[i]).join('').slice(0, -1);
+          typed = path
+            .map((i) => letters[i])
+            .join('')
+            .slice(0, -1);
           path = findPath(letters, n, typed) ?? [];
           render();
           return true;
@@ -200,8 +258,10 @@ export const hunt: PuzzleDef = {
         if (ch) {
           typed = path.map((i) => letters[i]).join('') + ch;
           const p = findPath(letters, n, typed);
-          if (p) { path = p; render(); }
-          else shake(grid);
+          if (p) {
+            path = p;
+            render();
+          } else shake(grid);
           return true;
         }
         return false;

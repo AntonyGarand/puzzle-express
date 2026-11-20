@@ -7,23 +7,39 @@ import './untangle.css';
 
 export const untangle: PuzzleDef = {
   id: 'untangle',
-  get name() { return L('Untangle', 'Démêler'); },
+  get name() {
+    return L('Untangle', 'Démêler');
+  },
   category: 'paths',
-  get rules() { return L('Drag the points until no lines cross.', 'Glissez les points pour qu’aucune ligne ne se croise.'); },
+  get rules() {
+    return L('Drag the points until no lines cross.', 'Glissez les points pour qu’aucune ligne ne se croise.');
+  },
   help: () => ({
     goal: L(
       'Move the points so that no two lines cross. Each line stays attached to its two points.',
       'Déplacez les points pour qu’aucune ligne n’en croise une autre. Chaque ligne reste attachée à ses deux points.',
     ),
     steps: [
-      L('Drag a point anywhere in the square; its lines follow it.', 'Glissez un point n’importe où dans le carré : ses lignes le suivent.'),
+      L(
+        'Drag a point anywhere in the square; its lines follow it.',
+        'Glissez un point n’importe où dans le carré : ses lignes le suivent.',
+      ),
       L('Lines that cross another line are shown in red.', 'Les lignes qui en croisent une autre sont en rouge.'),
       L('The status line counts the crossing lines left.', 'La ligne d’état compte les lignes croisées restantes.'),
-      L('The puzzle is solved when you let go of a point and nothing crosses.', 'Le casse-tête est résolu quand vous relâchez un point et que plus rien ne se croise.'),
+      L(
+        'The puzzle is solved when you let go of a point and nothing crosses.',
+        'Le casse-tête est résolu quand vous relâchez un point et que plus rien ne se croise.',
+      ),
     ],
     tips: [
-      L('Pull a point with few lines out of the tangle first, then place the busier points around it.', 'Sortez d’abord du fouillis un point qui a peu de lignes, puis placez les points plus chargés autour.'),
-      L('Use the whole square: spread the points out, then tidy up.', 'Servez-vous de tout le carré : étalez les points, puis faites le ménage.'),
+      L(
+        'Pull a point with few lines out of the tangle first, then place the busier points around it.',
+        'Sortez d’abord du fouillis un point qui a peu de lignes, puis placez les points plus chargés autour.',
+      ),
+      L(
+        'Use the whole square: spread the points out, then tidy up.',
+        'Servez-vous de tout le carré : étalez les points, puis faites le ménage.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [15, 30, 50, 80, 130]),
@@ -72,7 +88,11 @@ export const untangle: PuzzleDef = {
         c.setAttribute('class', `v${i === drag ? ' on' : ''}`);
       });
       const crossings = bad.size;
-      ctx.status(crossings ? P(crossings, ['crossing line', 'crossing lines'], ['ligne croisée', 'lignes croisées']) : L('No crossings', 'Aucun croisement'));
+      ctx.status(
+        crossings
+          ? P(crossings, ['crossing line', 'crossing lines'], ['ligne croisée', 'lignes croisées'])
+          : L('No crossings', 'Aucun croisement'),
+      );
       return crossings === 0;
     };
 
@@ -81,7 +101,8 @@ export const untangle: PuzzleDef = {
       const clamp = (v: number) => Math.round(Math.max(r, Math.min(100 - r, v)) * 10) / 10;
       return { x: clamp(((e.clientX - rc.left) / (rc.width || 1)) * 100), y: clamp(((e.clientY - rc.top) / (rc.height || 1)) * 100) };
     };
-    let grabDx = 0, grabDy = 0;
+    let grabDx = 0,
+      grabDy = 0;
     svg.addEventListener('pointerdown', (e) => {
       if (finished) return;
       let v = Number((e.target as Element | null)?.getAttribute?.('data-v') ?? -1);
@@ -92,7 +113,10 @@ export const untangle: PuzzleDef = {
         v = -1;
         pos.forEach((q, i) => {
           const dd = Math.hypot(q.x - p.x, q.y - p.y);
-          if (dd < bd) (bd = dd), (v = i);
+          if (dd < bd) {
+            bd = dd;
+            v = i;
+          }
         });
       }
       if (v < 0) return;

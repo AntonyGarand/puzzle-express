@@ -12,7 +12,8 @@ export function renderStats(el: HTMLElement, defs: PuzzleDef[]) {
   const solved = all.reduce((a, x) => a + x.s.solved, 0);
   const time = all.reduce((a, x) => a + x.s.time, 0);
 
-  const tile = (label: string, value: string | number) => h('div', { class: 'stat' }, h('div', { class: 'stat-v' }, value), h('div', { class: 'stat-l' }, label));
+  const tile = (label: string, value: string | number) =>
+    h('div', { class: 'stat' }, h('div', { class: 'stat-v' }, value), h('div', { class: 'stat-l' }, label));
 
   // Last 28 days activity
   const days: HTMLElement[] = [];
@@ -40,7 +41,11 @@ export function renderStats(el: HTMLElement, defs: PuzzleDef[]) {
       return h(
         'tr',
         { 'data-puzzle': d.id },
-        h('td', null, h('a', { href: `#/game/${d.id}`, title: `${L('Open', 'Ouvrir')} ${d.name}` }, h('span', { class: 'swatchlet' }), d.name)),
+        h(
+          'td',
+          null,
+          h('a', { href: `#/game/${d.id}`, title: `${L('Open', 'Ouvrir')} ${d.name}` }, h('span', { class: 'swatchlet' }), d.name),
+        ),
         h('td', null, LEVEL_NAMES[pr.level], h('span', { class: 'muted' }, pr.manual ? L(' · fixed', ' · fixe') : ' · auto')),
         h('td', { class: 'num' }, s.solved),
         h('td', { class: 'num' }, s.played ? `${Math.round((100 * s.solved) / s.played)}%` : '—'),
@@ -66,7 +71,14 @@ export function renderStats(el: HTMLElement, defs: PuzzleDef[]) {
       'div',
       { class: 'page' },
       h('div', { class: 'page-head' }, h('h1', null, L('Profile', 'Profil')), nameInput),
-      h('p', { class: 'muted' }, L(`Playing since ${new Date(p.created).toLocaleDateString(localeTag())}. Everything is stored on this device.`, `Vous jouez depuis le ${new Date(p.created).toLocaleDateString(localeTag())}. Tout est stocké sur cet appareil.`)),
+      h(
+        'p',
+        { class: 'muted' },
+        L(
+          `Playing since ${new Date(p.created).toLocaleDateString(localeTag())}. Everything is stored on this device.`,
+          `Vous jouez depuis le ${new Date(p.created).toLocaleDateString(localeTag())}. Tout est stocké sur cet appareil.`,
+        ),
+      ),
       h(
         'div',
         { class: 'stats' },
@@ -85,27 +97,67 @@ export function renderStats(el: HTMLElement, defs: PuzzleDef[]) {
         h(
           'table',
           null,
-          h('thead', null, h('tr', null, ...[L('Game', 'Jeu'), L('Level', 'Niveau'), L('Solved', 'Réussis'), L('Rate', 'Taux'), L('Avg', 'Moy.'), L('Best', 'Record')].map((x, i) => h('th', { class: `${i > 1 ? 'num' : ''} ${i === 4 ? 'hide-sm' : ''}` }, x)))),
+          h(
+            'thead',
+            null,
+            h(
+              'tr',
+              null,
+              ...[
+                L('Game', 'Jeu'),
+                L('Level', 'Niveau'),
+                L('Solved', 'Réussis'),
+                L('Rate', 'Taux'),
+                L('Avg', 'Moy.'),
+                L('Best', 'Record'),
+              ].map((x, i) => h('th', { class: `${i > 1 ? 'num' : ''} ${i === 4 ? 'hide-sm' : ''}` }, x)),
+            ),
+          ),
           h('tbody', null, ...rows),
         ),
       ),
-      h('p', { class: 'muted small' }, L('Best is your fastest solve at the current level. Tap a game to open it.', 'Le record est votre solution la plus rapide au niveau actuel. Touchez un jeu pour l’ouvrir.')),
+      h(
+        'p',
+        { class: 'muted small' },
+        L(
+          'Best is your fastest solve at the current level. Tap a game to open it.',
+          'Le record est votre solution la plus rapide au niveau actuel. Touchez un jeu pour l’ouvrir.',
+        ),
+      ),
       h(
         'div',
         { class: 'row' },
-        btn(L('Export', 'Exporter'), () => {
-          const a = h('a', { href: URL.createObjectURL(new Blob([exportProfile()], { type: 'application/json' })), download: 'puzzle-express-profile.json' });
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-        }, 'ghost'),
+        btn(
+          L('Export', 'Exporter'),
+          () => {
+            const a = h('a', {
+              href: URL.createObjectURL(new Blob([exportProfile()], { type: 'application/json' })),
+              download: 'puzzle-express-profile.json',
+            });
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+          },
+          'ghost',
+        ),
         btn(L('Import', 'Importer'), () => fileInput.click(), 'ghost'),
-        btn(L('Reset everything', 'Tout effacer'), () => {
-          if (confirm(L('Erase your profile, stats and settings on this device?', 'Effacer votre profil, vos statistiques et vos réglages sur cet appareil?'))) {
-            resetProfile();
-            clearAllSaves();
-            renderStats(el, defs);
-          }
-        }, 'ghost'),
+        btn(
+          L('Reset everything', 'Tout effacer'),
+          () => {
+            if (
+              confirm(
+                L(
+                  'Erase your profile, stats and settings on this device?',
+                  'Effacer votre profil, vos statistiques et vos réglages sur cet appareil?',
+                ),
+              )
+            ) {
+              resetProfile();
+              clearAllSaves();
+              renderStats(el, defs);
+            }
+          },
+          'ghost',
+        ),
         fileInput,
       ),
     ),
