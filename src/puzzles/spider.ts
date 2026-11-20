@@ -48,8 +48,8 @@ export const spider: PuzzleDef = {
         'Seule une suite de la même sorte se déplace en bloc. Une suite complète du roi à l’as est retirée automatiquement.',
       ),
       L(
-        'Tap a card to send it to the best spot (same suit first), or drag it. Face-down cards turn over once uncovered.',
-        'Touchez une carte pour l’envoyer au meilleur endroit (même sorte d’abord), ou glissez-la. Les cartes cachées se retournent une fois dégagées.',
+        'Tap a card to send it to the best spot (same suit first), or drag it (on a touch screen, hold it a moment first). Face-down cards turn over once uncovered.',
+        'Touchez une carte pour l’envoyer au meilleur endroit (même sorte d’abord), ou glissez-la (sur écran tactile, maintenez-la un instant d’abord). Les cartes cachées se retournent une fois dégagées.',
       ),
       L(
         'Tap the stock (top left) to deal one card on every column. You can only deal when no column is empty.',

@@ -1,6 +1,6 @@
 # puzzle express
 
-An endless, scroll-snapping feed of short puzzles: 45 games in English and Québec French. It's a static site with no backend; your profile, stats, preferences and unfinished games live in `localStorage`.
+An endless, scroll-snapping feed of short puzzles: 43 games in English and Québec French. It's a static site with no backend; your profile, stats, preferences and unfinished games live in `localStorage`.
 
 **Play:** https://puzzle.garand.dev
 
@@ -47,15 +47,15 @@ scripts/             Playwright audit + screenshot tools (use your installed Chr
 
 ## Games
 
-There are 45 games in seven categories (`src/core/categories.ts`):
+There are 43 games in seven categories (`src/core/categories.ts`):
 
 - **Logic:** Sudoku, Jigsaw Sudoku, Killer Sudoku, Cross Sums, Unequal, Binary, Queens, Stars, Tents, Tiles, Mines, Bridges, Nonogram, Lights, Code Breaker
 - **Paths & links:** Pipes, Connect, Beehive, Tracks, Untangle, Maze
-- **Numbers:** Quick Math, Sequence, Target, Guess, Merge
+- **Numbers:** Sequence, Target, Guess, Merge
 - **Words:** Anagram, Word Guess, Hunt, Tower (English and French word lists)
 - **Moves:** Slide, Unblock, Push, Gems, Arrange, Blocks, Flood
 - **Cards & chess:** Solitaire, FreeCell, Spider, Pyramid, Chess (mate in 1 or 2)
-- **Memory & eyes:** Memory, Pairs, Odd Shade
+- **Memory & eyes:** Memory, Pairs
 
 Every game is generated from a seed, has five levels (Easy to Master) and a how-to-play tutorial behind its "?" button.
 

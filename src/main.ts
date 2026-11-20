@@ -4,7 +4,7 @@ import './styles.css';
 import { Feed } from './core/feed';
 import { dayStreak, getProfile, onChange } from './core/store';
 import { LEVELS, type Difficulty } from './core/types';
-import { h, s } from './core/ui';
+import { cogIcon, h, s } from './core/ui';
 import { LabView } from './pages/lab';
 import { renderLabs } from './pages/labs';
 import { renderSettings } from './pages/settings';
@@ -22,8 +22,7 @@ const ICONS = {
   feed: () => icon('M5 4h14v7H5z', 'M5 15h14v5H5z'),
   labs: () => icon('M9 3h6', 'M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3', 'M7.5 15h9'),
   stats: () => icon('M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M4 21c1-4 4-6 8-6s7 2 8 6'),
-  settings: () =>
-    icon('M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1'),
+  settings: () => cogIcon('tab-icon'),
 };
 const tab = (key: keyof typeof ICONS, href: string, label: string) =>
   h('a', { href, class: 'tab', 'data-tab': key }, ICONS[key](), h('span', null, label));

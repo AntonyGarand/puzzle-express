@@ -1,7 +1,7 @@
 import { L, P } from '../core/i18n';
 import { byLevel, type PuzzleDef } from '../core/types';
 import { board, h, PALETTE, s, shake } from '../core/ui';
-import { anim, int, isIntArr } from './movekit/kit';
+import { int, isIntArr } from './movekit/kit';
 import './pairs.css';
 
 const SHAPES = 9;
@@ -46,12 +46,12 @@ export const pairs: PuzzleDef = {
       L('Tap a card to flip it, then tap a second one.', 'Touchez une carte pour la retourner, puis une deuxième.'),
       L('If the two symbols match, the pair stays face up.', 'Si les deux symboles sont identiques, la paire reste visible.'),
       L(
-        'If not, both stay shown until you tap another card, then flip back.',
-        'Sinon, les deux restent visibles jusqu’à ce que vous touchiez une autre carte, puis se retournent.',
+        'If not, the cards shake and flip back after a moment (or as soon as you tap another card).',
+        'Sinon, les cartes tremblent et se retournent après un instant (ou dès que vous touchez une autre carte).',
       ),
       L(
-        'Each pair of flips is one try. Missing a match you had already seen counts as a mistake.',
-        'Chaque paire de cartes retournées compte pour un essai. Rater une paire déjà vue compte comme une erreur.',
+        'Each pair of flips is one try, shown at the bottom. Every mismatch adds to the ✕ mistakes count at the top.',
+        'Chaque paire de cartes retournées compte pour un essai, affiché en bas. Chaque paire ratée s’ajoute au compteur d’erreurs ✕ en haut.',
       ),
       L(
         'On Master you have 40 tries; run out and the game is lost.',
@@ -93,7 +93,6 @@ export const pairs: PuzzleDef = {
       syms = rng.shuffle([...Array(SHAPES * 8).keys()]).slice(0, np);
     }
     const deck = rng.shuffle([...syms, ...syms]);
-    const partner = deck.map((v, i) => deck.findIndex((w, j) => j !== i && w === v));
 
     let matched = new Array<boolean>(n).fill(false);
     let seen = new Array<boolean>(n).fill(false);
@@ -113,22 +112,36 @@ export const pairs: PuzzleDef = {
     }
 
     const grid = board(cols, rows, 'pairs-grid');
-    const els = deck.map((_, i) => {
-      const el = h('button', { type: 'button', class: 'cell', 'aria-label': L(`card ${i + 1}`, `carte ${i + 1}`), onclick: () => tap(i) });
+    // Each card is a 3D flipper: the back (pattern) and the face (symbol) share one box, back to back.
+    // Flipping is a CSS transition on `.up`, so the resumed view is the same markup without any animation.
+    const els = deck.map((v, i) => {
+      const el = h(
+        'button',
+        { type: 'button', class: 'cell pc', 'aria-label': L(`card ${i + 1}`, `carte ${i + 1}`), onclick: () => tap(i) },
+        h('span', { class: 'pc-in' }, h('span', { class: 'pc-back' }), h('span', { class: 'pc-face' }, symbol(v))),
+      );
       grid.append(el);
       return el;
     });
-    const shown = new Array<boolean>(n).fill(false);
+    const calm = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    /** Web Animations on the individual `scale`/`translate` properties: never touch class/style, so resume views match. */
+    const fx = (el: HTMLElement, frames: Keyframe[], ms: number, delay = 0) => {
+      if (calm() || typeof el.animate !== 'function') return;
+      try {
+        el.animate(frames, { duration: ms, delay, easing: 'ease-out' });
+      } catch {
+        /* ignore */
+      }
+    };
+    /** A mismatched pair stays face up for a moment, then flips back on its own (or on the next tap). */
+    let hideTimer = 0;
     const render = () => {
       els.forEach((el, i) => {
         const up = matched[i] || open.includes(i) || over;
         el.className = `cell pc ${up ? 'up' : ''} ${matched[i] ? 'on' : ''} ${over && !matched[i] ? 'miss' : ''}`
           .replace(/\s+/g, ' ')
           .trim();
-        if (up !== shown[i]) {
-          el.replaceChildren(...(up ? [symbol(deck[i])] : []));
-          shown[i] = up;
-        }
+        el.setAttribute('aria-pressed', String(up));
       });
       const found = matched.filter(Boolean).length / 2;
       const left = limit - tries;
@@ -143,6 +156,7 @@ export const pairs: PuzzleDef = {
 
     const tap = (i: number) => {
       if (over || matched[i]) return;
+      clearTimeout(hideTimer);
       if (open.length === 2) {
         const was = open;
         open = [];
@@ -157,18 +171,29 @@ export const pairs: PuzzleDef = {
       if (open.length === 2) {
         const [a, b] = open;
         tries++;
-        if (deck[a] === deck[b]) {
+        const hit = deck[a] === deck[b];
+        if (hit) {
           matched[a] = matched[b] = true;
           open = [];
-        } else if (seen[partner[a]] || seen[b]) {
+        } else {
           ctx.mistake();
         }
         seen[a] = seen[b] = true;
         render();
-        if (deck[a] === deck[b]) {
-          anim(els[a], FLASH, 260);
-          anim(els[b], FLASH, 260);
-        } else anim(els[i], FLIP, 180);
+        if (hit) {
+          // Let the second card finish turning, then the pair pops and settles.
+          fx(els[a], POP, 360, 260);
+          fx(els[b], POP, 360, 260);
+        } else {
+          fx(els[a], SHAKE, 380, 300);
+          fx(els[b], SHAKE, 380, 300);
+          hideTimer = window.setTimeout(() => {
+            if (open.length === 2 && open[0] === a && open[1] === b) {
+              open = [];
+              render();
+            }
+          }, 1300);
+        }
         if (matched.every(Boolean)) {
           over = true;
           ctx.solved();
@@ -185,16 +210,23 @@ export const pairs: PuzzleDef = {
       }
       seen[i] = true;
       render();
-      anim(els[i], FLIP, 180);
     };
 
     root.append(grid);
     render();
     return {
       snapshot: () => ({ m: matched.map(Number), seen: seen.map(Number), open, tries }),
+      destroy: () => clearTimeout(hideTimer),
     };
   },
 };
 
-const FLIP: Keyframe[] = [{ transform: 'rotateY(90deg)' }, { transform: 'rotateY(0deg)' }];
-const FLASH: Keyframe[] = [{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }, { transform: 'scale(1)' }];
+const POP: Keyframe[] = [{ scale: '1' }, { scale: '1.12', offset: 0.4 }, { scale: '0.97', offset: 0.75 }, { scale: '1' }];
+const SHAKE: Keyframe[] = [
+  { translate: '0' },
+  { translate: '-7px' },
+  { translate: '6px' },
+  { translate: '-4px' },
+  { translate: '2px' },
+  { translate: '0' },
+];

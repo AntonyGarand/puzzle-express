@@ -81,8 +81,8 @@ export const freecell: PuzzleDef = {
         'Les cellules libres en haut à gauche contiennent une carte chacune. Il y en a 4, ou seulement 3 en Maître.',
       ),
       L(
-        'Tap a card to play it automatically: to a foundation, onto a matching column, into a free cell, then into an empty column. Or drag it where you want.',
-        'Touchez une carte pour la jouer automatiquement : sur une fondation, sur une colonne compatible, dans une cellule libre, puis dans une colonne vide. Ou glissez-la où vous voulez.',
+        'Tap a card to play it automatically: to a foundation, onto a matching column, into a free cell, then into an empty column. Or drag it where you want (on a touch screen, hold it a moment first).',
+        'Touchez une carte pour la jouer automatiquement : sur une fondation, sur une colonne compatible, dans une cellule libre, puis dans une colonne vide. Ou glissez-la où vous voulez (sur écran tactile, maintenez-la un instant d’abord).',
       ),
       L(
         'You can move an ordered run at once if there is enough room: free cells + 1, doubled for each empty column.',

@@ -1,6 +1,7 @@
 import { L } from '../core/i18n';
 import { byLevel, type PuzzleDef } from '../core/types';
 import { board, h, PALETTE } from '../core/ui';
+import './flood.css';
 
 /** Flood from the top-left corner with colour `c`; returns the new grid. */
 function flood(g: number[], n: number, c: number): number[] {
@@ -61,10 +62,13 @@ export const floodPuzzle: PuzzleDef = {
         'Pick a colour from the palette (or tap a tile of that colour, or press 1, 2, 3…). Your area takes that colour and swallows the touching tiles of the same colour.',
         'Choisissez une couleur dans la palette (ou touchez une case de cette couleur, ou appuyez sur 1, 2, 3…). Votre zone prend cette couleur et absorbe les cases voisines de la même couleur.',
       ),
-      L('The status line shows moves used out of the limit.', 'La ligne d’état affiche les coups joués sur le maximum permis.'),
       L(
-        'Cover the board within the limit to win. Reach the limit first and the game is lost.',
-        'Couvrez la grille dans la limite pour gagner. Si vous l’atteignez avant, la partie est perdue.',
+        'The counter above the board shows how many moves you have left; it turns red near the end.',
+        'Le compteur au-dessus de la grille indique combien de coups il vous reste; il devient rouge vers la fin.',
+      ),
+      L(
+        'Cover the board before the counter reaches 0 to win. Run out of moves first and the game is lost.',
+        'Couvrez la grille avant que le compteur tombe à 0 pour gagner. Si vos coups s’épuisent avant, la partie est perdue.',
       ),
     ],
     tips: [
@@ -83,7 +87,9 @@ export const floodPuzzle: PuzzleDef = {
     const { root, rng, difficulty: d } = ctx;
     const n = byLevel(d, [6, 8, 10, 12, 14]);
     const k = byLevel(d, [3, 4, 5, 6, 6]);
-    const slack = byLevel(d, [5, 4, 3, 2, 1]);
+    // Slack over a 2-ply greedy solve: a plain greedy player still fits the limit ~93% of the time on
+    // Expert and ~80% on Master (checked over 120 boards per level).
+    const slack = byLevel(d, [4, 4, 3, 3, 2]);
     let g = Array.from({ length: n * n }, () => rng.int(0, k - 1));
 
     // Greedy solve (with a one-move lookahead) to set a fair move limit.
@@ -126,12 +132,23 @@ export const floodPuzzle: PuzzleDef = {
         }),
       );
 
+    // Moves-left counter above the board: big number + a draining bar, red when 2 or fewer remain.
+    const leftNum = h('b', { class: 'fl-num' });
+    const leftLbl = h('span', { class: 'fl-lbl' });
+    const bar = h('i', { class: 'fl-fill' });
+    const head = h('div', { class: 'fl-head' }, h('div', { class: 'fl-left' }, leftNum, leftLbl), h('div', { class: 'fl-bar' }, bar));
+
     const render = () => {
       cells.forEach((el, i) => (el.style.background = PALETTE[g[i]]));
-      ctx.status(L(`${moves} / ${limit} moves`, `${moves} / ${limit} coups`));
+      const left = Math.max(0, limit - moves);
+      leftNum.textContent = String(left);
+      leftLbl.textContent = L(left === 1 ? 'move left' : 'moves left', left < 2 ? 'coup restant' : 'coups restants');
+      bar.style.width = `${(100 * left) / limit}%`;
+      head.classList.toggle('low', left <= 2);
+      ctx.status(L(`${moves} / ${limit} moves used`, `${moves} / ${limit} coups joués`));
     };
     const choose = (c: number) => {
-      if (c === g[0]) return;
+      if (c === g[0] || moves >= limit || regionSize(g, n) === n * n) return;
       ctx.touch();
       g = flood(g, n, c);
       moves++;
@@ -144,7 +161,7 @@ export const floodPuzzle: PuzzleDef = {
       g = sv.g;
       moves = sv.moves ?? 0;
     }
-    root.append(grid, palette);
+    root.append(head, grid, palette);
     render();
     return {
       snapshot: () => ({ g, moves }),

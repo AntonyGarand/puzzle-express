@@ -2,7 +2,7 @@
   --accent: var(--p6);
 }
 [data-puzzle='gems'] .puzzle {
-  --board: min(90vw, calc(100dvh - var(--head) - var(--tabs) - 320px), 420px);
+  --board: var(--fit, min(90vw, calc(100dvh - var(--head) - var(--tabs) - 320px), 420px));
 }
 
 [data-puzzle='gems'] .gems-grid {
@@ -16,8 +16,24 @@
   box-shadow: var(--sh) var(--sh) 0 var(--ink);
   touch-action: none;
 }
-[data-puzzle='gems'] .pad {
-  width: min(var(--board), 300px);
+/* 3×3 direction pad, move counter in the middle */
+[data-puzzle='gems'] .gems-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: min(var(--board), 210px);
+}
+[data-puzzle='gems'] .gems-pad .key {
+  height: 40px;
+}
+[data-puzzle='gems'] .gems-mid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
 [data-puzzle='gems'] .gems-grid .cell {
   border: 0;
@@ -34,11 +50,42 @@
   border: 2px dashed color-mix(in srgb, var(--ink) 45%, transparent);
   border-radius: 50%;
 }
+/* rock: a raised neo-brutalist block (ink border, hard offset shadow, lit top edge) */
 [data-puzzle='gems'] .gems-grid .cell.rock {
-  background: color-mix(in srgb, var(--ink) 78%, var(--cell));
+  --rk: max(2px, calc(var(--board) / var(--cols) * 0.07));
+  margin: 4% calc(4% + var(--rk)) calc(4% + var(--rk)) 4%;
+  border: var(--cbw) solid var(--ink);
+  border-radius: 18%;
   outline: 0;
-  border-radius: 22%;
-  margin: 6%;
+  background: color-mix(in srgb, var(--muted) 62%, var(--cell));
+  box-shadow:
+    inset 0 calc(var(--rk) * 0.9) 0 color-mix(in srgb, var(--cell) 45%, transparent),
+    inset 0 calc(var(--rk) * -0.9) 0 color-mix(in srgb, var(--ink) 18%, transparent),
+    var(--rk) var(--rk) 0 var(--ink);
+}
+/* mine: a red bomb with spikes */
+[data-puzzle='gems'] .gems-grid .cell.mine::before {
+  content: '';
+  position: absolute;
+  width: 74%;
+  height: 74%;
+  background:
+    linear-gradient(var(--ink), var(--ink)) center / 100% 12% no-repeat,
+    linear-gradient(var(--ink), var(--ink)) center / 12% 100% no-repeat;
+  transform: rotate(45deg);
+}
+[data-puzzle='gems'] .gems-grid .cell.mine::after {
+  content: '';
+  position: relative;
+  width: 46%;
+  height: 46%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 32%, color-mix(in srgb, var(--cell) 75%, transparent) 0 14%, transparent 15%), var(--bad);
+  border: var(--cbw) solid var(--ink);
+  box-shadow: 0 0 0 calc(var(--cbw) * 0.6) var(--bad);
+}
+[data-puzzle='gems'] .gems-grid .cell.mine.hit {
+  background: color-mix(in srgb, var(--bad) 45%, transparent);
 }
 [data-puzzle='gems'] .gems-grid .cell.gem::after {
   content: '';

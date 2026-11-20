@@ -4,36 +4,57 @@
 [data-puzzle='push'] .push-grid {
   touch-action: none;
 }
+/* wall: a raised stone block (ink border, hard offset shadow, lit top edge, mortar line) */
 [data-puzzle='push'] .cell.wall {
-  background: repeating-linear-gradient(135deg, var(--ink) 0 3px, var(--cell-alt) 3px 8px);
-  box-shadow: none;
+  --lit: calc(var(--board) / var(--cols) * 0.07);
+  background:
+    linear-gradient(color-mix(in srgb, var(--ink) 30%, transparent), color-mix(in srgb, var(--ink) 30%, transparent)) 0 50% / 100%
+      max(1.5px, calc(var(--cbw) * 0.6)) no-repeat,
+    linear-gradient(color-mix(in srgb, var(--ink) 30%, transparent), color-mix(in srgb, var(--ink) 30%, transparent)) 50% 0 /
+      max(1.5px, calc(var(--cbw) * 0.6)) 50% no-repeat,
+    color-mix(in srgb, var(--muted) 62%, var(--cell));
+  box-shadow:
+    inset 0 var(--lit) 0 color-mix(in srgb, var(--cell) 45%, transparent),
+    inset 0 calc(var(--lit) * -1) 0 color-mix(in srgb, var(--ink) 18%, transparent),
+    var(--csh) var(--csh) 0 var(--ink);
 }
-/* target: a ring on the floor */
+/* floor between walls sits lower: flat tiles, so walls and crates read as raised */
+[data-puzzle='push'] .push-grid button.cell {
+  box-shadow: inset 0 0 0 0 transparent;
+  background: color-mix(in srgb, var(--accent) 8%, var(--cell));
+}
+/* target: a dashed pad on the floor */
 [data-puzzle='push'] .cell.tg::before {
   content: '';
   position: absolute;
-  width: 46%;
-  height: 46%;
-  border: 3px dashed var(--ink);
+  width: 52%;
+  height: 52%;
+  border: max(2px, var(--cbw)) dashed var(--ink);
   border-radius: 50%;
+  background: var(--accent-soft);
 }
-/* crate */
-[data-puzzle='push'] .cell.bx {
+/* crate: a raised block in the game's tone */
+[data-puzzle='push'] .push-grid .cell.bx {
+  --lit: calc(var(--board) / var(--cols) * 0.07);
   background: var(--accent);
+  box-shadow:
+    inset 0 var(--lit) 0 color-mix(in srgb, var(--cell) 40%, transparent),
+    inset 0 calc(var(--lit) * -1) 0 color-mix(in srgb, var(--ink) 22%, transparent),
+    var(--csh) var(--csh) 0 var(--ink);
 }
 [data-puzzle='push'] .cell.bx::after {
   content: '';
-  width: 58%;
-  height: 58%;
-  border: 3px solid var(--on-tone);
+  width: 56%;
+  height: 56%;
+  border: max(2px, var(--cbw)) solid var(--ink);
   border-radius: 3px;
-  background: linear-gradient(45deg, transparent 45%, var(--on-tone) 45% 55%, transparent 55%);
-  opacity: 0.55;
+  background: linear-gradient(45deg, transparent 44%, var(--ink) 44% 56%, transparent 56%);
+  opacity: 0.6;
 }
 [data-puzzle='push'] .cell.bx.tg::before {
   display: none;
 }
-[data-puzzle='push'] .cell.bx.on {
+[data-puzzle='push'] .push-grid .cell.bx.on {
   background: var(--good);
   color: var(--on-tone);
 }

@@ -1,24 +1,50 @@
 import { L } from '../core/i18n';
 import { byLevel, type PuzzleDef } from '../core/types';
 import { board, btn, h, pad, shake } from '../core/ui';
-import { genGems, slide } from './pathkit/gems-gen';
+import { anim } from './movekit/kit';
+import { DIRS8, MINE, ROCK, genGems, slide } from './pathkit/gems-gen';
 import { capture, cellAt } from './pathkit/grid';
 import './gems.css';
 
+/** Directions are DIRS8 indices: 0 ↑, 1 ↗, 2 →, 3 ↘, 4 ↓, 5 ↙, 6 ←, 7 ↖. */
 const KEYS: Record<string, number> = {
   ArrowUp: 0,
   w: 0,
   W: 0,
-  ArrowRight: 1,
-  d: 1,
-  D: 1,
-  ArrowDown: 2,
-  s: 2,
-  S: 2,
-  ArrowLeft: 3,
-  a: 3,
-  A: 3,
+  '8': 0,
+  e: 1,
+  E: 1,
+  '9': 1,
+  PageUp: 1,
+  ArrowRight: 2,
+  d: 2,
+  D: 2,
+  '6': 2,
+  c: 3,
+  C: 3,
+  '3': 3,
+  PageDown: 3,
+  ArrowDown: 4,
+  s: 4,
+  S: 4,
+  '2': 4,
+  z: 5,
+  Z: 5,
+  '1': 5,
+  End: 5,
+  ArrowLeft: 6,
+  a: 6,
+  A: 6,
+  '4': 6,
+  q: 7,
+  Q: 7,
+  '7': 7,
+  Home: 7,
 };
+/** Pad layout, row by row; -1 is the centre (move counter). */
+const PAD = [7, 0, 1, 6, -1, 2, 5, 4, 3];
+const ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+const LIVES = 3;
 
 export const gems: PuzzleDef = {
   id: 'gems',
@@ -27,25 +53,34 @@ export const gems: PuzzleDef = {
   },
   category: 'moves',
   get rules() {
-    return L('Slide on ice until you hit a rock. Grab every gem.', 'Glissez jusqu’à un rocher et ramassez toutes les gemmes.');
+    return L('Slide on ice in 8 directions. Grab gems, dodge mines.', 'Glissez en 8 directions : gemmes oui, mines non.');
   },
   help: () => ({
     goal: L(
-      'Collect every gem. Your token slides across the ice and only stops when it hits a rock or the edge.',
-      'Ramassez toutes les gemmes. Votre jeton glisse sur la glace et ne s’arrête que contre un rocher ou le bord.',
+      'Collect every gem. Your token slides across the ice in any of 8 directions and only stops at a rock or the edge.',
+      'Ramassez toutes les gemmes. Votre jeton glisse sur la glace dans 8 directions et ne s’arrête que contre un rocher ou le bord.',
     ),
     steps: [
       L(
-        'Swipe on the board, use the arrow buttons, or press the arrow keys / WASD to slide.',
-        'Balayez le plateau, utilisez les flèches à l’écran ou les touches fléchées / WASD pour glisser.',
+        'Slide with the 3×3 pad, by swiping (diagonals too), or by tapping a cell in line with your token: same row, column or diagonal.',
+        'Glissez avec le pavé 3×3, en balayant (en diagonale aussi) ou en touchant une case alignée avec votre jeton : même rangée, colonne ou diagonale.',
       ),
-      L('You can also tap a cell to slide in its direction.', 'Vous pouvez aussi toucher une case pour glisser dans sa direction.'),
-      L('Every gem you pass over on the way is collected.', 'Chaque gemme croisée en chemin est ramassée.'),
       L(
-        'On Expert and Master, moves are limited (shown as 3/12). Run out and the puzzle fails.',
-        'En Expert et Maître, les coups sont limités (affichés 3/12). À court de coups, c’est l’échec.',
+        'Keyboard: arrows or WASD, plus Q E Z C (or numpad 7 9 1 3) for the diagonals. U or Backspace undoes.',
+        'Clavier : flèches ou WASD, plus Q E Z C (ou 7 9 1 3 du pavé numérique) pour les diagonales. U ou Retour arrière annule.',
       ),
-      L('Undo takes back your last move.', 'Annuler reprend votre dernier coup.'),
+      L(
+        'Every gem you pass over is collected. A diagonal slide can’t squeeze between two rocks touching at their corners.',
+        'Chaque gemme croisée est ramassée. Une glissade en diagonale ne passe pas entre deux rochers qui se touchent par le coin.',
+      ),
+      L(
+        'From Medium on, mines lie on the ice. Slide into one and you lose a heart and go back to where that slide began. Lose all 3 hearts and the puzzle fails.',
+        'Dès le niveau Moyen, des mines parsèment la glace. Si vous glissez dessus, vous perdez un cœur et revenez au début de cette glissade. Trois cœurs perdus, c’est l’échec.',
+      ),
+      L(
+        'On Expert and Master, moves are limited (shown as 3/12). Undo takes back your last move, but not a lost heart.',
+        'En Expert et Maître, les coups sont limités (affichés 3/12). Annuler reprend votre dernier coup, mais pas un cœur perdu.',
+      ),
     ],
     tips: [
       L(
@@ -53,17 +88,22 @@ export const gems: PuzzleDef = {
         'Les rochers sont vos freins : repérez celui qui vous arrête près de chaque gemme.',
       ),
       L(
+        'A mine only hurts if your slide reaches it: a rock in front of it keeps you safe.',
+        'Une mine ne fait mal que si votre glissade l’atteint : un rocher devant vous protège.',
+      ),
+      L(
         'Sometimes you must move away from a gem to line up the right slide.',
         'Parfois, il faut s’éloigner d’une gemme pour bien s’aligner.',
       ),
     ],
   }),
-  par: (d) => byLevel(d, [20, 35, 60, 90, 140]),
+  par: (d) => byLevel(d, [20, 40, 70, 100, 150]),
   create(ctx) {
     const { root, rng, difficulty: d } = ctx;
     const P = genGems(rng, d);
-    const { n, rock, start, limit } = P;
+    const { n, cell, start, limit } = P;
     const N = n * n;
+    const hasMines = cell.includes(MINE);
     const gemIdx = new Map<number, number>();
     P.gems.forEach((g, k) => gemIdx.set(g, k));
     const G = P.gems.length;
@@ -71,6 +111,8 @@ export const gems: PuzzleDef = {
     let hist: number[] = [];
     let at = start;
     let got = new Set<number>();
+    let boom = 0;
+    let hit = -1;
     let finished = false;
 
     const grid = board(n, n, 'gems-grid');
@@ -82,38 +124,66 @@ export const gems: PuzzleDef = {
     const token = h('div', { class: 'gems-token', style: `--n:${n}` });
     grid.append(token);
 
+    /** Replay the history from the start; drops everything from the first move that no longer applies. */
     const replay = () => {
       at = start;
       got = new Set();
-      for (const dir of hist) {
-        const s = slide(n, rock, at, dir);
+      for (let k = 0; k < hist.length; k++) {
+        const s = slide(n, cell, at, hist[k]);
+        if (!s.length || cell[s[s.length - 1]] === MINE) {
+          hist = hist.slice(0, k);
+          break;
+        }
         for (const x of s) if (gemIdx.has(x)) got.add(x);
-        if (s.length) at = s[s.length - 1];
+        at = s[s.length - 1];
       }
     };
+    const xy = (i: number) => `translate(${(i % n) * 100}%, ${Math.floor(i / n) * 100}%)`;
     const place = (dist: number) => {
       token.style.transitionDuration = `${Math.min(0.32, 0.06 + dist * 0.035)}s`;
-      token.style.transform = `translate(${(at % n) * 100}%, ${Math.floor(at / n) * 100}%)`;
+      token.style.transform = xy(at);
     };
+    const mid = h('div', { class: 'gems-mid' });
     const render = () => {
       cells.forEach((el, i) => {
-        el.className = `cell${rock[i] ? ' rock' : ''}${gemIdx.has(i) && !got.has(i) ? ' gem' : ''}${i === start ? ' home' : ''}`;
+        const kind = cell[i] === ROCK ? ' rock' : cell[i] === MINE ? ` mine${i === hit ? ' hit' : ''}` : '';
+        el.className = `cell${kind}${gemIdx.has(i) && !got.has(i) ? ' gem' : ''}${i === start ? ' home' : ''}`;
       });
       const mv = `${hist.length}${limit ? `/${limit}` : ''}`;
-      ctx.status(L(`${got.size}/${G} gems · ${mv} moves`, `${got.size}/${G} gemmes · ${mv} coups`));
+      mid.textContent = mv;
+      const hearts = hasMines ? ` · ${'♥'.repeat(LIVES - boom)}${'♡'.repeat(boom)}` : '';
+      ctx.status(L(`${got.size}/${G} gems · ${mv} moves${hearts}`, `${got.size}/${G} gemmes · ${mv} coups${hearts}`));
     };
 
     const move = (dir: number) => {
       if (finished) return;
-      const s = slide(n, rock, at, dir);
+      const s = slide(n, cell, at, dir);
       if (!s.length) {
         shake(grid);
         return;
       }
       ctx.touch();
+      const end = s[s.length - 1];
+      if (cell[end] === MINE) {
+        // Boom: lose a heart, bounce back to where the slide began. The move isn't counted.
+        boom++;
+        ctx.mistake();
+        anim(token, [{ transform: xy(at) }, { transform: xy(end), offset: 0.45 }, { transform: xy(at) }], 200 + s.length * 50);
+        anim(cells[end], [{ transform: 'scale(1)' }, { transform: 'scale(1.35)' }, { transform: 'scale(1)' }], 260);
+        shake(grid);
+        if (boom >= LIVES) {
+          finished = true;
+          hit = end;
+          render();
+          ctx.failed();
+          return;
+        }
+        render();
+        return;
+      }
       hist.push(dir);
       for (const x of s) if (gemIdx.has(x)) got.add(x);
-      at = s[s.length - 1];
+      at = end;
       place(s.length);
       render();
       if (got.size === G) {
@@ -125,7 +195,16 @@ export const gems: PuzzleDef = {
       }
     };
 
-    // swipe anywhere on the board, or tap a cell to slide towards it
+    /** Direction from the token towards cell i if it lies on one of the 8 lines, else -1. */
+    const lineTo = (i: number) => {
+      const dr = Math.floor(i / n) - Math.floor(at / n),
+        dc = (i % n) - (at % n);
+      if (!dr && !dc) return -1;
+      if (dr && dc && Math.abs(dr) !== Math.abs(dc)) return -1;
+      return DIRS8.findIndex(([r, c]) => r === Math.sign(dr) && c === Math.sign(dc));
+    };
+
+    // swipe anywhere on the board (8 directions), or tap a cell in line with the token
     let sx = 0,
       sy = 0,
       down = false;
@@ -141,56 +220,53 @@ export const gems: PuzzleDef = {
       down = false;
       const dx = e.clientX - sx,
         dy = e.clientY - sy;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) >= 20) {
-        move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : dy > 0 ? 2 : 0);
+      if (Math.hypot(dx, dy) >= 20) {
+        const k = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+        move((((k + 2) % 8) + 8) % 8);
         return;
       }
       const i = cellAt(grid, n, n, e.clientX, e.clientY);
-      if (i < 0 || i === at) return;
-      const tr = Math.floor(i / n) - Math.floor(at / n),
-        tc = (i % n) - (at % n);
-      move(Math.abs(tc) > Math.abs(tr) ? (tc > 0 ? 1 : 3) : tr > 0 ? 2 : 0);
+      if (i < 0) return;
+      const dir = lineTo(i);
+      if (dir >= 0) move(dir);
     });
     grid.addEventListener('pointercancel', () => (down = false));
 
     const keys = pad(
-      [
-        { label: '←', value: '3' },
-        { label: '↑', value: '0' },
-        { label: '↓', value: '2' },
-        { label: '→', value: '1' },
-      ],
+      PAD.filter((v) => v >= 0).map((v) => ({ label: ARROWS[v], value: String(v) })),
       (v) => move(Number(v)),
     );
-    ctx.controls(
-      btn(
-        L('Undo', 'Annuler'),
-        () => {
-          if (finished || !hist.length) return;
-          hist.pop();
-          replay();
-          place(1);
-          render();
-        },
-        'ghost',
-      ),
-    );
+    keys.classList.add('gems-pad');
+    keys.insertBefore(mid, keys.children[4]);
+    const undo = () => {
+      if (finished || !hist.length) return;
+      hist.pop();
+      replay();
+      place(1);
+      render();
+    };
+    ctx.controls(btn(L('Undo', 'Annuler'), undo, 'ghost'));
 
-    const sv = ctx.saved as { hist?: unknown } | undefined;
-    if (Array.isArray(sv?.hist) && sv.hist.every((v) => v === 0 || v === 1 || v === 2 || v === 3)) {
+    const sv = ctx.saved as { v?: unknown; hist?: unknown; boom?: unknown } | undefined;
+    if (sv?.v === 2 && Array.isArray(sv.hist) && sv.hist.every((v) => Number.isInteger(v) && v >= 0 && v < 8)) {
       hist = (sv.hist as number[]).slice(0, limit ? limit - 1 : undefined);
       replay();
       if (got.size === G) {
         hist.pop();
         replay();
       }
+      if (hasMines && Number.isInteger(sv.boom)) boom = Math.max(0, Math.min(LIVES - 1, sv.boom as number));
     }
     root.append(grid, keys);
     place(0);
     render();
     return {
-      snapshot: () => ({ hist }),
+      snapshot: () => ({ v: 2, hist, boom }),
       onKey(e) {
+        if (e.key === 'Backspace' || e.key === 'u' || e.key === 'U') {
+          undo();
+          return true;
+        }
         const k = KEYS[e.key];
         if (k == null) return false;
         move(k);

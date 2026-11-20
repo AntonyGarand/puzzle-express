@@ -1,6 +1,6 @@
 import { L, P } from '../core/i18n';
 import { byLevel, type PuzzleDef } from '../core/types';
-import { board, btn, h } from '../core/ui';
+import { board, h } from '../core/ui';
 import { nb8 } from './logickit/kit';
 import { flood, genMines, mineCounts } from './logickit/minesgen';
 import './mines.css';
@@ -29,13 +29,14 @@ export const mines: PuzzleDef = {
         'Un chiffre compte les mines dans les 8 cases autour. Ouvrir une mine met fin à la partie.',
       ),
       L(
-        'Long-press or right-click a tile to flag it, or switch the footer button to “Tap: flag” (F or Space).',
-        'Appuyez longuement ou cliquez droit pour poser un drapeau. Ou réglez le bouton du bas sur « Touche : drapeau » (F ou Espace).',
+        'Long-press a closed tile (or right-click it) to plant or remove a flag where you think a mine is.',
+        'Appuyez longuement sur une case fermée (ou cliquez droit) pour poser ou retirer un drapeau là où vous croyez qu’il y a une mine.',
       ),
       L(
         'Tap an open number whose mines are all flagged to open the rest of its neighbours at once.',
         'Touchez un chiffre ouvert dont toutes les mines sont marquées pour ouvrir ses autres voisines d’un coup.',
       ),
+      L('Keyboard: Tab to a tile, Enter opens it, F flags it.', 'Au clavier : Tab va à une case, Entrée l’ouvre, F y pose un drapeau.'),
     ],
     tips: [
       L(
@@ -62,7 +63,6 @@ export const mines: PuzzleDef = {
     let count: number[] = new Array<number>(N).fill(0);
     const open = new Array<boolean>(N).fill(false);
     const flag = new Array<boolean>(N).fill(false);
-    let mode: 'dig' | 'flag' = 'dig';
     let over: 'won' | 'lost' | null = null;
     let hit = -1;
 
@@ -154,29 +154,37 @@ export const mines: PuzzleDef = {
       px = 0,
       py = 0,
       suppress = false;
-    const cellOf = (e: Event) => {
-      const t = (e.target as Element | null)?.closest?.('[data-i]') as HTMLElement | null;
+    const cellOf = (target: EventTarget | null) => {
+      const t = (target as Element | null)?.closest?.('[data-i]') as HTMLElement | null;
       return t && grid.contains(t) ? Number(t.dataset.i) : -1;
     };
     const cancelPress = () => {
       clearTimeout(pressTimer);
       pressTimer = 0;
+      if (pressCell >= 0) cells[pressCell]?.classList.remove('lp');
     };
     grid.addEventListener('pointerdown', (e) => {
       suppress = false;
       cancelPress();
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      pressCell = cellOf(e);
+      pressCell = cellOf(e.target);
       px = e.clientX;
       py = e.clientY;
-      if (pressCell < 0) return;
+      if (pressCell < 0 || over || open[pressCell]) return;
+      // Progress hint while holding (transient class, gone before the next render/snapshot).
+      cells[pressCell].classList.add('lp');
       pressTimer = window.setTimeout(() => {
         pressTimer = 0;
+        cells[pressCell].classList.remove('lp');
         if (over || open[pressCell]) return;
         suppress = true;
         toggleFlag(pressCell);
-        navigator.vibrate?.(12);
-      }, 380);
+        try {
+          navigator.vibrate?.(15);
+        } catch {
+          /* not allowed */
+        }
+      }, 350);
     });
     grid.addEventListener('pointermove', (e) => {
       if (pressTimer && Math.hypot(e.clientX - px, e.clientY - py) > 10) cancelPress();
@@ -188,7 +196,7 @@ export const mines: PuzzleDef = {
       e.preventDefault();
       cancelPress();
       if (suppress) return;
-      const i = cellOf(e);
+      const i = cellOf(e.target);
       if (i >= 0) toggleFlag(i);
     });
 
@@ -199,42 +207,27 @@ export const mines: PuzzleDef = {
       }
       if (over) return;
       ctx.touch();
-      if (mode === 'flag' && !open[i]) toggleFlag(i);
-      else dig(i);
+      dig(i);
     };
 
-    const digLabel = L('Tap: dig', 'Touche : creuser'),
-      flagLabel = L('Tap: flag', 'Touche : drapeau');
-    const modeBtn = btn(
-      digLabel,
-      () => {
-        mode = mode === 'dig' ? 'flag' : 'dig';
-        modeBtn.textContent = mode === 'dig' ? digLabel : flagLabel;
-      },
-      'ghost',
-    );
-    ctx.controls(modeBtn);
-
-    const sv = ctx.saved as { first?: unknown; open?: unknown; flag?: unknown; mode?: unknown } | undefined;
+    const sv = ctx.saved as { first?: unknown; open?: unknown; flag?: unknown } | undefined;
     if (sv && typeof sv.first === 'number' && Number.isInteger(sv.first) && sv.first >= 0 && sv.first < N) {
       lay(sv.first);
       const idx = (v: unknown) => (Array.isArray(v) ? v.filter((k): k is number => Number.isInteger(k) && k >= 0 && k < N) : []);
       for (const k of idx(sv.open)) if (!mine[k]) open[k] = true;
       for (const k of idx(sv.flag)) if (!open[k]) flag[k] = true;
     }
-    if (sv?.mode === 'flag') modeBtn.click();
     root.append(grid);
     render();
 
     const list = (a: boolean[]) => a.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
     return {
-      snapshot: () => ({ first, open: list(open), flag: list(flag), mode }),
+      snapshot: () => ({ first, open: list(open), flag: list(flag) }),
       onKey(e) {
-        if (e.key === 'f' || e.key === ' ') {
-          modeBtn.click();
-          return true;
-        }
-        return false;
+        if (e.key !== 'f' && e.key !== 'F') return false;
+        const i = cellOf(document.activeElement);
+        if (i >= 0) toggleFlag(i);
+        return i >= 0;
       },
       destroy: cancelPress,
     };

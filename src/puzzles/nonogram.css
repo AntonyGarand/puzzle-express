@@ -1,0 +1,29 @@
+[data-puzzle='nonogram'] .nono-grid {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+[data-puzzle='nonogram'] .nono-grid .cell.cur {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+  z-index: 1;
+}
+/* long-press progress: a ring closes in while holding, then the cell turns into ✕ */
+[data-puzzle='nonogram'] .nono-grid .cell.lp::before {
+  content: '';
+  position: absolute;
+  inset: 14%;
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+  animation: nono-press 0.35s linear forwards;
+}
+@keyframes nono-press {
+  from {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+}

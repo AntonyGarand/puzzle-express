@@ -1,3 +1,4 @@
+import { sheetOpen } from '../core/sheet';
 import { L, locale } from '../core/i18n';
 import { Card } from '../core/card';
 import { getSave } from '../core/saves';
@@ -14,7 +15,7 @@ export class LabView {
   constructor() {
     window.setInterval(() => this.card?.tick(), 250);
     document.addEventListener('keydown', (e) => {
-      if (!this.shown || !this.card) return;
+      if (!this.shown || !this.card || sheetOpen()) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;

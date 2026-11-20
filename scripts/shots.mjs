@@ -9,8 +9,16 @@ mkdirSync(out, { recursive: true });
 let ids = (process.env.IDS ?? '').split(',').filter(Boolean);
 const levels = (process.env.LEVELS ?? '1,3,5').split(',');
 const themes = (process.env.THEMES ?? 'light').split(',');
-const viewports = { mobile: { width: 390, height: 844 }, desktop: { width: 1280, height: 860 } };
+// pixel ≈ a Pixel 7 in Chrome with its address and nav bars (412 × 915 screen).
+const viewports = { mobile: { width: 390, height: 844 }, pixel: { width: 412, height: 760 }, desktop: { width: 1280, height: 860 } };
 const vps = (process.env.VP ?? 'mobile').split(',');
+
+/** Pick a level (1–5 or 'auto') through the card's cog sheet. */
+async function pickLevel(page, lv, card = page.locator('.card').first()) {
+  await card.locator('[data-action="settings"]').click();
+  await page.locator(`dialog.sheet [data-setting="level"] [data-value="${lv}"]`).click();
+  await page.waitForTimeout(150);
+}
 
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
 for (const vp of vps)
@@ -28,7 +36,7 @@ for (const vp of vps)
       for (const lv of levels) {
         await page.goto(`${base}#/play/${id}`);
         await page.waitForSelector('.card .puzzle');
-        await page.selectOption('.card >> nth=0 >> select.level', lv);
+        await pickLevel(page, lv);
         await page.waitForTimeout(lv === '5' ? 900 : 400);
         if (process.env.HELP) {
           await page.locator('.card .help-btn').first().click();

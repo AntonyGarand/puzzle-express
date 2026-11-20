@@ -1,18 +1,60 @@
 [data-puzzle='pairs'] {
   --accent: var(--p5);
 }
+/* The button is only a 3D stage; the two faces carry the card's border and shadow. */
 [data-puzzle='pairs'] .cell.pc {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  perspective: 600px;
+  transition: transform 0.18s ease;
+}
+[data-puzzle='pairs'] button.cell.pc:active {
+  transform: none;
+  box-shadow: none;
+}
+[data-puzzle='pairs'] .pc-in {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 0.38s cubic-bezier(0.3, 0.7, 0.25, 1);
+  pointer-events: none;
+}
+[data-puzzle='pairs'] .cell.pc.up .pc-in {
+  transform: rotateY(180deg);
+}
+[data-puzzle='pairs'] .pc-back,
+[data-puzzle='pairs'] .pc-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--cbw) solid var(--ink);
+  border-radius: var(--r-cell);
+  box-shadow: var(--csh) var(--csh) 0 var(--ink);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
+}
+[data-puzzle='pairs'] .pc-back {
   background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--accent) 45%, var(--cell)) 0 5px, var(--accent-soft) 5px 10px);
 }
-[data-puzzle='pairs'] .cell.pc.up {
+[data-puzzle='pairs'] .pc-face {
   background: var(--cell);
+  transform: rotateY(180deg);
 }
+/* matched: the pair settles into the board (pressed, no shadow, tinted) */
 [data-puzzle='pairs'] .cell.pc.on {
-  background: var(--accent-soft);
-  box-shadow: none;
   transform: translate(var(--csh), var(--csh));
 }
-[data-puzzle='pairs'] .cell.pc.miss {
+[data-puzzle='pairs'] .cell.pc.on .pc-face {
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 var(--ink);
+}
+[data-puzzle='pairs'] .cell.pc.miss .pc-face {
   opacity: 0.6;
 }
 [data-puzzle='pairs'] .sym {

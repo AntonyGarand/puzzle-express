@@ -2,7 +2,7 @@
   --accent: var(--p7);
 }
 [data-puzzle='arrange'] .puzzle {
-  --board: min(80vw, calc(100dvh - var(--head) - var(--tabs) - 430px), 360px);
+  --board: var(--fit, min(80vw, calc(100dvh - var(--head) - var(--tabs) - 430px), 360px));
   gap: 14px;
 }
 

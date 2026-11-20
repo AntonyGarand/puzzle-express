@@ -2,6 +2,14 @@
 import { chromium } from 'playwright-core';
 
 const base = process.argv[2] ?? 'http://localhost:5180/';
+
+/** Pick a level (1–5 or 'auto') through the card's cog sheet. */
+async function pickLevel(page, lv, card = page.locator('.card').first()) {
+  await card.locator('[data-action="settings"]').click();
+  await page.locator(`dialog.sheet [data-setting="level"] [data-value="${lv}"]`).click();
+  await page.waitForTimeout(150);
+}
+
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const page = await ctx.newPage();
@@ -21,80 +29,14 @@ async function open(id, level) {
   await page.goto(`${base}#/play/${id}`);
   await page.waitForSelector('.card .puzzle');
   if (level) {
-    await card().locator('select.level').selectOption(String(level));
-    await page.waitForTimeout(150);
+    await pickLevel(page, level, card());
   }
 }
 const state = async () => (await card().getAttribute('class')).match(/is-(\w+)/)?.[1] ?? 'open';
 const footer = async () => (await card().locator('.card-foot').innerText()).replace(/\s+/g, ' ');
 
-async function solveMath() {
-  for (let i = 0; i < 3; i++) {
-    const t = await card().locator('.big').innerText();
-    const js = t
-      .replace('=', '')
-      .replace(/×/g, '*')
-      .replace(/÷/g, '/')
-      .replace(/−/g, '-')
-      .replace(/(\d+)²/g, '($1*$1)');
-    const v = Function(`return ${js}`)();
-    await card().locator('input').fill(String(v));
-    await card().locator('input').press('Enter');
-  }
-}
-
-// ---- Quick Math + auto-levelling + auto-advance
-await open('quickmath', 1);
-await solveMath();
-ok('quickmath solves', (await state()) === 'solved', await footer());
-
-await open('quickmath');
-await card().locator('select.level').selectOption('auto');
-await page.waitForTimeout(100);
-await solveMath();
-const f1 = await footer();
-await open('quickmath');
-await solveMath();
-const f2 = await footer();
-ok('auto level-up after fast flawless solves', /Level up/.test(f1 + f2), `${f1} | ${f2}`);
-await page.waitForTimeout(1800);
-const scrolled = await page.evaluate(() => document.querySelector('.feed').scrollTop);
-ok('auto-advance scrolls to the next card', scrolled > 300, `scrollTop=${scrolled}`);
-
-// ---- Odd shade
-await open('oddshade', 5);
-for (let r = 0; r < 3; r++) {
-  const bgs = await card()
-    .locator('.cell')
-    .evaluateAll((els) => els.map((e) => e.style.background));
-  const odd = bgs.findIndex((b) => bgs.filter((x) => x === b).length === 1);
-  await card().locator('.cell').nth(odd).click();
-}
-ok('oddshade solves', (await state()) === 'solved', await footer());
-
-// ---- Memory (solve + fail)
-async function memoryLit() {
-  await page.waitForFunction(() => document.querySelectorAll('.card .cell.on').length > 0, null, { timeout: 4000 });
-  const lit = await card()
-    .locator('.cell')
-    .evaluateAll((els) => els.map((e, i) => (e.classList.contains('on') ? i : -1)).filter((i) => i >= 0));
-  await page.waitForFunction(() => document.querySelectorAll('.card .cell.on').length === 0, null, { timeout: 5000 });
-  return lit;
-}
-await open('memory', 3);
-const lit = await memoryLit();
-for (const i of lit) await card().locator('.cell').nth(i).click();
-ok('memory solves', (await state()) === 'solved', `${lit.length} tiles · ${await footer()}`);
-
-await open('memory', 1);
-const lit2 = await memoryLit();
-const wrong = [...Array(9).keys()].filter((i) => !lit2.includes(i)).slice(0, 3);
-for (const i of wrong) await card().locator('.cell').nth(i).click();
-ok('memory fails after 3 misses', (await state()) === 'failed', await footer());
-
-// ---- Lights: solve with GF(2) elimination
-for (const lv of [1, 3, 5]) {
-  await open('lights', lv);
+/** Solve the Lights board on the current card (GF(2) elimination in the page) and click the presses. */
+async function solveLights() {
   const presses = await card()
     .locator('.cell')
     .evaluateAll((els) => {
@@ -131,7 +73,51 @@ for (const lv of [1, 3, 5]) {
       return where.map((w, i) => (w >= 0 && A[w][N] ? i : -1)).filter((i) => i >= 0);
     });
   for (const i of presses) await card().locator('.cell').nth(i).click();
-  ok(`lights L${lv} solves`, (await state()) === 'solved', `${presses.length} presses`);
+  return presses.length;
+}
+
+// ---- Lights + auto-levelling + auto-advance
+await open('lights', 1);
+await solveLights();
+ok('lights L1 solves', (await state()) === 'solved', await footer());
+
+await open('lights');
+await pickLevel(page, 'auto', card());
+await solveLights();
+const f1 = await footer();
+await open('lights');
+await solveLights();
+const f2 = await footer();
+ok('auto level-up after fast flawless solves', /Level up/.test(f1 + f2), `${f1} | ${f2}`);
+await page.waitForTimeout(3000); // auto-advance waits longer after a first clear / record (confetti)
+const scrolled = await page.evaluate(() => document.querySelector('.feed').scrollTop);
+ok('auto-advance scrolls to the next card', scrolled > 300, `scrollTop=${scrolled}`);
+
+// ---- Memory (solve + fail)
+async function memoryLit() {
+  await page.waitForFunction(() => document.querySelectorAll('.card .cell.on').length > 0, null, { timeout: 4000 });
+  const lit = await card()
+    .locator('.cell')
+    .evaluateAll((els) => els.map((e, i) => (e.classList.contains('on') ? i : -1)).filter((i) => i >= 0));
+  await page.waitForFunction(() => document.querySelectorAll('.card .cell.on').length === 0, null, { timeout: 5000 });
+  return lit;
+}
+await open('memory', 3);
+const lit = await memoryLit();
+for (const i of lit) await card().locator('.cell').nth(i).click();
+ok('memory solves', (await state()) === 'solved', `${lit.length} tiles · ${await footer()}`);
+
+await open('memory', 1);
+const lit2 = await memoryLit();
+const wrong = [...Array(9).keys()].filter((i) => !lit2.includes(i)).slice(0, 3);
+for (const i of wrong) await card().locator('.cell').nth(i).click();
+ok('memory fails after 3 misses', (await state()) === 'failed', await footer());
+
+// ---- Lights at harder levels
+for (const lv of [3, 5]) {
+  await open('lights', lv);
+  const n = await solveLights();
+  ok(`lights L${lv} solves`, (await state()) === 'solved', `${n} presses`);
 }
 
 // ---- Queens: backtrack around the locked queen
@@ -230,7 +216,8 @@ ok('codebreaker ends; failure reveals the code', cb === 'solved' || (cb === 'fai
 
 // ---- Skip
 await open('slide', 1);
-await card().getByRole('button', { name: 'Skip' }).click();
+await card().locator('[data-action="settings"]').click(); // Skip lives in the cog sheet now
+await page.locator('dialog.sheet').getByRole('button', { name: 'Skip' }).click();
 await page.waitForTimeout(900);
 ok('skip advances to the next card', (await page.evaluate(() => document.querySelector('.feed').scrollTop)) > 300);
 
@@ -281,6 +268,16 @@ ok('reloading a lab puzzle resumes it', boardA.join() === boardB.join());
 await page.locator('.tabs a[data-tab="settings"]').click();
 await page.waitForSelector('.page h1');
 ok('settings tab opens settings', (await page.locator('.page h1').innerText()) === 'Settings');
+
+// ---- Cog sheet, guide and confetti
+await open('lights', 1);
+await card().locator('.help-btn').click();
+ok('guide opens with a playable practice board', (await page.locator('dialog.sheet .practice-board .cell').count()) > 0);
+await page.keyboard.press('Escape');
+const before2 = await card().locator('.cell').count();
+await card().locator('[data-action="settings"]').click();
+await page.locator('dialog.sheet [data-setting="level"] [data-value="3"]').click();
+ok('cog sheet changes the level', (await card().locator('.cell').count()) > before2);
 
 // ---- Stats & persistence
 await page.goto(`${base}#/stats`);

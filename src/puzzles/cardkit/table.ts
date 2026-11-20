@@ -14,8 +14,29 @@ export interface TableHooks {
   accepts?(p: string, i: number, to: string): boolean;
 }
 
+/** Touch: how long a finger must rest on a card before it lifts for a drag in any direction. */
+const HOLD_MS = 230;
+/** Movement (px) that separates a tap from a drag. */
+const SLOP = 7;
+
+/**
+ * Mouse / pen: press and move to drag. Touch: the feed scrolls vertically, so a vertical swipe on the
+ * table scrolls it (the table is `touch-action: pan-y`). A card only lifts on touch after a sideways
+ * move or a short hold; taps always work.
+ */
 export function bindTable(table: HTMLElement, hooks: TableHooks): () => void {
-  let drag: { p: string; i: number; x: number; y: number; els: HTMLElement[]; on: boolean; id: number } | null = null;
+  let drag: {
+    p: string;
+    i: number;
+    x: number;
+    y: number;
+    els: HTMLElement[];
+    on: boolean;
+    moved: boolean;
+    id: number;
+    touch: boolean;
+    timer: number;
+  } | null = null;
   let suppress = 0;
 
   const target = (e: Event) => (e.target as HTMLElement | null)?.closest?.('[data-p]') as HTMLElement | null;
@@ -27,23 +48,42 @@ export function bindTable(table: HTMLElement, hooks: TableHooks): () => void {
     hooks.tap(el.dataset.p!, Number(el.dataset.i));
   };
 
-  const reset = () => {
-    if (!drag) return;
-    for (const el of drag.els) {
+  const reset = (d = drag) => {
+    if (!d) return;
+    for (const el of d.els) {
       el.style.removeProperty('transform');
       el.classList.remove('lift');
     }
   };
 
+  const end = () => {
+    if (drag) clearTimeout(drag.timer);
+    drag = null;
+  };
+
+  const lift = (id: number) => {
+    if (!drag || drag.on) return;
+    drag.on = true;
+    try {
+      table.setPointerCapture(id);
+    } catch {
+      /* ignore */
+    }
+    for (const el of drag.els) el.classList.add('lift');
+  };
+
   const onDown = (e: PointerEvent) => {
-    if (e.button > 0) return;
+    if (e.button > 0 || drag) return;
     const el = target(e);
     if (!el || !el.classList.contains('pc')) return;
     const p = el.dataset.p!;
     const i = Number(el.dataset.i);
     if (!hooks.canDrag(p, i)) return;
     const els = [...table.querySelectorAll<HTMLElement>('.pc[data-p]')].filter((c) => c.dataset.p === p && Number(c.dataset.i) >= i);
-    drag = { p, i, x: e.clientX, y: e.clientY, els, on: false, id: e.pointerId };
+    const touch = e.pointerType === 'touch';
+    const id = e.pointerId;
+    const timer = touch ? window.setTimeout(() => lift(id), HOLD_MS) : 0;
+    drag = { p, i, x: e.clientX, y: e.clientY, els, on: false, moved: false, id, touch, timer };
   };
 
   const onMove = (e: PointerEvent) => {
@@ -51,27 +91,36 @@ export function bindTable(table: HTMLElement, hooks: TableHooks): () => void {
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
     if (!drag.on) {
-      if (Math.hypot(dx, dy) < 7) return;
-      drag.on = true;
-      try {
-        table.setPointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
+      if (Math.hypot(dx, dy) < SLOP) return;
+      if (drag.touch && Math.abs(dy) >= Math.abs(dx)) {
+        end(); // vertical swipe before the hold: leave it to the feed
+        return;
       }
-      for (const el of drag.els) el.classList.add('lift');
+      lift(e.pointerId);
     }
+    if (!drag.moved && Math.hypot(dx, dy) < SLOP) return;
+    drag.moved = true;
     for (const el of drag.els) el.style.transform = `translate(${dx}px, ${dy}px)`;
     e.preventDefault();
+  };
+
+  // Once a card is lifted, keep the browser from turning the gesture into a scroll.
+  const onTouchMove = (e: TouchEvent) => {
+    if (drag?.on && e.cancelable) e.preventDefault();
   };
 
   const onUp = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag;
-    if (!d.on) {
-      drag = null;
+    end();
+    if (!d.on) return;
+    suppress = performance.now() + 250;
+    if (!d.moved) {
+      // Held without moving: that's a tap.
+      reset(d);
+      hooks.tap(d.p, d.i);
       return;
     }
-    suppress = performance.now() + 250;
     // Drop on the pile whose box overlaps the lead card most (pointer position breaks ties).
     const lead = d.els[0].getBoundingClientRect();
     let best: string | null = null;
@@ -90,27 +139,32 @@ export function bindTable(table: HTMLElement, hooks: TableHooks): () => void {
       }
     }
     const moved = best != null && hooks.drop(d.p, d.i, best);
-    if (!moved) reset();
-    drag = null;
+    if (!moved) reset(d);
   };
 
   const onCancel = () => {
     reset();
-    drag = null;
+    end();
   };
+
+  const onMenu = (e: Event) => e.preventDefault();
 
   table.addEventListener('click', onClick);
   table.addEventListener('pointerdown', onDown);
   table.addEventListener('pointermove', onMove);
   table.addEventListener('pointerup', onUp);
   table.addEventListener('pointercancel', onCancel);
-  table.addEventListener('contextmenu', (e) => e.preventDefault());
+  table.addEventListener('touchmove', onTouchMove, { passive: false });
+  table.addEventListener('contextmenu', onMenu);
   return () => {
+    end();
     table.removeEventListener('click', onClick);
     table.removeEventListener('pointerdown', onDown);
     table.removeEventListener('pointermove', onMove);
     table.removeEventListener('pointerup', onUp);
     table.removeEventListener('pointercancel', onCancel);
+    table.removeEventListener('touchmove', onTouchMove);
+    table.removeEventListener('contextmenu', onMenu);
   };
 }
 
