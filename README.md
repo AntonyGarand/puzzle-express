@@ -1,8 +1,8 @@
 # puzzle express
 
-An endless, scroll-snapping feed of short puzzles: 43 games in English and Québec French. It's a static site with no backend; your profile, stats, preferences and unfinished games live in `localStorage`.
+An endless, scroll-snapping feed of short puzzles: 53 games in English and Québec French. It's a static site with no backend; your profile, stats, preferences and unfinished games live in `localStorage`.
 
-**Play:** https://puzzle.garand.dev
+**Play:** https://puzzle.garand.dev — installable, and works fully offline once loaded (it's a PWA; a banner offers new versions).
 
 ## Development
 
@@ -47,13 +47,13 @@ scripts/             Playwright audit + screenshot tools (use your installed Chr
 
 ## Games
 
-There are 43 games in seven categories (`src/core/categories.ts`):
+There are 53 games in seven categories (`src/core/categories.ts`):
 
-- **Logic:** Sudoku, Jigsaw Sudoku, Killer Sudoku, Cross Sums, Unequal, Binary, Queens, Stars, Tents, Tiles, Mines, Bridges, Nonogram, Lights, Code Breaker
-- **Paths & links:** Pipes, Connect, Beehive, Tracks, Untangle, Maze
-- **Numbers:** Sequence, Target, Guess, Merge
+- **Logic:** Sudoku, Jigsaw Sudoku, Killer Sudoku, Cross Sums, Unequal, Skyscrapers, Math Cages, Binary, Eclipse, Queens, Stars, Tents, Tiles, Mines, Bridges, Nonogram, Mosaic, Light Up, Singles, Dominoes, Lights, Code Breaker
+- **Paths & links:** Pipes, Connect, Beehive, Tracks, Trail, Loop, Untangle, Maze
+- **Numbers:** Target, Guess, Merge
 - **Words:** Anagram, Word Guess, Hunt, Tower (English and French word lists)
-- **Moves:** Slide, Unblock, Push, Gems, Arrange, Blocks, Flood
+- **Moves:** Slide, Unblock, Push, Gems, Arrange, Blocks, Flood, Pegs, Collapse
 - **Cards & chess:** Solitaire, FreeCell, Spider, Pyramid, Chess (mate in 1 or 2)
 - **Memory & eyes:** Memory, Pairs
 

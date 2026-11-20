@@ -201,6 +201,7 @@ export function renderSettings(el: HTMLElement, defs: PuzzleDef[]) {
           'ghost',
         ),
       ),
+      h('p', { class: 'muted small app-version' }, `puzzle express · ${__APP_VERSION__}`),
     ),
   );
 }

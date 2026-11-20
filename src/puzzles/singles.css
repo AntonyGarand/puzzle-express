@@ -1,0 +1,38 @@
+[data-puzzle='singles'] {
+  --accent: var(--p3);
+}
+[data-puzzle='singles'] .sgl {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+[data-puzzle='singles'] .sgl .cell .v {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+}
+[data-puzzle='singles'] .sgl .cell.shade {
+  background: var(--ink);
+  color: color-mix(in srgb, var(--bg) 45%, var(--ink));
+}
+[data-puzzle='singles'] .sgl .cell.ring::before {
+  content: '';
+  position: absolute;
+  inset: 11%;
+  border: max(2.5px, calc(var(--board) / var(--cols) * 0.06)) solid var(--accent);
+  border-radius: 50%;
+  background: var(--accent-soft);
+}
+[data-puzzle='singles'] .sgl .cell.given {
+  box-shadow: none;
+  cursor: default;
+}
+[data-puzzle='singles'] .sgl .cell.given.ring::before {
+  border-color: var(--ink);
+  background: transparent;
+}
+[data-puzzle='singles'] .sgl .cell.cur {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+  z-index: 1;
+}

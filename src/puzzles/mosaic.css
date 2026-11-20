@@ -1,0 +1,65 @@
+[data-puzzle='mosaic'] {
+  --accent: var(--p7);
+}
+[data-puzzle='mosaic'] .mo-grid {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+[data-puzzle='mosaic'] .mo-grid .cell {
+  cursor: pointer;
+}
+[data-puzzle='mosaic'] .mo-grid .cell.x {
+  background: var(--cell-alt);
+}
+[data-puzzle='mosaic'] .mo-grid .cell.x::after {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2em;
+  opacity: 0.28;
+}
+[data-puzzle='mosaic'] .mo-n {
+  position: relative;
+  z-index: 1;
+  transition:
+    opacity 0.2s,
+    color 0.2s;
+}
+[data-puzzle='mosaic'] .cell.done .mo-n {
+  opacity: 0.35;
+}
+[data-puzzle='mosaic'] .cell.over .mo-n {
+  color: var(--bad);
+}
+[data-puzzle='mosaic'] .cell.on.over .mo-n {
+  color: var(--on-tone);
+  text-decoration: underline wavy var(--bad);
+}
+[data-puzzle='mosaic'] .mo-grid .cell.cur {
+  outline: 3px solid var(--ink);
+  outline-offset: 1px;
+  z-index: 1;
+}
+/* long-press progress: a ring closes in while holding, then the cell turns into ✕ */
+[data-puzzle='mosaic'] .mo-grid .cell.lp::before {
+  content: '';
+  position: absolute;
+  inset: 14%;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  animation: mo-press 0.35s linear forwards;
+}
+@keyframes mo-press {
+  from {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+}

@@ -1,3 +1,4 @@
+import { genMaze } from './pathkit/maze-gen';
 import { L } from '../core/i18n';
 import { byLevel, type PuzzleDef } from '../core/types';
 import { h } from '../core/ui';
@@ -55,32 +56,13 @@ export const maze: PuzzleDef = {
   create(ctx) {
     const { root, rng, difficulty: d } = ctx;
     const n = byLevel(d, [6, 9, 12, 15, 19]);
-    const open = new Array<number>(n * n).fill(0);
-
-    // Iterative recursive-backtracker.
-    const seen = new Array<boolean>(n * n).fill(false);
-    const stack = [0];
-    seen[0] = true;
-    while (stack.length) {
-      const i = stack[stack.length - 1];
-      const r = Math.floor(i / n),
-        c = i % n;
-      const opts = DIRS.filter((dd) => {
-        const rr = r + dd.dr,
-          cc = c + dd.dc;
-        return rr >= 0 && rr < n && cc >= 0 && cc < n && !seen[rr * n + cc];
-      });
-      if (!opts.length) {
-        stack.pop();
-        continue;
-      }
-      const dd = rng.pick(opts);
-      const j = (r + dd.dr) * n + (c + dd.dc);
-      open[i] |= dd.bit;
-      open[j] |= dd.opp;
-      seen[j] = true;
-      stack.push(j);
-    }
+    // Branchy growing-tree maze, best of 8 by decision points along the route (see pathkit/maze-gen.ts).
+    const open = genMaze(rng, {
+      size: n,
+      newest: byLevel(d, [0.8, 0.75, 0.7, 0.65, 0.6]),
+      braid: byLevel(d, [0, 0, 0.06, 0.1, 0.15]),
+      tries: 8,
+    });
 
     const goal = n * n - 1;
     const path = [0];
@@ -244,13 +226,15 @@ export const maze: PuzzleDef = {
     mq.addEventListener('change', draw);
     const themeObs = new MutationObserver(draw);
     themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    const sv = ctx.saved as { path?: number[] } | undefined;
-    if (sv?.path?.length && sv.path[0] === 0 && sv.path.every((v) => v >= 0 && v < n * n)) path.splice(0, path.length, ...sv.path);
+    // v2 = growing-tree generator; paths saved on the old mazes don't apply.
+    const sv = ctx.saved as { v?: number; path?: number[] } | undefined;
+    if (sv?.v === 2 && sv.path?.length && sv.path[0] === 0 && sv.path.every((v) => v >= 0 && v < n * n))
+      path.splice(0, path.length, ...sv.path);
     root.append(wrap);
     requestAnimationFrame(draw);
 
     return {
-      snapshot: () => ({ path }),
+      snapshot: () => ({ v: 2, path }),
       onKey(e) {
         const map: Record<string, number> = { ArrowUp: 0, w: 0, ArrowRight: 1, d: 1, ArrowDown: 2, s: 2, ArrowLeft: 3, a: 3 };
         const k = map[e.key];

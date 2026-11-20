@@ -1,0 +1,213 @@
+import { L } from '../core/i18n';
+import { byLevel, type PuzzleDef } from '../core/types';
+import { board, h } from '../core/ui';
+import { block, genMosaic } from './gridkit/mosaic';
+import './mosaic.css';
+
+export const mosaic: PuzzleDef = {
+  id: 'mosaic',
+  get name() {
+    return L('Mosaic', 'Mosaïque');
+  },
+  category: 'logic',
+  get rules() {
+    return L('Each number counts filled cells in its 3×3 square.', 'Chaque nombre compte les cases pleines de son carré 3×3.');
+  },
+  help: () => ({
+    goal: L(
+      'Fill in cells to reveal a picture that agrees with every number.',
+      'Remplissez des cases pour révéler une image qui respecte tous les nombres.',
+    ),
+    steps: [
+      L(
+        'A number tells how many cells are filled in the 3×3 square around it, counting its own cell.',
+        'Un nombre indique combien de cases sont pleines dans le carré 3×3 autour de lui, sa propre case comprise.',
+      ),
+      L(
+        'Tap a cell to fill it, again to mark it ✕ (surely empty), and once more to clear it.',
+        'Touchez une case pour la remplir, encore pour la marquer d’un ✕ (vide à coup sûr), puis une autre fois pour l’effacer.',
+      ),
+      L(
+        'Long-press (or right-click) to mark ✕ directly. Drag to repeat your first change over several cells.',
+        'Appuyez longuement (ou cliquez droit) pour marquer un ✕ directement. Glissez pour répéter votre premier changement sur plusieurs cases.',
+      ),
+      L(
+        'Keyboard: arrow keys move, Space cycles a cell, X marks it, Delete clears it.',
+        'Au clavier : les flèches déplacent, Espace change l’état de la case, X la marque, Suppr l’efface.',
+      ),
+      L(
+        'A number fades once its square is settled and red means too many (or too few left).',
+        'Un nombre pâlit quand son carré est réglé; en rouge, il y en a trop (ou plus assez).',
+      ),
+    ],
+    tips: [
+      L(
+        'A 0 empties its whole square and a 9 fills it. In a corner, a 4 fills all four cells.',
+        'Un 0 vide tout son carré et un 9 le remplit. Dans un coin, un 4 remplit les quatre cases.',
+      ),
+      L(
+        'Compare overlapping squares: the cells they don’t share explain the difference.',
+        'Comparez des carrés qui se chevauchent : les cases qu’ils ne partagent pas expliquent la différence.',
+      ),
+    ],
+  }),
+  par: (d) => byLevel(d, [40, 70, 110, 170, 280]),
+  create(ctx) {
+    const { root, rng, difficulty: d } = ctx;
+    const n = byLevel(d, [5, 6, 7, 8, 10]);
+    const { clue } = genMosaic(n, byLevel(d, [0.6, 0.45, 0.3, 0.15, 0]), rng);
+    const blocks = clue.map((_, i) => block(i, n));
+
+    // 0 empty, 1 filled, 2 marked
+    const st = new Array<number>(n * n).fill(0);
+    /** Keyboard cursor (-1 until the keyboard is used). */
+    let cur = -1;
+    let done = false;
+
+    const grid = board(n, n, 'mo-grid');
+    const cells = st.map((_, i) => {
+      const el = h('div', { class: 'cell', 'data-i': i }, clue[i] >= 0 ? h('span', { class: 'mo-n' }, clue[i]) : null);
+      grid.append(el);
+      return el;
+    });
+
+    const render = () => {
+      let ok = true;
+      cells.forEach((el, i) => {
+        el.classList.toggle('on', st[i] === 1);
+        el.classList.toggle('x', st[i] === 2);
+        el.classList.toggle('cur', i === cur);
+        if (clue[i] < 0) return;
+        let on = 0,
+          open = 0;
+        for (const j of blocks[i]) {
+          if (st[j] === 1) on++;
+          else if (st[j] === 0) open++;
+        }
+        el.classList.toggle('done', on === clue[i] && !open);
+        el.classList.toggle('over', on > clue[i] || on + open < clue[i]);
+        ok &&= on === clue[i];
+      });
+      return ok;
+    };
+
+    // Long-press (350 ms on the first cell, before the stroke spreads) marks ✕ directly.
+    let pressTimer = 0;
+    const cancelPress = () => {
+      clearTimeout(pressTimer);
+      pressTimer = 0;
+      for (const el of cells) el.classList.remove('lp');
+    };
+
+    // Tap cycles empty → filled → ✕ → empty. Dragging repeats the first cell's change on every cell
+    // in the same starting state, so a stroke never overwrites cells of another kind.
+    let stroke: { from: number; to: number; first: number; id: number; x: number; y: number; spread: boolean } | null = null;
+    const set = (i: number, v: number) => {
+      st[i] = v;
+      if (render()) {
+        done = true;
+        stroke = null;
+        cancelPress();
+        ctx.solved();
+      }
+    };
+    const cellAt = (x: number, y: number) => {
+      const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      const c = el?.closest?.('[data-i]') as HTMLElement | null;
+      return c && grid.contains(c) ? Number(c.dataset.i) : -1;
+    };
+    grid.addEventListener('contextmenu', (e) => e.preventDefault());
+    grid.addEventListener('pointerdown', (e) => {
+      if (done || stroke) return;
+      const t = (e.target as Element | null)?.closest?.('[data-i]') as HTMLElement | null;
+      const i = t && grid.contains(t) ? Number(t.dataset.i) : cellAt(e.clientX, e.clientY);
+      if (i < 0) return;
+      e.preventDefault();
+      ctx.touch();
+      cur = -1;
+      const from = st[i];
+      const to = e.button === 2 ? (from === 2 ? 0 : 2) : (from + 1) % 3;
+      stroke = { from, to, first: i, id: e.pointerId, x: e.clientX, y: e.clientY, spread: false };
+      set(i, to);
+      // Only an empty cell turned filled can still become ✕ by holding.
+      if (done || to !== 1) return;
+      cells[i].classList.add('lp');
+      pressTimer = window.setTimeout(() => {
+        pressTimer = 0;
+        cells[i].classList.remove('lp');
+        if (!stroke || stroke.spread || done) return;
+        stroke.to = 2;
+        set(i, 2);
+        try {
+          navigator.vibrate?.(15);
+        } catch {
+          /* not allowed */
+        }
+      }, 350);
+    });
+    grid.addEventListener('pointermove', (e) => {
+      const g = stroke;
+      if (!g || e.pointerId !== g.id) return;
+      if (pressTimer && Math.hypot(e.clientX - g.x, e.clientY - g.y) > 10) cancelPress();
+      const i = cellAt(e.clientX, e.clientY);
+      if (i < 0 || i === g.first || st[i] !== g.from) return;
+      g.spread = true;
+      cancelPress();
+      set(i, g.to);
+    });
+    const end = (e: PointerEvent) => {
+      if (stroke && e.pointerId !== stroke.id) return;
+      cancelPress();
+      stroke = null;
+    };
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+
+    const sv = ctx.saved as { st?: unknown; cur?: unknown } | undefined;
+    if (Array.isArray(sv?.st) && sv.st.length === st.length) sv.st.forEach((v, i) => (st[i] = v === 1 || v === 2 ? v : 0));
+    const c0 = sv?.cur;
+    if (typeof c0 === 'number' && Number.isInteger(c0) && c0 >= -1 && c0 < st.length) cur = c0;
+    root.append(grid);
+    render();
+
+    const DIRS: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+    return {
+      snapshot: () => ({ st, cur }),
+      onKey(e) {
+        if (done) return false;
+        const dir = DIRS[e.key];
+        if (dir) {
+          if (cur < 0) cur = 0;
+          else {
+            const r = Math.min(n - 1, Math.max(0, Math.floor(cur / n) + dir[1]));
+            const c = Math.min(n - 1, Math.max(0, (cur % n) + dir[0]));
+            cur = r * n + c;
+          }
+          render();
+          return true;
+        }
+        if (cur < 0) return false;
+        const k = e.key.toLowerCase();
+        const next =
+          k === ' ' || k === 'enter'
+            ? (st[cur] + 1) % 3
+            : k === 'x'
+              ? st[cur] === 2
+                ? 0
+                : 2
+              : k === 'backspace' || k === 'delete'
+                ? 0
+                : -1;
+        if (next < 0) return false;
+        ctx.touch();
+        set(cur, next);
+        return true;
+      },
+      destroy() {
+        cancelPress();
+        window.removeEventListener('pointerup', end);
+        window.removeEventListener('pointercancel', end);
+      },
+    };
+  },
+};

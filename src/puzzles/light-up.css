@@ -1,0 +1,71 @@
+[data-puzzle='light-up'] {
+  --accent: var(--p4);
+}
+[data-puzzle='light-up'] .lu-grid {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+[data-puzzle='light-up'] .lu-grid .cell.blk {
+  background: var(--ink);
+  color: var(--cell);
+  cursor: default;
+}
+[data-puzzle='light-up'] .lu-grid .cell.blk.done {
+  color: color-mix(in srgb, var(--cell) 40%, var(--ink));
+}
+[data-puzzle='light-up'] .lu-grid .cell.glow {
+  background: color-mix(in srgb, var(--accent) 36%, var(--cell));
+  box-shadow:
+    var(--csh) var(--csh) 0 var(--ink),
+    inset 0 0 calc(var(--board) / var(--cols) * 0.22) color-mix(in srgb, var(--accent) 75%, transparent);
+}
+[data-puzzle='light-up'] .lu-grid .cell.bulb {
+  background: var(--accent);
+}
+[data-puzzle='light-up'] .lu-bulb {
+  display: none;
+  width: 84%;
+  height: 84%;
+}
+[data-puzzle='light-up'] .cell.bulb .lu-bulb {
+  display: block;
+}
+[data-puzzle='light-up'] .lu-bulb .glass {
+  fill: color-mix(in srgb, var(--accent) 50%, var(--bg));
+  stroke: var(--on-tone);
+  stroke-width: 6;
+}
+[data-puzzle='light-up'] .lu-bulb .base,
+[data-puzzle='light-up'] .lu-bulb .rays {
+  fill: var(--on-tone);
+  stroke: var(--on-tone);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+[data-puzzle='light-up'] .lu-grid .cell.mark::after {
+  content: '';
+  width: 16%;
+  height: 16%;
+  border-radius: 50%;
+  background: var(--ink);
+}
+/* long-press progress ring */
+[data-puzzle='light-up'] .lu-grid .cell.lp::before {
+  content: '';
+  position: absolute;
+  inset: 14%;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  animation: lu-press 0.4s linear forwards;
+}
+@keyframes lu-press {
+  from {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+}

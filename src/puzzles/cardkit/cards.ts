@@ -56,7 +56,7 @@ export function cardEl(c: Card, up: boolean, p: string, i: number, style = '', e
     'button',
     {
       type: 'button',
-      class: `pc ${isRed(c) ? 'red' : 'blk'} ${extra}`.trim(),
+      class: `pc ${isRed(c) ? 'red' : 'blk'} s${suit(c)} ${extra}`.trim(),
       'data-p': p,
       'data-i': i,
       style: style || null,

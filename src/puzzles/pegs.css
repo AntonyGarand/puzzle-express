@@ -1,0 +1,83 @@
+[data-puzzle='pegs'] {
+  --accent: var(--p1);
+}
+
+[data-puzzle='pegs'] .pegs-grid {
+  width: min(var(--board), calc(var(--board) * var(--cols) / var(--rows)));
+  touch-action: none;
+}
+[data-puzzle='pegs'] .cell.void {
+  visibility: hidden;
+}
+[data-puzzle='pegs'] .cell.hole {
+  background: var(--cell-alt);
+  border-radius: 50%;
+  cursor: pointer;
+  overflow: visible;
+}
+/* the socket */
+[data-puzzle='pegs'] .cell.hole::before {
+  content: '';
+  position: absolute;
+  width: 34%;
+  height: 34%;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) 22%, var(--cell-alt));
+  box-shadow: inset 2px 2px 0 color-mix(in srgb, var(--ink) 35%, transparent);
+}
+[data-puzzle='pegs'] .cell.hole.goal::before {
+  width: 46%;
+  height: 46%;
+  background: transparent;
+  border: 2px dashed var(--ink);
+  box-shadow: none;
+}
+[data-puzzle='pegs'] .cell.hole.hint {
+  background: var(--accent-soft);
+  border-style: dashed;
+}
+[data-puzzle='pegs'] .cell.hole.hint::before {
+  background: var(--accent);
+  box-shadow: none;
+}
+[data-puzzle='pegs'] .cell.hole.sel {
+  background: var(--accent-soft);
+}
+
+/* the bead */
+[data-puzzle='pegs'] .bead {
+  position: absolute;
+  z-index: 1;
+  width: 72%;
+  height: 72%;
+  border: var(--cbw) solid var(--ink);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 2px 2px 0 var(--ink);
+  transform: scale(0);
+  opacity: 0;
+  transition:
+    transform 0.16s ease-out,
+    opacity 0.16s,
+    box-shadow 0.1s;
+  pointer-events: none;
+}
+[data-puzzle='pegs'] .bead::after {
+  content: '';
+  position: absolute;
+  top: 16%;
+  left: 18%;
+  width: 28%;
+  height: 22%;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--cell) 70%, transparent);
+  transform: rotate(-30deg);
+}
+[data-puzzle='pegs'] .cell.has .bead {
+  transform: none;
+  opacity: 1;
+}
+[data-puzzle='pegs'] .cell.sel .bead {
+  transform: translate(-2px, -3px) scale(1.06);
+  box-shadow: 4px 5px 0 var(--ink);
+}

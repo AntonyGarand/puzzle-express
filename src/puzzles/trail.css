@@ -1,0 +1,74 @@
+[data-puzzle='trail'] {
+  --accent: var(--p7);
+}
+
+[data-puzzle='trail'] .trail-grid {
+  position: relative;
+  gap: 0;
+  padding: 0;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  background-color: var(--cell);
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px), linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: calc(100% / var(--cols)) calc(100% / var(--cols));
+  background-position: -0.5px -0.5px;
+  --line: color-mix(in srgb, var(--ink) 22%, transparent);
+  box-shadow: var(--sh) var(--sh) 0 var(--ink);
+  overflow: hidden;
+  touch-action: none;
+}
+[data-puzzle='trail'] .trail-grid .cell {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  cursor: pointer;
+}
+[data-puzzle='trail'] .trail-grid .cell.on {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.trail-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.trail-svg polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.trail-svg .under {
+  stroke: var(--ink);
+  stroke-width: 0.5;
+}
+.trail-svg .over {
+  stroke: var(--accent);
+  stroke-width: 0.36;
+}
+.trail-svg .wall {
+  stroke: var(--ink);
+  stroke-width: 0.13;
+  stroke-linecap: round;
+}
+.trail-svg .cp circle {
+  fill: var(--ink);
+  stroke: var(--ink);
+  stroke-width: 0.06;
+  transition: fill 0.15s;
+}
+.trail-svg .cp text {
+  fill: var(--cell);
+  font-size: 0.34px;
+  font-weight: 800;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.trail-svg .cp.hit circle {
+  fill: var(--accent);
+}
+.trail-svg .cp.hit text {
+  fill: var(--on-tone);
+}

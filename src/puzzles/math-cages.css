@@ -1,0 +1,75 @@
+[data-puzzle='math-cages'] {
+  --accent: var(--p7);
+}
+/* slab: one framed board with hairlines inside */
+[data-puzzle='math-cages'] .grid.lk-slab {
+  gap: 0;
+  padding: 0;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--cell);
+  box-shadow: var(--sh) var(--sh) 0 var(--ink);
+  width: calc(var(--board) - var(--sh));
+  margin-right: var(--sh);
+  --in: calc(var(--board) / var(--cols) * 0.08);
+}
+[data-puzzle='math-cages'] .lk-slab .cell {
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border-radius: 0;
+  box-shadow: none;
+}
+[data-puzzle='math-cages'] .lk-slab button.cell:active {
+  transform: none;
+}
+[data-puzzle='math-cages'] .lk-slab .cell.lc {
+  border-right: 0;
+}
+[data-puzzle='math-cages'] .lk-slab .cell.lr {
+  border-bottom: 0;
+}
+[data-puzzle='math-cages'] .mc .cage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 0 dashed color-mix(in srgb, var(--ink) 80%, transparent);
+}
+[data-puzzle='math-cages'] .mc .cage.ct {
+  top: var(--in);
+  border-top-width: 2px;
+}
+[data-puzzle='math-cages'] .mc .cage.cb {
+  bottom: var(--in);
+  border-bottom-width: 2px;
+}
+[data-puzzle='math-cages'] .mc .cage.cl {
+  left: var(--in);
+  border-left-width: 2px;
+}
+[data-puzzle='math-cages'] .mc .cage.cr {
+  right: var(--in);
+  border-right-width: 2px;
+}
+[data-puzzle='math-cages'] .mc .lbl {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  z-index: 2;
+  padding: 0 4px 2px 1px;
+  background: inherit;
+  color: var(--fg);
+  font-size: max(10px, calc(var(--board) / var(--cols) * 0.22));
+  line-height: 1;
+  font-weight: 800;
+  white-space: nowrap;
+}
+[data-puzzle='math-cages'] .mc .cell.sel .lbl,
+[data-puzzle='math-cages'] .mc .cell.err .lbl {
+  color: var(--on-tone);
+}
+[data-puzzle='math-cages'] .mc .cell .v {
+  font-size: 0.95em;
+  margin-top: 0.18em;
+}

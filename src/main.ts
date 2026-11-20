@@ -10,6 +10,7 @@ import { renderLabs } from './pages/labs';
 import { renderSettings } from './pages/settings';
 import { renderStats } from './pages/stats';
 import { PUZZLES } from './puzzles';
+import { setupUpdates } from './core/update';
 
 const app = document.getElementById('app')!;
 // For scripts/shots.mjs & scripts/audit.mjs
@@ -111,3 +112,4 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme
 window.addEventListener('hashchange', route);
 applyTheme();
 route();
+setupUpdates();

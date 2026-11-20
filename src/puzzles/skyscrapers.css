@@ -1,0 +1,28 @@
+[data-puzzle='skyscrapers'] {
+  --accent: var(--p6);
+}
+[data-puzzle='skyscrapers'] .sky .sky-clue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  margin: 12%;
+  border-radius: 50%;
+  color: var(--fg);
+  font-weight: 800;
+  font-size: calc(var(--board) / var(--cols) * 0.42);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition:
+    opacity 0.15s,
+    background 0.12s;
+}
+[data-puzzle='skyscrapers'] .sky .sky-clue.ok {
+  opacity: 0.35;
+}
+[data-puzzle='skyscrapers'] .sky .sky-clue.bad {
+  background: var(--bad);
+  color: var(--on-tone);
+  border: var(--cbw) solid var(--ink);
+}
