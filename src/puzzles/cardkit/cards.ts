@@ -19,7 +19,10 @@ export const rank = (c: Card) => (c % 13) + 1;
 export const suit = (c: Card) => Math.floor(c / 13) % 4;
 export const isRed = (c: Card) => suit(c) === 1 || suit(c) === 2;
 const make = (s: number, r: number): Card => s * 13 + r - 1;
-const label = (c: Card) => rankName(rank(c)) + SUITS[suit(c)];
+/** Short card name for the current locale, e.g. "7♥", "Q♠" (French: "D♠"). */
+export const label = (c: Card) => rankName(rank(c)) + SUITS[suit(c)];
+/** French "le 7♥" / "l’A♥" (elided before an ace). */
+export const leCard = (c: Card) => (rank(c) === 1 ? `l’${label(c)}` : `le ${label(c)}`);
 
 /** Shuffled deck. `suits` picks which suits appear, `copies` repeats each suit (Spider). */
 export function deck(rng: Rng, suits: number[] = [0, 1, 2, 3], copies = 1): Card[] {
@@ -98,3 +101,18 @@ export function fan(down: number, up: number, maxH: number, dOff = 0.2, uOff = 0
 export function tableEl(n: number, hcw: number, extra = ''): HTMLDivElement {
   return h('div', { class: `ctable ${extra}`.trim(), style: `--n:${n};--hcw:${hcw}` });
 }
+
+/** Card (or slot, i = -1) element for pile p / index i on a rendered table (guide hints). */
+export const elAt = (table: HTMLElement, p: string, i: number): HTMLElement | null => table.querySelector(`[data-p="${p}"][data-i="${i}"]`);
+
+/** Topmost rendered element of pile p: its top card, or its empty slot. */
+export function topEl(table: HTMLElement, p: string): HTMLElement | null {
+  const all = table.querySelectorAll<HTMLElement>(`[data-p="${p}"]`);
+  return all.length ? all[all.length - 1] : null;
+}
+
+/** Capitalise the first letter (sentence starts like "Le 7♥…"). */
+export const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+
+/** Rank letter alone for the current locale (1 = A … 13 = K / R). */
+export const rankLabel = (r: number) => rankName(r);

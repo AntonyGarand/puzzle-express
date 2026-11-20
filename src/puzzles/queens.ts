@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
 
 function allSolutions(n: number): number[][] {
@@ -111,6 +111,77 @@ export const queens: PuzzleDef = {
     if (sv?.q?.length === n) sv.q.forEach((c, r) => r !== lockedRow && (q[r] = c));
     root.append(grid);
     render();
-    return { snapshot: () => ({ q }) };
+
+    /** Placed queens attacking square (r, c). */
+    const attackers = (r: number, c: number) => q.flatMap((x, rr) => (x != null && rr !== r && attacks(rr, x, r, c) ? [rr * n + x] : []));
+    let last = -1;
+    /** The next deduction for the guide: a row or column with a single safe square. */
+    const hint = (): Hint | null => {
+      if (q.every((x) => x != null)) return null;
+      const free = [...Array(n).keys()].filter((r) => q[r] == null);
+      const safe = (r: number, c: number) => !attackers(r, c).length;
+      const why = (sq: [number, number][]) => [...new Set(sq.flatMap(([r, c]) => attackers(r, c)))].map((i) => cells[i]);
+      const byRow = (): Hint | null => {
+        for (const r of free) {
+          const ok = [...Array(n).keys()].filter((c) => safe(r, c));
+          if (ok.length !== 1) continue;
+          const c = ok[0];
+          return {
+            text: L(
+              `Every square of row ${r + 1} but one is attacked by a queen (same column or diagonal). Row ${r + 1}’s queen must go in column ${c + 1}.`,
+              `Toutes les cases de la rangée ${r + 1} sauf une sont menacées par une dame (même colonne ou diagonale). Sa dame va donc dans la colonne ${c + 1}.`,
+            ),
+            why: why([...Array(n).keys()].filter((cc) => cc !== c).map((cc) => [r, cc])),
+            at: [cells[r * n + c]],
+            play: () => tap(r, c),
+          };
+        }
+        return null;
+      };
+      const byCol = (): Hint | null => {
+        for (let c = 0; c < n; c++) {
+          if (q.includes(c)) continue;
+          const ok = free.filter((r) => safe(r, c));
+          if (ok.length !== 1) continue;
+          const r = ok[0];
+          const w = why(free.filter((rr) => rr !== r).map((rr) => [rr, c]));
+          return {
+            text: L(
+              `Column ${c + 1} still needs a queen, and ${w.length === 1 ? 'the queen attacks' : 'the queens attack'} all its free squares but one: row ${r + 1}.`,
+              `La colonne ${c + 1} a encore besoin d’une dame, et ${w.length === 1 ? 'la dame menace' : 'les dames menacent'} toutes ses cases libres sauf une : la rangée ${r + 1}.`,
+            ),
+            why: w,
+            at: [cells[r * n + c]],
+            play: () => tap(r, c),
+          };
+        }
+        return null;
+      };
+      const rules = [byRow, byCol];
+      for (const rule of [...rules.filter((_, k) => k !== last), ...rules.filter((_, k) => k === last)]) {
+        const found = rule();
+        if (found) {
+          last = rules.indexOf(rule);
+          return found;
+        }
+      }
+      // No forced square: follow a full solution that fits the queens already placed.
+      const fit = allSolutions(n).find((cand) => q.every((x, r) => x == null || x === cand[r]));
+      if (!fit) return null;
+      const r = free.reduce((a, b) =>
+        [...Array(n).keys()].filter((c) => safe(b, c)).length < [...Array(n).keys()].filter((c) => safe(a, c)).length ? b : a,
+      );
+      const c = fit[r];
+      last = -1;
+      return {
+        text: L(
+          `No row is forced yet, so pick the row with the fewest safe squares. Column ${c + 1} works out: it still leaves a safe square in every other row.`,
+          `Aucune rangée n’est encore forcée : prenez celle qui a le moins de cases sûres. La colonne ${c + 1} fonctionne : elle laisse une case sûre dans chaque autre rangée.`,
+        ),
+        at: [cells[r * n + c]],
+        play: () => tap(r, c),
+      };
+    };
+    return { snapshot: () => ({ q }), hint };
   },
 };

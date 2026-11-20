@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
 import { fullSet, genDominosa, pairIndex } from './gridkit/dominosa';
 import { capture } from './pathkit/grid';
@@ -205,6 +205,110 @@ export const dominoes: PuzzleDef = {
     if (typeof s0 === 'number' && Number.isInteger(s0) && s0 >= 0 && s0 < N && mate[s0] < 0) sel = s0;
     root.append(wrap);
     render();
-    return { snapshot: () => ({ mate, sel }) };
+    // Guide: cells with one partner left, pairs with one spot left, pairs already used.
+    let lastKind = '';
+    let taught = false;
+    const hint = (): Hint | null => {
+      if (done) return null;
+      const used = new Set<number>();
+      for (let i = 0; i < N; i++) if (mate[i] > i) used.add(pairIndex(val[i], val[mate[i]], n));
+      const nbs = (i: number) => {
+        const r = Math.floor(i / cols),
+          c = i % cols;
+        return [r > 0 ? i - cols : -1, c < cols - 1 ? i + 1 : -1, r < rows - 1 ? i + cols : -1, c > 0 ? i - 1 : -1].filter((j) => j >= 0);
+      };
+      const name = (a: number, b: number) => `${Math.min(val[a], val[b])}-${Math.max(val[a], val[b])}`;
+      const cands: { kind: string; hint: Hint }[] = [];
+      const lay = (a: number, b: number) => () => toggle(a, b);
+      for (let i = 0; i < N; i++) {
+        if (mate[i] >= 0) continue;
+        const free = nbs(i).filter((j) => mate[j] < 0);
+        const ok = free.filter((j) => !used.has(pairIndex(val[i], val[j], n)));
+        if (ok.length !== 1) continue;
+        const j = ok[0];
+        if (free.length === 1)
+          cands.push({
+            kind: 'one',
+            hint: {
+              text: L(
+                `This ${val[i]} has only one free neighbour, the ${val[j]}, so they form the ${name(i, j)}.`,
+                `Ce ${val[i]} n’a qu’une seule voisine libre, le ${val[j]} : ensemble, ils forment le ${name(i, j)}.`,
+              ),
+              why: [cells[i]],
+              at: [cells[j]],
+              play: lay(i, j),
+            },
+          });
+        else {
+          const gone = free.filter((x) => x !== j);
+          cands.push({
+            kind: 'used',
+            hint: {
+              text: L(
+                `This ${val[i]} could pair with ${gone.length === 1 ? 'another neighbour' : 'other neighbours'}, but ${gone.map((x) => name(i, x)).join(', ')} ${gone.length === 1 ? 'is' : 'are'} already placed. Only the ${name(i, j)} is left.`,
+                `Ce ${val[i]} pourrait aller avec ${gone.length === 1 ? 'une autre voisine' : 'd’autres voisines'}, mais ${gone.map((x) => name(i, x)).join(', ')} ${gone.length === 1 ? 'est déjà posé' : 'sont déjà posés'}. Il ne reste que le ${name(i, j)}.`,
+              ),
+              why: [cells[i], ...gone.map((x) => chips[pairIndex(val[i], val[x], n)])],
+              at: [cells[i], cells[j]],
+              play: lay(i, j),
+            },
+          });
+        }
+      }
+      // A pair of the set that fits in one spot only.
+      const spots = new Map<number, [number, number][]>();
+      for (let i = 0; i < N; i++) {
+        if (mate[i] >= 0) continue;
+        for (const j of [i + 1, i + cols]) {
+          if (j >= N || mate[j] >= 0 || (j === i + 1 && j % cols === 0)) continue;
+          const k = pairIndex(val[i], val[j], n);
+          if (used.has(k)) continue;
+          if (!spots.has(k)) spots.set(k, []);
+          spots.get(k)!.push([i, j]);
+        }
+      }
+      for (const [k, at] of spots) {
+        if (at.length !== 1) continue;
+        const [a, b] = at[0];
+        cands.push({
+          kind: 'pair',
+          hint: {
+            text: L(
+              `Each pair is used once, and the ${name(a, b)} appears side by side only here: it goes here.`,
+              `Chaque paire sert une fois, et le ${name(a, b)} n’apparaît côte à côte qu’ici : il va donc ici.`,
+            ),
+            why: [chips[k]],
+            at: [cells[a], cells[b]],
+            play: lay(a, b),
+          },
+        });
+      }
+      const order = ['pair', 'one', 'used'];
+      cands.sort((x, y) => order.indexOf(x.kind) - order.indexOf(y.kind));
+      const pick = cands.find((c) => c.kind !== lastKind) ?? cands[0];
+      if (pick) {
+        lastKind = pick.kind;
+        if (taught) return pick.hint;
+        taught = true;
+        return {
+          ...pick.hint,
+          text: pick.hint.text + L(' Tap the line between two cells to place it.', ' Touchez la ligne entre deux cases pour le poser.'),
+        };
+      }
+      lastKind = '';
+      const i = p.mate.findIndex((j, x) => mate[x] < 0 && mate[j] < 0);
+      if (i < 0) return null;
+      const j = p.mate[i];
+      return {
+        text: L(
+          `No single rule decides here. Try the options: only the ${name(i, j)} here leaves every remaining pair a place.`,
+          `Aucune règle ne décide seule ici. Essayez les options : seul le ${name(i, j)} ici laisse une place à chaque paire restante.`,
+        ),
+        why: [chips[pairIndex(val[i], val[j], n)]],
+        at: [cells[i], cells[j]],
+        play: lay(i, j),
+      };
+    };
+    return { snapshot: () => ({ mate, sel }), hint };
   },
 };

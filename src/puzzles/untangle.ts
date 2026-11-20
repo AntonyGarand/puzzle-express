@@ -1,5 +1,5 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { h, s } from '../core/ui';
 import { capture } from './pathkit/grid';
 import { crossingEdges, genUntangle, type Pt } from './pathkit/untangle-gen';
@@ -45,7 +45,7 @@ export const untangle: PuzzleDef = {
   par: (d) => byLevel(d, [15, 30, 50, 80, 130]),
   create(ctx) {
     const { root, rng, difficulty: d } = ctx;
-    const { edges, start } = genUntangle(rng, d);
+    const { edges, start, solution } = genUntangle(rng, d);
     const V = start.length;
     const pos: Pt[] = start.map((p) => ({ ...p }));
     const sv = ctx.saved as { pos?: unknown } | undefined;
@@ -58,7 +58,9 @@ export const untangle: PuzzleDef = {
     const svg = s('svg', { class: 'untangle', viewBox: '0 0 100 100' });
     const lineG = s('g');
     const dotG = s('g');
-    svg.append(lineG, dotG);
+    // Dashed marker for where the guide is about to move a dot.
+    const ghost = s('circle', { r: r + 1.5, class: 'ghost', style: 'display:none' });
+    svg.append(lineG, dotG, ghost);
     const lines = edges.map(() => {
       const l = s('line');
       lineG.append(l);
@@ -149,8 +151,84 @@ export const untangle: PuzzleDef = {
     svg.addEventListener('pointerup', end);
     svg.addEventListener('pointercancel', end);
 
+    // ---- guide: greedy moves that cut the most crossings ----
+    let lastRule = '';
+    const hint = (): Hint | null => {
+      ghost.style.display = 'none';
+      if (finished) return null;
+      const bad = crossingEdges(pos, edges);
+      if (!bad.size) return null;
+      const deg = pos.map((_, v) => edges.filter((e) => e.includes(v)).length);
+      const redAt = (v: number) => edges.filter((e, k) => bad.has(k) && e.includes(v)).length;
+      const clampPt = (p: Pt) => ({
+        x: Math.round(Math.max(r, Math.min(100 - r, p.x)) * 10) / 10,
+        y: Math.round(Math.max(r, Math.min(100 - r, p.y)) * 10) / 10,
+      });
+      type Move = { v: number; to: Pt; after: number; between: boolean };
+      let best: Move | null = null;
+      for (let v = 0; v < V; v++) {
+        const nbs = edges.filter((e) => e.includes(v)).map((e) => (e[0] === v ? e[1] : e[0]));
+        const mid = nbs.length
+          ? { x: nbs.reduce((t, j) => t + pos[j].x, 0) / nbs.length, y: nbs.reduce((t, j) => t + pos[j].y, 0) / nbs.length }
+          : null;
+        const tries: [Pt, boolean][] = [[solution[v], false]];
+        if (mid && nbs.length <= 3) tries.push([mid, true]);
+        for (const [raw, between] of tries) {
+          const to = clampPt(raw);
+          if (Math.hypot(to.x - pos[v].x, to.y - pos[v].y) < 2) continue;
+          if (pos.some((q, j) => j !== v && Math.hypot(q.x - to.x, q.y - to.y) < r * 2.2)) continue;
+          const trial = pos.map((q, j) => (j === v ? to : q));
+          const after = crossingEdges(trial, edges).size;
+          const score = after * 100 - redAt(v) - (between ? 0 : 0.5);
+          if (!best || score < best.after * 100 - redAt(best.v) - (best.between ? 0 : 0.5)) best = { v, to, after, between };
+        }
+      }
+      if (!best) return null;
+      const { v, to, after, between } = best;
+      ghost.setAttribute('cx', String(to.x));
+      ghost.setAttribute('cy', String(to.y));
+      ghost.style.display = '';
+      const red = redAt(v);
+      const rule = after === 0 ? 'last' : between && lastRule !== 'between' ? 'between' : 'most';
+      lastRule = rule;
+      const text =
+        rule === 'last'
+          ? L(
+              `Only this dot is still in the way. Drag it to the dashed circle and all ${bad.size} red lines clear.`,
+              `Seul ce point gêne encore. Glissez-le dans le cercle pointillé et les ${bad.size} lignes rouges disparaissent.`,
+            )
+          : rule === 'between'
+            ? L(
+                `This dot links to just ${deg[v]} others. Tuck it between them so its lines stay short: red lines drop from ${bad.size} to ${after}.`,
+                `Ce point n’est relié qu’à ${deg[v]} autres. Placez-le entre eux pour garder ses lignes courtes : les lignes rouges passent de ${bad.size} à ${after}.`,
+              )
+            : after >= bad.size
+              ? L(
+                  'No single move clears a crossing yet. Pull this dot toward the dashed circle to open up room.',
+                  'Aucun déplacement ne règle encore de croisement. Tirez ce point vers le cercle pointillé pour faire de la place.',
+                )
+              : L(
+                  `Red lines cross. ${red ? `This dot touches ${red} of them: drag it` : 'Drag this dot'} to the dashed circle and the count drops from ${bad.size} to ${after}.`,
+                  `Les lignes rouges se croisent. ${red ? `Ce point en touche ${red} : glissez-le` : 'Glissez ce point'} dans le cercle pointillé et leur nombre passe de ${bad.size} à ${after}.`,
+                );
+      return {
+        text,
+        why: [dots[v]],
+        at: [ghost],
+        play: () => {
+          ghost.style.display = 'none';
+          ctx.touch();
+          drag = v;
+          dotG.append(dots[v]);
+          pos[v] = to;
+          render();
+          end();
+        },
+      };
+    };
+
     root.append(h('div', { class: 'untangle-wrap' }, svg));
     render();
-    return { snapshot: () => ({ pos: pos.map((p) => [p.x, p.y]) }) };
+    return { hint, snapshot: () => ({ pos: pos.map((p) => [p.x, p.y]) }) };
   },
 };

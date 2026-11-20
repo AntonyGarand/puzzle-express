@@ -1,5 +1,5 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h, s } from '../core/ui';
 import { genLightUp, nb4, sightLines } from './gridkit/lightup';
 import { tapOrHold } from './gridkit/press';
@@ -134,6 +134,100 @@ export const lightUp: PuzzleDef = {
     if (Array.isArray(sv?.st) && sv.st.length === st.length) sv.st.forEach((v, i) => (st[i] = !black[i] && (v === 1 || v === 2) ? v : 0));
     root.append(grid);
     render();
-    return { snapshot: () => ({ st }), destroy: cleanup };
+    // Guide: numbered walls first, then dark cells with a single possible source.
+    let lastKind = '';
+    let taught = false;
+    const hint = (): Hint | null => {
+      if (done) return null;
+      const lit = (i: number) => sight[i].some((j) => st[j] === 1);
+      const free = (j: number) => !black[j] && st[j] === 0 && !lit(j);
+      const cands: { kind: string; hint: Hint }[] = [];
+      const fill = (ix: number[], v: number) => () => ix.forEach((j) => st[j] !== v && set(j, v));
+      cells.forEach((el, c) => {
+        if (!black[c] || num[c] < 0) return;
+        const nb = nb4(c, n);
+        const bulbs = nb.filter((j) => st[j] === 1).length;
+        const open = nb.filter(free);
+        if (!open.length) return;
+        const k = num[c];
+        const at = open.map((j) => cells[j]);
+        if (bulbs === k)
+          cands.push({
+            kind: k ? 'sat' : 'zero',
+            hint: {
+              text: k
+                ? L(
+                    `This ${k} already has ${k === 1 ? 'its bulb' : `its ${k} bulbs`}, so no other side can take one: dot ${open.length === 1 ? 'it' : 'them'}.`,
+                    `Ce ${k} a déjà ${k === 1 ? 'son ampoule' : `ses ${k} ampoules`} : aucun autre côté ne peut en recevoir, mettez-y un point.`,
+                  )
+                : L(
+                    'A 0 means no bulb touches it. Tap twice to dot its free sides as surely empty.',
+                    'Un 0 veut dire qu’aucune ampoule ne le touche. Touchez deux fois pour marquer ses côtés libres d’un point.',
+                  ),
+              why: [el],
+              at,
+              play: fill(open, 2),
+            },
+          });
+        else if (bulbs + open.length === k)
+          cands.push({
+            kind: 'need',
+            hint: {
+              text: L(
+                `This ${k} needs ${k - bulbs === 1 ? 'one more bulb' : `${k - bulbs} more bulbs`} and has exactly ${open.length === 1 ? 'one free side' : `${open.length} free sides`}: put a bulb on ${open.length === 1 ? 'it' : 'each'}.`,
+                `Ce ${k} demande encore ${k - bulbs === 1 ? 'une ampoule' : `${k - bulbs} ampoules`} et n’a que ${open.length === 1 ? 'un côté libre' : `${open.length} côtés libres`} : ${open.length === 1 ? 'mettez-y une ampoule' : 'une ampoule sur chacun'}.`,
+              ),
+              why: [el],
+              at,
+              play: fill(open, 1),
+            },
+          });
+      });
+      for (let i = 0; i < n * n && cands.length < 6; i++) {
+        if (black[i] || lit(i)) continue;
+        const src = sight[i].filter(free);
+        if (src.length !== 1) continue;
+        const j = src[0];
+        cands.push({
+          kind: j === i ? 'self' : 'only',
+          hint: {
+            text:
+              j === i
+                ? L(
+                    'Every cell that sees this dark cell is dotted or already lit, so it must hold its own bulb.',
+                    'Toutes les cases qui voient cette case sombre ont un point ou sont déjà éclairées : elle doit avoir sa propre ampoule.',
+                  )
+                : L(
+                    'This dark cell can only be lit from one place: every other cell in its row and column is dotted or lit.',
+                    'Cette case sombre ne peut être éclairée que d’un seul endroit : les autres cases de sa rangée et de sa colonne ont un point ou sont éclairées.',
+                  ),
+            why: j === i ? sight[i].filter((x) => x !== i).map((x) => cells[x]) : [cells[i]],
+            at: [cells[j]],
+            play: fill([j], 1),
+          },
+        });
+      }
+      const order = ['zero', 'need', 'sat', 'only', 'self'];
+      cands.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+      const pick = cands.find((c) => c.kind !== lastKind) ?? cands[0];
+      if (pick) {
+        lastKind = pick.kind;
+        if (taught || pick.kind === 'zero' || pick.kind === 'sat') return pick.hint;
+        taught = true;
+        return { ...pick.hint, text: pick.hint.text + L(' Tap a cell once for a bulb.', ' Touchez une case une fois pour une ampoule.') };
+      }
+      lastKind = '';
+      const j = p.sol.findIndex((v, i) => v && st[i] !== 1);
+      if (j < 0) return null;
+      return {
+        text: L(
+          'No single clue decides here. Try the options: only a bulb in this cell lights the area without two bulbs seeing each other.',
+          'Aucun indice ne décide seul ici. Essayez les options : seule une ampoule dans cette case éclaire le coin sans que deux ampoules se voient.',
+        ),
+        at: [cells[j]],
+        play: fill([j], 1),
+      };
+    };
+    return { snapshot: () => ({ st }), destroy: cleanup, hint };
   },
 };

@@ -1,7 +1,8 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, pad, shake } from '../core/ui';
 import { anim, keyDir, onSwipe, type Dir } from './movekit/kit';
+import { solvePush } from './movekit/push-hint';
 import { generateRoom, stepper } from './movekit/pushgen';
 import './push.css';
 
@@ -228,6 +229,64 @@ export const push: PuzzleDef = {
       render();
     };
 
+    /** Guide: follow a fewest-pushes solution; walking behind a crate and pushing it are separate steps. */
+    const hint = (): Hint | null => {
+      if (done) return null;
+      const sol = solvePush(w, hh, floor, targets, boxes, player);
+      if (!sol?.length) return null;
+      const { box, dir } = sol[0];
+      const el = (i: number) => els.get(i)!;
+      const dirName = [L('up', 'vers le haut'), L('right', 'vers la droite'), L('down', 'vers le bas'), L('left', 'vers la gauche')][dir];
+      const behind = nb(box, (dir + 2) % 4);
+      if (player !== behind) {
+        const side = [
+          L('below it', 'sous elle'),
+          L('on its left', 'à sa gauche'),
+          L('above it', 'au-dessus d’elle'),
+          L('on its right', 'à sa droite'),
+        ][dir];
+        return {
+          text: L(
+            `You can only push, never pull. To push this crate ${dirName}, first stand ${side}: tap that square to walk there.`,
+            `On peut seulement pousser, jamais tirer. Pour pousser cette caisse ${dirName}, placez-vous d’abord ${side} : touchez cette case pour y aller.`,
+          ),
+          why: [el(box)],
+          at: [el(behind)],
+          play: () => tap(behind),
+        };
+      }
+      let k = 1,
+        end = nb(box, dir);
+      while (k < sol.length && sol[k].box === end && sol[k].dir === dir) {
+        k++;
+        end = nb(end, dir);
+      }
+      const sq = k === 1 ? L('one square', 'd’une case') : L(`${k} squares`, `de ${k} cases`);
+      const row = (i: number) => Math.floor(i / w),
+        col = (i: number) => i % w;
+      const free = targets.filter((t) => !boxes.includes(t));
+      const lined = free.some((t) => (row(t) === row(end) || col(t) === col(end)) && row(t) !== row(box) && col(t) !== col(box));
+      const text = tset.has(end)
+        ? L(`Push the crate ${sq} ${dirName}, right onto the target.`, `Poussez la caisse ${sq} ${dirName}, jusque sur la cible.`)
+        : lined
+          ? L(
+              `Push the crate ${sq} ${dirName}: now it lines up with a target, so straight pushes can bring it home.`,
+              `Poussez la caisse ${sq} ${dirName} : elle est alors alignée avec une cible, et des poussées en ligne droite l’y amèneront.`,
+            )
+          : L(
+              `Push the crate ${sq} ${dirName}. Plan ahead: a crate pushed into a corner can never be pulled back out.`,
+              `Poussez la caisse ${sq} ${dirName}. Prévoyez la suite : une caisse poussée dans un coin ne peut plus en sortir.`,
+            );
+      return {
+        text,
+        why: [el(player), el(box)],
+        at: [el(end)],
+        play: () => {
+          for (let j = 0; j < k; j++) move(dir as Dir);
+        },
+      };
+    };
+
     let swiped = false;
     grid.addEventListener('pointerdown', () => (swiped = false));
     onSwipe(grid, (dir) => {
@@ -251,6 +310,7 @@ export const push: PuzzleDef = {
 
     return {
       snapshot: () => ({ h: history }),
+      hint,
       onKey(e) {
         const k = keyDir(e);
         if (k != null) {

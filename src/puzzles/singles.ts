@@ -1,7 +1,7 @@
 import './singles.css';
 import { L, P } from '../core/i18n';
 import type { Rng } from '../core/rng';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
 import { pressable } from './latinkit/entry';
 import { randomLatin } from './latinkit/solver';
@@ -304,8 +304,145 @@ export const singles: PuzzleDef = {
     root.append(grid);
     render();
 
+    const lineCells = (row: boolean, k: number) => Array.from({ length: n }, (_, j) => (row ? k * n + j : j * n + k));
+    const lineName = (row: boolean, k: number) =>
+      row ? L(`row ${k + 1}`, `la rangée ${k + 1}`) : L(`column ${k + 1}`, `la colonne ${k + 1}`);
+    const els = (ix: number[]) => ix.map((i) => cells[i]);
+    const mark = (ix: number[], v: number) => () => ix.forEach((i) => st[i] === 0 && set(i, v));
+    let last = -1;
+    /** The next deduction for the guide, from the numbers, shades and circles on the board. */
+    const hint = (): Hint | null => {
+      if (done) return null;
+      const plain = (i: number) => st[i] === 0;
+
+      const twinsOf = (): Hint | null => {
+        // A circled number stays, so its repeats in the same row and column go.
+        for (let i = 0; i < n * n; i++) {
+          if (st[i] !== 2) continue;
+          const ix = tw[i].filter(plain);
+          if (!ix.length) continue;
+          return {
+            text: L(
+              `This ${nums[i]} is circled, so it stays. ${ix.length > 1 ? `The other ${nums[i]}s in its row and column` : `The other ${nums[i]} in its row or column`} must be shaded. Tap once to shade.`,
+              `Ce ${nums[i]} est encerclé : il reste. ${ix.length > 1 ? `Les autres ${nums[i]} de sa rangée et de sa colonne doivent être noircis` : `L’autre ${nums[i]} de sa rangée ou de sa colonne doit être noirci`}. Touchez une fois pour noircir.`,
+            ),
+            why: els([i]),
+            at: els(ix),
+            play: mark(ix, 1),
+          };
+        }
+        return null;
+      };
+      const beside = (): Hint | null => {
+        // Shaded cells never touch, so a shade's neighbours all stay: circle them.
+        for (let i = 0; i < n * n; i++) {
+          if (st[i] !== 1) continue;
+          const ix = nb(n, i).filter(plain);
+          if (!ix.length) continue;
+          return {
+            text: L(
+              `Shaded cells never touch side by side, so every neighbour of this shaded cell stays. Long-press to circle ${ix.length > 1 ? 'them' : 'it'}.`,
+              `Les cases noires ne se touchent jamais par un côté : chaque voisine de cette case noire reste. Appuyez longuement pour ${ix.length > 1 ? 'les ' : 'l’'}encercler.`,
+            ),
+            why: els([i]),
+            at: els(ix),
+            play: mark(ix, 2),
+          };
+        }
+        return null;
+      };
+      const sandwich = (): Hint | null => {
+        // a b a: shading b would keep both a's beside it, a repeat.
+        for (const row of [true, false])
+          for (let k = 0; k < n; k++) {
+            const line = lineCells(row, k);
+            for (let j = 0; j + 2 < n; j++) {
+              const [a, m, b] = [line[j], line[j + 1], line[j + 2]];
+              if (nums[a] !== nums[b] || st[a] === 1 || st[b] === 1 || !plain(m) || !tw[m].length) continue;
+              return {
+                text: L(
+                  `In ${lineName(row, k)}, this ${nums[m]} sits between two ${nums[a]}s. Shading it would keep both ${nums[a]}s (shades can’t touch), a repeat. So it stays: circle it.`,
+                  `Dans ${lineName(row, k)}, ce ${nums[m]} est entre deux ${nums[a]}. Le noircir garderait les deux ${nums[a]} (les noires ne se touchent pas), un doublon. Il reste : encerclez-le.`,
+                ),
+                why: els([a, b]),
+                at: els([m]),
+                play: mark([m], 2),
+              };
+            }
+          }
+        return null;
+      };
+      const pair = (): Hint | null => {
+        // a a … a: one of the pair stays, so the lone a goes.
+        for (const row of [true, false])
+          for (let k = 0; k < n; k++) {
+            const line = lineCells(row, k);
+            for (let j = 0; j + 1 < n; j++) {
+              const [a, b] = [line[j], line[j + 1]];
+              if (nums[a] !== nums[b]) continue;
+              const ix = line.filter((x) => x !== a && x !== b && nums[x] === nums[a] && plain(x));
+              if (!ix.length) continue;
+              const v = nums[a];
+              return {
+                text: L(
+                  `Two ${v}s side by side in ${lineName(row, k)}: one of them has to stay, since both can’t be shaded. So the other ${v} in that line must go.`,
+                  `Deux ${v} côte à côte dans ${lineName(row, k)} : l’un des deux reste, car on ne peut pas noircir les deux. L’autre ${v} de la ligne doit donc partir.`,
+                ),
+                why: els([a, b]),
+                at: els(ix),
+                play: mark(ix, 1),
+              };
+            }
+          }
+        return null;
+      };
+      const cut = (): Hint | null => {
+        // Shading this cell would split the unshaded cells in two.
+        for (let i = 0; i < n * n; i++) {
+          if (!plain(i) || !tw[i].length) continue;
+          if (components(n, (j) => j !== i && st[j] !== 1).sizes.length <= 1) continue;
+          return {
+            text: L(
+              'Shading this cell would cut some unshaded cells off from the rest. They must stay in one piece, so it stays: circle it.',
+              'Noircir cette case couperait des cases blanches du reste. Elles doivent rester d’un seul morceau : encerclez-la.',
+            ),
+            why: els(nb(n, i).filter((j) => st[j] === 1)),
+            at: els([i]),
+            play: mark([i], 2),
+          };
+        }
+        return null;
+      };
+      const rules = [twinsOf, beside, sandwich, pair, cut];
+      for (const rule of [...rules.filter((_, k) => k !== last), ...rules.filter((_, k) => k === last)]) {
+        const found = rule();
+        if (found) {
+          last = rules.indexOf(rule);
+          return found;
+        }
+      }
+      // Nothing simple: follow the solution for a repeated number that's still undecided.
+      const i = st.findIndex((v, j) => v === 0 && tw[j].length);
+      if (i < 0) return null;
+      last = -1;
+      return {
+        text: shade[i]
+          ? L(
+              `This ${nums[i]} has to go: keeping it forces a repeat or a cut elsewhere (check its row and column).`,
+              `Ce ${nums[i]} doit partir : le garder force un doublon ou une coupure ailleurs (vérifiez sa rangée et sa colonne).`,
+            )
+          : L(
+              `This ${nums[i]} has to stay: shading it forces a repeat or a cut elsewhere (check its row and column).`,
+              `Ce ${nums[i]} doit rester : le noircir force un doublon ou une coupure ailleurs (vérifiez sa rangée et sa colonne).`,
+            ),
+        at: els([i]),
+        play: mark([i], shade[i] ? 1 : 2),
+      };
+    };
+
     const DIRS: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
     return {
+      hint,
       snapshot: () => ({ st, cur }),
       onKey(e) {
         if (done) return false;

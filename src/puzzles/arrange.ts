@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, PALETTE, shake } from '../core/ui';
 import { genArrange, rotated, type Shape } from './pathkit/arrange-gen';
 import { innerRect } from './pathkit/grid';
@@ -108,9 +108,7 @@ export const arrange: PuzzleDef = {
           shake(el);
           return;
         }
-        ctx.touch();
-        rot[p] = (rot[p] + 1) % 4;
-        render();
+        turnPiece(p);
       });
       return el;
     });
@@ -118,6 +116,11 @@ export const arrange: PuzzleDef = {
 
     let finished = false;
     let suppressClick = false;
+    const turnPiece = (p: number) => {
+      ctx.touch();
+      rot[p] = (rot[p] + 1) % 4;
+      render();
+    };
     let preview: number[] = [];
     const render = () => {
       recompute();
@@ -214,6 +217,10 @@ export const arrange: PuzzleDef = {
         ctx.touch();
         place[dg.p] = null;
       }
+      settle();
+    };
+    /** Redraw and check for the win after a piece lands or leaves. */
+    const settle = () => {
       if (render() && !finished) {
         finished = true;
         ctx.solved();
@@ -285,9 +292,150 @@ export const arrange: PuzzleDef = {
       recompute();
       if (place.every(Boolean)) place[K - 1] = null; // never resume already solved
     }
+    // ---- guide ----
+    const shapeKey = (sh: Shape) =>
+      sh
+        .map((q) => q.join(','))
+        .sort()
+        .join(' ');
+    const solCells = (p: number) => pieces[p].shape.map(([r, c]) => (pieces[p].r + r) * cols + pieces[p].c + c);
+    let lastRule = '';
+    const hint = (): Hint | null => {
+      if (finished) return null;
+      recompute();
+      for (let p = 0; p < K; p++) {
+        const o = place[p];
+        if (!o) continue;
+        if (o[0] === pieces[p].r && o[1] === pieces[p].c && shapeKey(shapeOf(p)) === shapeKey(pieces[p].shape)) continue;
+        const own = cells.filter((_, i) => owner[i] === p);
+        return {
+          text: L(
+            'This piece leaves gaps no other piece can fill. Tap it to send it back to the tray.',
+            'Cette pièce laisse des trous qu’aucune autre ne peut combler. Touchez-la pour la renvoyer au bac.',
+          ),
+          at: own,
+          play: () => {
+            ctx.touch();
+            place[p] = null;
+            settle();
+          },
+        };
+      }
+      const left = pieces.map((_, p) => p).filter((p) => !place[p]);
+      if (!left.length) return null;
+      const drop = (p: number) => () => {
+        place[p] = [pieces[p].r, pieces[p].c];
+        settle();
+      };
+      const spot = (p: number) => solCells(p).map((i) => cells[i]);
+      // Empty regions of the board.
+      const seen = new Uint8Array(N);
+      const regions: number[][] = [];
+      for (let i = 0; i < N; i++) {
+        if (seen[i] || owner[i] >= 0) continue;
+        const reg = [i];
+        seen[i] = 1;
+        for (let k = 0; k < reg.length; k++) {
+          const j = reg[k],
+            r = Math.floor(j / cols),
+            c = j % cols;
+          for (const [rr, cc] of [
+            [r - 1, c],
+            [r + 1, c],
+            [r, c - 1],
+            [r, c + 1],
+          ])
+            if (rr >= 0 && rr < rows && cc >= 0 && cc < cols && !seen[rr * cols + cc] && owner[rr * cols + cc] < 0) {
+              seen[rr * cols + cc] = 1;
+              reg.push(rr * cols + cc);
+            }
+        }
+        regions.push(reg);
+      }
+      const rules: Record<string, () => Hint | null> = {
+        gap: () => {
+          for (const reg of regions)
+            for (const p of left) {
+              const want = solCells(p);
+              if (want.length !== reg.length || !want.every((i) => reg.includes(i))) continue;
+              if (shapeKey(shapeOf(p)) !== shapeKey(pieces[p].shape)) continue;
+              return {
+                text:
+                  left.length === 1
+                    ? L(
+                        'Last piece: the hole left has exactly its shape. Drag it in.',
+                        'Dernière pièce : le trou restant a exactement sa forme. Glissez-la dedans.',
+                      )
+                    : L(
+                        `This ${reg.length}-cell gap is walled off and has exactly this piece’s shape, so only it can fill it.`,
+                        `Ce trou de ${reg.length} cases est fermé et a exactement la forme de cette pièce : elle seule peut le remplir.`,
+                      ),
+                why: [trayEls[p]],
+                at: spot(p),
+                play: drop(p),
+              };
+            }
+          return null;
+        },
+        corner: () => {
+          const corners = [0, cols - 1, (rows - 1) * cols, N - 1].filter((i) => owner[i] < 0);
+          for (const i of corners) {
+            const p = left.find((q) => solCells(q).includes(i));
+            if (p == null || shapeKey(shapeOf(p)) !== shapeKey(pieces[p].shape)) continue;
+            return {
+              text: L(
+                'Fill the corners first: they’re the hardest cells to reach, and this piece tucks in snugly with no gap.',
+                'Remplissez d’abord les coins : ce sont les cases les plus difficiles à atteindre, et cette pièce s’y loge sans laisser de trou.',
+              ),
+              why: [trayEls[p]],
+              at: spot(p),
+              play: drop(p),
+            };
+          }
+          return null;
+        },
+        big: () => {
+          const p = [...left]
+            .filter((q) => shapeKey(shapeOf(q)) === shapeKey(pieces[q].shape))
+            .sort((a, b) => pieces[b].shape.length - pieces[a].shape.length)[0];
+          if (p == null) return null;
+          const size = pieces[p].shape.length;
+          const edge = solCells(p).some((i) => i < cols || i >= N - cols || i % cols === 0 || i % cols === cols - 1);
+          return {
+            text: L(
+              `Place big pieces early: this ${size}-cell one has the fewest spots where it fits${edge ? ', and here it hugs the edge' : ''}.`,
+              `Placez tôt les grosses pièces : celle-ci, de ${size} cases, a le moins d’endroits où elle entre${edge ? ', et ici elle longe le bord' : ''}.`,
+            ),
+            why: [trayEls[p]],
+            at: spot(p),
+            play: drop(p),
+          };
+        },
+      };
+      const ruleOrder = ['gap', 'corner', 'big'];
+      for (const r of [...ruleOrder.filter((o) => o !== lastRule), lastRule]) {
+        const found = rules[r]?.();
+        if (found) {
+          lastRule = r;
+          return found;
+        }
+      }
+      // Every piece left needs turning first.
+      const p = left[0];
+      return {
+        text: L(
+          'This piece has to turn to fit: tap it in the tray to rotate it a quarter turn.',
+          'Cette pièce doit tourner pour entrer : touchez-la dans le bac pour lui faire faire un quart de tour.',
+        ),
+        at: [trayEls[p]],
+        play: () => turnPiece(p),
+      };
+    };
+
     root.append(grid, tray);
     render();
     return {
+      hint,
       snapshot: () => ({ rot, place }),
       destroy() {
         window.removeEventListener('pointermove', onMove);

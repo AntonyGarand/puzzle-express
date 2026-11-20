@@ -1,5 +1,5 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, shake } from '../core/ui';
 import './guess.css';
 
@@ -170,7 +170,69 @@ export const guess: PuzzleDef = {
     ctx.controls(del, btn(L('Guess', 'Essayer'), submit, 'primary'));
     root.append(boardEl, ...pads);
     render();
+    // ---------- guide ----------
+    const hint = (): Hint | null => {
+      if (over) return null;
+      const fits = (s: number[]) =>
+        guesses.every((x) => {
+          const r = scoreGuess(s, x.g);
+          return r.exact === x.exact && r.near === x.near;
+        });
+      const cands: number[][] = [];
+      const gen = (pre: number[]) => {
+        if (pre.length === len) {
+          if (fits(pre)) cands.push(pre);
+          return;
+        }
+        for (const v of pool) if (!pre.includes(v)) gen([...pre, v]);
+      };
+      gen([]);
+      if (!cands.length) return null;
+      // A code that fits every row; keep the secret for last so the guide shows a few deductions.
+      const g = cands.find((c) => c.join() !== secret.join() || cands.length === 1) ?? cands[0];
+      const shown = g.join(' ');
+      const at = g.map((v) => keyEls.get(v)!);
+      const play = () => {
+        while (cur.length) back();
+        g.forEach(add);
+        submit();
+      };
+      const last = guesses[guesses.length - 1];
+      if (!last)
+        return {
+          text: L(
+            `Start with ${len} different digits, like ${shown}. ● means a right digit in the right spot, ○ a right digit in the wrong spot.`,
+            `Commencez par ${len} chiffres différents, comme ${shown}. ● : bon chiffre à la bonne place; ○ : bon chiffre à la mauvaise place.`,
+          ),
+          at,
+          play,
+        };
+      const tried = last.g.join(', ');
+      const tot = last.exact + last.near;
+      const first =
+        tot === 0
+          ? L(`No dots: none of ${tried} is in the code.`, `Aucune pastille : aucun des chiffres ${tried} n’est dans le code.`)
+          : tot === len
+            ? L(
+                `${tot} dots: ${tried} are all in the code, so only the order is wrong.`,
+                `${tot} pastilles : ${tried} sont tous dans le code, seul l’ordre est faux.`,
+              )
+            : L(
+                `${last.exact} ● and ${last.near} ○: exactly ${tot} of ${tried} ${tot === 1 ? 'is' : 'are'} in the code, ${last.exact ? `${last.exact} in the right spot` : 'but none in the right spot'}.`,
+                `${last.exact} ● et ${last.near} ○ : exactement ${tot} chiffre${tot > 1 ? 's' : ''} sur ${tried} ${tot > 1 ? 'sont' : 'est'} dans le code, ${last.exact ? `dont ${last.exact} bien placé${last.exact > 1 ? 's' : ''}` : 'mais aucun à la bonne place'}.`,
+              );
+      const second =
+        cands.length === 1
+          ? L(`Only ${shown} fits every row.`, `Seul le code ${shown} respecte toutes les rangées.`)
+          : L(
+              `${cands.length} codes still fit every row; try one, like ${shown}.`,
+              `${cands.length} codes respectent encore toutes les rangées; essayez-en un, comme ${shown}.`,
+            );
+      return { text: `${first} ${second}`, why: [boardEl.children[guesses.length - 1]], at, play };
+    };
+
     return {
+      hint,
       snapshot: () => ({ guesses, cur }),
       onKey(e) {
         if (/^[0-9]$/.test(e.key)) {

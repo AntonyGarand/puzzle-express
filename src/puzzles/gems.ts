@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, pad, shake } from '../core/ui';
 import { anim } from './movekit/kit';
 import { DIRS8, MINE, ROCK, genGems, slide } from './pathkit/gems-gen';
@@ -44,6 +44,17 @@ const KEYS: Record<string, number> = {
 /** Pad layout, row by row; -1 is the centre (move counter). */
 const PAD = [7, 0, 1, 6, -1, 2, 5, 4, 3];
 const ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+const DIR_EN = ['up', 'up-right', 'right', 'down-right', 'down', 'down-left', 'left', 'up-left'];
+const DIR_FR = [
+  'vers le haut',
+  'en haut à droite',
+  'vers la droite',
+  'en bas à droite',
+  'vers le bas',
+  'en bas à gauche',
+  'vers la gauche',
+  'en haut à gauche',
+];
 const LIVES = 3;
 
 export const gems: PuzzleDef = {
@@ -257,11 +268,121 @@ export const gems: PuzzleDef = {
       }
       if (hasMines && Number.isInteger(sv.boom)) boom = Math.max(0, Math.min(LIVES - 1, sv.boom as number));
     }
+    /** Shortest safe plan from the current spot and gems (BFS over position × collected mask). */
+    const plan = (): number[] | null => {
+      const full = (1 << G) - 1;
+      const bit = (x: number) => (gemIdx.has(x) ? 1 << gemIdx.get(x)! : 0);
+      let m0 = 0;
+      for (const g of got) m0 |= bit(g);
+      const key = (i: number, m: number) => m * N + i;
+      const prev = new Map<number, [number, number]>([[key(at, m0), [-1, -1]]]);
+      const q = [key(at, m0)];
+      for (let qi = 0; qi < q.length; qi++) {
+        const st = q[qi];
+        const m = Math.floor(st / N),
+          i = st % N;
+        if (m === full) {
+          const out: number[] = [];
+          for (let x = st; prev.get(x)![0] >= 0; x = prev.get(x)![0]) out.push(prev.get(x)![1]);
+          return out.reverse();
+        }
+        for (let dir = 0; dir < 8; dir++) {
+          const s = slide(n, cell, i, dir);
+          if (!s.length || cell[s[s.length - 1]] === MINE) continue;
+          const ns = key(
+            s[s.length - 1],
+            s.reduce((a, x) => a | bit(x), m),
+          );
+          if (prev.has(ns)) continue;
+          prev.set(ns, [st, dir]);
+          q.push(ns);
+        }
+      }
+      return null;
+    };
+    /** Why the slide stops at `end` going `dir`: a rock, two rocks corner to corner, or the edge. */
+    const stopper = (end: number, dir: number): number[] => {
+      const [dr, dc] = DIRS8[dir];
+      const r = Math.floor(end / n) + dr,
+        c = (end % n) + dc;
+      if (r < 0 || r >= n || c < 0 || c >= n) return [];
+      if (cell[r * n + c] === ROCK) return [r * n + c];
+      return [r * n + (end % n), Math.floor(end / n) * n + c];
+    };
+    const hint = (): Hint | null => {
+      if (finished || got.size === G) return null;
+      const p = plan();
+      if (!p?.length) return null;
+      const dir = p[0];
+      const s = slide(n, cell, at, dir);
+      const end = s[s.length - 1];
+      const picks = s.filter((x) => gemIdx.has(x) && !got.has(x));
+      const stop = stopper(end, dir);
+      const by =
+        stop.length === 1 ? L('the rock', 'le rocher') : stop.length ? L('the two rocks', 'les deux rochers') : L('the edge', 'le bord');
+      const arrow = `${ARROWS[dir]} (${L(DIR_EN[dir], DIR_FR[dir])})`;
+      const leftAfter = G - got.size - picks.length;
+      let text: string;
+      if (!hist.length && !picks.length)
+        text = L(
+          `Your token slides until something stops it. Slide ${arrow}: ${by} stops you in a spot that lines up with the gems.`,
+          `Votre jeton glisse jusqu’à ce que quelque chose l’arrête. Glissez ${arrow} : ${by} vous arrête à un endroit aligné avec les gemmes.`,
+        );
+      else if (!hist.length)
+        text = L(
+          `Your token slides until something stops it. Slide ${arrow}: you pass over ${picks.length === 1 ? 'a gem' : `${picks.length} gems`} and ${by} stops you.`,
+          `Votre jeton glisse jusqu’à ce que quelque chose l’arrête. Glissez ${arrow} : vous passez sur ${picks.length === 1 ? 'une gemme' : `${picks.length} gemmes`} et ${by} vous arrête.`,
+        );
+      else if (!picks.length) {
+        const next = p.length > 1 ? ARROWS[p[1]] : '';
+        const tempt = [0, 1, 2, 3, 4, 5, 6, 7].some((d2) => {
+          const t = slide(n, cell, at, d2);
+          return t.length && cell[t[t.length - 1]] !== MINE && t.some((x) => gemIdx.has(x) && !got.has(x));
+        });
+        text = tempt
+          ? L(
+              `A gem is within reach, but grabbing it now leaves you badly placed. Go ${arrow} first: ${by} stops you where a ${next} slide carries on.`,
+              `Une gemme est à portée, mais la prendre maintenant vous placerait mal. Allez d’abord ${arrow} : ${by} vous arrête là où une glissade ${next} prend le relais.`,
+            )
+          : L(
+              `No gem lines up with your token yet. Go ${arrow} first: ${by} stops you where a ${next} slide reaches the next gem.`,
+              `Aucune gemme n’est encore alignée avec votre jeton. Allez d’abord ${arrow} : ${by} vous arrête là où une glissade ${next} atteint la gemme suivante.`,
+            );
+      } else if (!leftAfter)
+        text = L(
+          `Last ${picks.length === 1 ? 'gem' : 'gems'}: slide ${arrow} and you pass over ${picks.length === 1 ? 'it' : 'them'}. Gems are picked up anywhere along the slide, not just where you stop.`,
+          `${picks.length === 1 ? 'Dernière gemme' : 'Dernières gemmes'} : glissez ${arrow} pour passer dessus. Les gemmes se ramassent tout le long de la glissade, pas seulement à l’arrêt.`,
+        );
+      else if (dir % 2)
+        text = L(
+          `Diagonals work too: slide ${arrow} to grab ${picks.length === 1 ? 'the gem' : `${picks.length} gems`}; ${by} stops you.`,
+          `Les diagonales comptent aussi : glissez ${arrow} pour prendre ${picks.length === 1 ? 'la gemme' : `${picks.length} gemmes`}; ${by} vous arrête.`,
+        );
+      else
+        text = L(
+          `This gem lines up with your token. Slide ${arrow}: you pick it up on the way and ${by} stops you.`,
+          `Cette gemme est alignée avec votre jeton. Glissez ${arrow} : vous la ramassez au passage et ${by} vous arrête.`,
+        );
+      return {
+        text,
+        // The stopping rock is shown only when it can't pull the arrow backwards past a gem.
+        why: [token, ...(picks.some((x) => x !== end) ? [] : stop.map((x) => cells[x]))],
+        at: [
+          cells[end],
+          ...picks.filter((x) => x !== end).map((x) => cells[x]),
+          // the matching pad key, so the guide also shows where to press
+          ...[...keys.querySelectorAll('button')].filter((b) => b.textContent === ARROWS[dir]),
+        ],
+        play: () => move(dir),
+      };
+    };
+
     root.append(grid, keys);
     place(0);
     render();
     return {
       snapshot: () => ({ v: 2, hist, boom }),
+      hint,
       onKey(e) {
         if (e.key === 'Backspace' || e.key === 'u' || e.key === 'U') {
           undo();

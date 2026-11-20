@@ -1,5 +1,5 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h, shake } from '../core/ui';
 import { better, keyboard, keyValue, type KeyState } from './wordkit/keyboard';
 import { answers, dictReady, isWord, whenDict } from './wordkit/lexicon';
@@ -177,7 +177,94 @@ export const wordGuess: PuzzleDef = {
     whenDict(() => {
       if (!over) status();
     });
+    // ---------- guide ----------
+    const up = (s: string) => s.toUpperCase();
+    const list = (cs: string[]) => up(cs.join(', '));
+    /** Sum, over a word's distinct letters, of how many words in `pool` contain that letter. */
+    const coverage = (pool: string[]) => {
+      const n = new Map<string, number>();
+      for (const w of pool) for (const ch of new Set(w)) n.set(ch, (n.get(ch) ?? 0) + 1);
+      return (w: string) => [...new Set(w)].reduce((t, ch) => t + (n.get(ch) ?? 0), 0);
+    };
+    const best = (from: string[], pool: string[]) => {
+      const sc = coverage(pool);
+      return from.reduce((a, b) => (sc(b) > sc(a) ? b : a));
+    };
+    const hint = (): Hint | null => {
+      if (over) return null;
+      const r = guesses.length;
+      const at = cells.slice(r * len, r * len + len);
+      const typeIn = (w: string) => () => {
+        while (cur.length) press('back');
+        for (const ch of w) press(ch);
+        press('enter');
+      };
+      const all = answers(len);
+      if (!r) {
+        const pool = all.filter((w) => w !== answer && new Set(w).size === len);
+        const w = best(pool.length ? pool : all, all);
+        return {
+          text: L(
+            `Open with common letters: ${up(w)} tests ${list([...w])} at once. Green will mean right spot, yellow elsewhere in the word, grey not in it.`,
+            `Ouvrez avec des lettres courantes : ${up(w)} teste ${list([...w])} d’un coup. Vert voudra dire bien placé, jaune ailleurs dans le mot, gris absent du mot.`,
+          ),
+          at,
+          play: typeIn(w),
+        };
+      }
+      const fb = guesses.map((g) => score(g, answer).join());
+      const cands = all.filter((w) => guesses.every((g, k) => score(g, w).join() === fb[k]));
+      if (!cands.length) return null;
+      // Any word that fits the colours; save the answer itself for when it's the only one left (or one of two).
+      const rest = cands.length > 2 ? cands.filter((w) => w !== answer) : cands;
+      const w = cands.length === 1 ? cands[0] : best(rest, cands);
+      const g = guesses[r - 1];
+      const f = score(g, answer);
+      const greens: string[] = [],
+        yellows: string[] = [],
+        greys: string[] = [];
+      f.forEach((st, k) => {
+        const ch = up(g[k]);
+        const into = st === 'hit' ? greens : st === 'near' ? yellows : greys;
+        if (!into.includes(ch) && !(st === 'out' && (greens.includes(ch) || yellows.includes(ch)))) into.push(ch);
+      });
+      const parts: string[] = [];
+      if (greens.length)
+        parts.push(
+          L(
+            `${greens.join(', ')} green: keep ${greens.length > 1 ? 'them' : 'it'} there`,
+            `${greens.join(', ')} en vert : on ${greens.length > 1 ? 'les' : 'le'} garde`,
+          ),
+        );
+      if (yellows.length)
+        parts.push(
+          L(
+            `${yellows.join(', ')} yellow: move ${yellows.length > 1 ? 'them' : 'it'}`,
+            `${yellows.join(', ')} en jaune : on ${yellows.length > 1 ? 'les' : 'le'} déplace`,
+          ),
+        );
+      if (greys.length)
+        parts.push(
+          L(
+            `${greys.join(', ')} grey: drop ${greys.length > 1 ? 'them' : 'it'}`,
+            `${greys.join(', ')} en gris : on ${greys.length > 1 ? 'les ' : 'l’'}écarte`,
+          ),
+        );
+      const first = parts.join('; ') + '.';
+      const second =
+        cands.length === 1
+          ? L(`Only ${up(w)} fits every clue.`, `Seul ${up(w)} respecte tous les indices.`)
+          : L(`${cands.length} words still fit; try ${up(w)}.`, `${cands.length} mots conviennent encore; essayez ${up(w)}.`);
+      return {
+        text: `${first[0].toUpperCase()}${first.slice(1)} ${second}`,
+        why: cells.slice((r - 1) * len, r * len),
+        at,
+        play: typeIn(w),
+      };
+    };
+
     return {
+      hint,
       snapshot: () => ({ g: guesses, cur }),
       onKey(e) {
         const v = keyValue(e);

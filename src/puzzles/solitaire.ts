@@ -1,8 +1,8 @@
 import './solitaire.css';
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, shake } from '../core/ui';
-import { cardEl, deck, fan, pileEl, slotEl, SUITS, tableEl } from './cardkit/cards';
+import { cap, cardEl, deck, elAt, fan, isRed, label, leCard, pileEl, rank, slotEl, suit, SUITS, tableEl, topEl } from './cardkit/cards';
 import {
   bestDest,
   canDraw,
@@ -190,6 +190,13 @@ export const solitaire: PuzzleDef = {
       after();
     };
 
+    /** Apply a validated move (tap, drop and the guide all come through here). */
+    const go = (p: string, i: number, to: string) => {
+      hist.push(s);
+      moveK(s, p, i, to);
+      after();
+    };
+
     bindTable(table, {
       canDrag: (p, i) => !over && p !== 's' && picked(s, p, i) != null,
       accepts: (p, i, to) => moveK(s, p, i, to[0] === 'f' ? 'f' : to, true),
@@ -206,18 +213,14 @@ export const solitaire: PuzzleDef = {
           bump(p, i);
           return;
         }
-        hist.push(s);
-        moveK(s, p, i, to);
-        after();
+        go(p, i, to);
       },
       drop(p, i, to) {
         if (over) return false;
         ctx.touch();
         const dest = to[0] === 'f' ? 'f' : to;
         if (!moveK(s, p, i, dest, true)) return false;
-        hist.push(s);
-        moveK(s, p, i, dest);
-        after();
+        go(p, i, dest);
         return true;
       },
     });
@@ -236,7 +239,132 @@ export const solitaire: PuzzleDef = {
     render();
     status();
 
+    let lastRule = '';
+    const hint = (): Hint | null => {
+      if (over) return null;
+      const cands: { rule: string; h: Hint }[] = [];
+      const fit = (dst: number) =>
+        L(
+          `one lower, ${isRed(dst) ? 'black on red' : 'red on black'}`,
+          `une valeur de moins, ${isRed(dst) ? 'noir sur rouge' : 'rouge sur noir'}`,
+        );
+      // Home: a top card that continues its foundation.
+      const homeFrom = (p: string, i: number, c: number) =>
+        cands.push({
+          rule: 'home',
+          h: {
+            text:
+              rank(c) === 1
+                ? L(
+                    `Aces go straight up: the ${label(c)} starts the ${SUITS[suit(c)]} foundation, which builds up to the king.`,
+                    `Les as montent tout de suite : ${leCard(c)} commence la fondation ${SUITS[suit(c)]}, qui monte jusqu’au roi.`,
+                  )
+                : L(
+                    `The ${label(c)} goes home on the ${label(c - 1)}: foundations build up by suit.`,
+                    `${cap(leCard(c))} monte sur ${leCard(c - 1)} : les fondations montent par sorte.`,
+                  ),
+            why: [elAt(table, p, i)!],
+            at: [topEl(table, 'f' + suit(c))!],
+            play: () => go(p, i, 'f'),
+          },
+        });
+      s.tab.forEach((col, a) => {
+        const i = col.d.length + col.u.length - 1;
+        if (col.u.length && moveK(s, 't' + a, i, 'f', true)) homeFrom('t' + a, i, col.u[col.u.length - 1]);
+      });
+      if (s.waste.length && moveK(s, 'w', s.waste.length - 1, 'f', true)) homeFrom('w', s.waste.length - 1, s.waste[s.waste.length - 1]);
+      // Reveal: move a whole face-up run off a face-down card, deepest pile first.
+      const order = s.tab.map((_, a) => a).sort((x, y) => s.tab[y].d.length - s.tab[x].d.length);
+      reveal: for (const a of order) {
+        const col = s.tab[a];
+        if (!col.d.length || !col.u.length) continue;
+        const i = col.d.length;
+        for (let b = 0; b < 7; b++) {
+          if (b === a || !moveK(s, 't' + a, i, 't' + b, true)) continue;
+          const c = col.u[0];
+          const dst = s.tab[b].u[s.tab[b].u.length - 1];
+          const n = col.u.length;
+          cands.push({
+            rule: dst == null ? 'king' : 'reveal',
+            h: {
+              text:
+                dst == null
+                  ? L(
+                      `Only a king may fill an empty column. Move the ${label(c)} there to turn over the hidden card it was on.`,
+                      `Seul un roi peut occuper une colonne vide. Déplacez-y ${leCard(c)} pour retourner la carte cachée dessous.`,
+                    )
+                  : L(
+                      `Move the ${label(c)}${n > 1 ? ` and ${n === 2 ? 'the card' : `the ${n - 1} cards`} on it` : ''} onto the ${label(dst)} (${fit(dst)}): the face-down card underneath turns over.`,
+                      `Déplacez ${leCard(c)}${n > 1 ? ` avec ${n === 2 ? 'la carte posée dessus' : `les ${n - 1} cartes posées dessus`}` : ''} sur ${leCard(dst)} (${fit(dst)}) : la carte cachée dessous se retourne.`,
+                    ),
+              why: [elAt(table, 't' + a, i)!],
+              at: [topEl(table, 't' + b)!],
+              play: () => go('t' + a, i, 't' + b),
+            },
+          });
+          break reveal;
+        }
+      }
+      // Waste: play the turned card onto the tableau.
+      if (s.waste.length) {
+        const i = s.waste.length - 1;
+        const c = s.waste[i];
+        for (let b = 0; b < 7; b++) {
+          if (!moveK(s, 'w', i, 't' + b, true)) continue;
+          const dst = s.tab[b].u[s.tab[b].u.length - 1];
+          cands.push({
+            rule: 'waste',
+            h: {
+              text:
+                dst == null
+                  ? L(
+                      `The ${label(c)} from the waste can fill the empty column: only kings may.`,
+                      `${cap(leCard(c))} du talon peut occuper la colonne vide : seuls les rois le peuvent.`,
+                    )
+                  : L(
+                      `Use the ${label(c)} from the waste: it fits on the ${label(dst)}, ${fit(dst)}.`,
+                      `Jouez ${leCard(c)} du talon : il va sur ${leCard(dst)}, ${fit(dst)}.`,
+                    ),
+              why: [elAt(table, 'w', i)!],
+              at: [topEl(table, 't' + b)!],
+              play: () => go('w', i, 't' + b),
+            },
+          });
+          break;
+        }
+      }
+      if (!cands.length) {
+        if (!canDraw(s, rules) || !hasProgress(s, rules)) return null;
+        lastRule = 'draw';
+        return {
+          text: s.stock.length
+            ? L(
+                `Nothing useful on the table: tap the stock to turn ${rules.draw === 1 ? 'a card' : 'three cards'} over, until the waste shows one that plays.`,
+                `Rien d’utile sur la table : touchez la pioche pour retourner ${rules.draw === 1 ? 'une carte' : 'trois cartes'}, jusqu’à ce que le talon en montre une qui se joue.`,
+              )
+            : L(
+                'The stock is empty: tap ↻ to turn the waste over and go through it again.',
+                'La pioche est vide : touchez ↻ pour retourner le talon et le parcourir de nouveau.',
+              ),
+          at: [topEl(table, 's')!],
+          play: () => {
+            if (!s.stock.length) return doDraw();
+            // Keep turning until the waste's top card has somewhere to go (or the stock runs out).
+            const plays = () => s.waste.length > 0 && bestDest(s, 'w', s.waste.length - 1) != null;
+            for (let n = s.stock.length; n > 0; n--) {
+              doDraw();
+              if (over || !s.stock.length || plays()) break;
+            }
+          },
+        };
+      }
+      const pick = cands.find((x) => x.rule !== lastRule) ?? cands[0];
+      lastRule = pick.rule;
+      return pick.h;
+    };
+
     return {
+      hint,
       snapshot: () => ({ s, hist: hist.stack }),
       onKey(e) {
         if (e.key === 'z' || e.key === 'Backspace') {

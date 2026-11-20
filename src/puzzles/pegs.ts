@@ -1,5 +1,5 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, shake } from '../core/ui';
 import { anim } from './movekit/kit';
 import { genPegs, jumps, type Jump } from './playkit/pegs-gen';
@@ -199,10 +199,146 @@ export const pegs: PuzzleDef = {
       }
       if (Number.isInteger(sv.sel) && peg[sv.sel as number]) sel = sv.sel as number;
     }
+    // ---- Guide ----
+    const won = (p: boolean[]) => p.filter(Boolean).length === 1 && (goal < 0 || p[goal]);
+    /** Can this position still be cleared? Memoised depth-first search with a node budget. */
+    const memo = new Map<string, boolean>();
+    let budget = 0;
+    const solvable = (p: boolean[]): boolean => {
+      if (won(p)) return true;
+      const key = p.map((v) => (v ? 1 : 0)).join('');
+      const m = memo.get(key);
+      if (m != null) return m;
+      if (--budget < 0) return false;
+      let ok = false;
+      for (const j of jumps(B, p)) {
+        const q = p.slice();
+        q[j.from] = q[j.over] = false;
+        q[j.to] = true;
+        if (solvable(q)) {
+          ok = true;
+          break;
+        }
+      }
+      memo.set(key, ok);
+      return ok;
+    };
+    const after = (j: Jump) => {
+      const q = peg.slice();
+      q[j.from] = q[j.over] = false;
+      q[j.to] = true;
+      return q;
+    };
+    /** Pegs with no other peg among their 8 neighbours: nothing can ever jump them or be jumped by them. */
+    const alone = (p: boolean[]) =>
+      p
+        .map((v, i) => {
+          if (!v) return -1;
+          const r = Math.floor(i / cols),
+            c = i % cols;
+          for (let dr = -1; dr <= 1; dr++)
+            for (let dc = -1; dc <= 1; dc++) {
+              const rr = r + dr,
+                cc = c + dc;
+              if ((dr || dc) && rr >= 0 && rr < rows && cc >= 0 && cc < cols && p[rr * cols + cc]) return -1;
+            }
+          return i;
+        })
+        .filter((i) => i >= 0);
+    let lastKind = '';
+    const hint = (): Hint | null => {
+      if (over) return null;
+      const all = jumps(B, peg);
+      if (!all.length) return null;
+      budget = 200000;
+      const good = all.filter((j) => solvable(after(j)));
+      const bad = all.filter((j) => !good.includes(j));
+      const pick = good[0] ?? all[0];
+      const left = count();
+      const base = { why: [cells[pick.from], cells[pick.over]], at: [cells[pick.to]], play: () => (tap(pick.from), tap(pick.to)) };
+      const kinds: { kind: string; text: string; why?: Element[] }[] = [];
+      if (!done.length)
+        kinds.push({
+          kind: 'start',
+          text: L(
+            'A peg jumps over a neighbouring peg into the empty hole just beyond it, and the peg it jumps over is removed. Start with this one.',
+            'Une bille saute par-dessus une bille voisine et atterrit dans le trou vide juste derrière; la bille sautée est retirée. Commencez par celle-ci.',
+          ),
+        });
+      if (left === 2)
+        kinds.push({
+          kind: 'last',
+          text: L(
+            `Two pegs left, side by side: jump one over the other to finish with a single peg${goal >= 0 ? ' in the centre' : ''}.`,
+            `Il reste deux billes côte à côte : sautez l’une par-dessus l’autre pour finir avec une seule bille${goal >= 0 ? ' au centre' : ''}.`,
+          ),
+        });
+      if (all.length === 1)
+        kinds.push({
+          kind: 'only',
+          text: L(
+            'Only one jump is possible right now: this is the only peg with a neighbour and an empty hole just beyond it.',
+            'Un seul saut est possible pour l’instant : c’est la seule bille qui a une voisine et un trou vide juste derrière.',
+          ),
+        });
+      if (good.length && bad.length) {
+        // Explain what a wrong jump would do.
+        const strand = bad.map((j) => ({ j, lone: alone(after(j)) })).find((x) => x.lone.length);
+        const dead = bad.find((j) => !jumps(B, after(j)).length);
+        if (strand)
+          kinds.push({
+            kind: 'strand',
+            text: L(
+              `Careful: ${all.length} jumps are possible, but ${bad.length === 1 && all.length === 2 ? 'the other would' : 'some would'} leave a peg alone with no neighbour, and it could never be removed. This one keeps the pegs together.`,
+              `Attention : ${all.length} sauts sont possibles, mais ${bad.length === 1 && all.length === 2 ? 'l’autre laisserait' : 'certains laisseraient'} une bille seule sans voisine, impossible à retirer. Celui-ci garde les billes ensemble.`,
+            ),
+          });
+        else if (dead)
+          kinds.push({
+            kind: 'dead',
+            text: L(
+              `Some jumps here would leave no jump at all, with ${left - 1} pegs still on the board. This one keeps the game going.`,
+              `Certains sauts ne laisseraient plus aucun saut possible, avec encore ${left - 1} billes. Celui-ci garde la partie en vie.`,
+            ),
+          });
+        else
+          kinds.push({
+            kind: 'plan',
+            text: L(
+              `${all.length} jumps are possible, but only ${good.length === 1 ? 'this one leaves' : 'some leave'} a way to clear the board. Think a few jumps ahead before you move.`,
+              `${all.length} sauts sont possibles, mais ${good.length === 1 ? 'seul celui-ci laisse' : 'seuls certains laissent'} une façon de vider le plateau. Prévoyez quelques sauts d’avance.`,
+            ),
+          });
+      }
+      // Does the jump bring the peg closer to the others?
+      const others = peg.map((v, i) => (v && i !== pick.from && i !== pick.over ? i : -1)).filter((i) => i >= 0);
+      const dist = (i: number) =>
+        others.reduce((t, o) => t + Math.abs(Math.floor(o / cols) - Math.floor(i / cols)) + Math.abs((o % cols) - (i % cols)), 0);
+      if (others.length && dist(pick.to) < dist(pick.from))
+        kinds.push({
+          kind: 'gather',
+          text: L(
+            'Jump toward the other pegs, not away from them: pegs that stay close together can keep jumping each other.',
+            'Sautez vers les autres billes, pas loin d’elles : des billes regroupées peuvent continuer à se sauter.',
+          ),
+        });
+      kinds.push({
+        kind: 'plain',
+        text: L(
+          'This jump removes a peg and still leaves a way to clear the board down to one.',
+          'Ce saut retire une bille et laisse encore une façon de vider le plateau jusqu’à une seule.',
+        ),
+      });
+      const k = kinds.find((x) => x.kind !== lastKind) ?? kinds[0];
+      lastKind = k.kind;
+      return { ...base, text: k.text, why: k.why ?? base.why };
+    };
+
     root.append(grid);
     render();
     return {
       snapshot: () => ({ moves: done.map((j) => [j.from, j.to]), sel }),
+      hint,
       onKey(e) {
         const k = e.key.toLowerCase();
         if (k === 'z' || k === 'backspace') undo();

@@ -172,3 +172,8 @@
   --y: 0;
   --dx: 0;
 }
+
+/* The "?" guide stage is narrower than the feed card: size the table to it. */
+.guide-board .ctable {
+  --tw: calc(var(--fit) + 40px);
+}

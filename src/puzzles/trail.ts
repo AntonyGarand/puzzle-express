@@ -1,8 +1,8 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, s, shake } from '../core/ui';
 import { keyDir } from './movekit/kit';
-import { adjacent, capture, cellAt, pts, stepsToward } from './pathkit/grid';
+import { adjacent, capture, cellAt, nbrs, pts, stepsToward } from './pathkit/grid';
 import { genTrail, wallKey } from './playkit/trail-gen';
 import './trail.css';
 
@@ -198,10 +198,208 @@ export const trail: PuzzleDef = {
       });
       if (!ok) path.length = 1;
     }
+    // ---- Guide ----
+    const open = (a: number, b: number) => !walls.has(wallKey(a, b));
+    /** Free neighbours of j: unvisited cells reachable without crossing a wall. */
+    const freeNb = (j: number, on: Set<number>) => nbrs(j, n, n).filter((x) => !on.has(x) && open(j, x));
+    /** Unvisited cells no longer connected to x once the path moves there (`on` includes x). */
+    const strandedBy = (x: number, on: Set<number>) => {
+      const seen = new Set([x]);
+      const st = [x];
+      while (st.length)
+        for (const y of freeNb(st.pop()!, on))
+          if (!seen.has(y)) {
+            seen.add(y);
+            st.push(y);
+          }
+      const out: number[] = [];
+      for (let i = 0; i < N; i++) if (!on.has(i) && !seen.has(i)) out.push(i);
+      return out;
+    };
+    /** Steps from `from` that respect walls, the path and the number order, and don't end the path early. */
+    const options = (from: number, on: Set<number>, next: number) =>
+      nbrs(from, n, n).filter(
+        (j) => from !== end && open(from, j) && !on.has(j) && (!marks[j] || marks[j] === next) && (j !== end || on.size === N - 1),
+      );
+    /** A full solution continuing the current path (the generated one if we're on it, else a bounded search). */
+    const solve = (): number[] | null => {
+      if (path.every((x, k) => P.path[k] === x)) return P.path;
+      const cur = path.slice();
+      const on = new Set(cur);
+      let budget = 200000;
+      const go = (next: number): boolean => {
+        if (--budget < 0) return false;
+        const head = cur[cur.length - 1];
+        if (cur.length === N) return head === end;
+        for (const j of options(head, on, next)) {
+          on.add(j);
+          if (!strandedBy(j, on).length) {
+            cur.push(j);
+            if (go(marks[j] ? next + 1 : next)) return true;
+            cur.pop();
+          }
+          on.delete(j);
+        }
+        return false;
+      };
+      return go(nextMark()) ? cur : null;
+    };
+    const DIRS_EN = ['up', 'right', 'down', 'left'];
+    const DIRS_FR = ['vers le haut', 'vers la droite', 'vers le bas', 'vers la gauche'];
+    const way = (a: number, b: number) => {
+      const k = b === a - n ? 0 : b === a + 1 ? 1 : b === a + n ? 2 : 3;
+      return L(DIRS_EN[k], DIRS_FR[k]);
+    };
+    /** Same as pressing the arrow keys: extend the path one cell at a time. */
+    const extend = (add: number[]) => () => {
+      for (const j of add) if (canEnter(path[path.length - 1], j)) path.push(j);
+      check();
+    };
+    let lastRule: (() => Hint | null) | undefined;
+    const hint = (): Hint | null => {
+      if (finished) return null;
+      const on = new Set(path);
+      const head = path[path.length - 1];
+      const next = nextMark();
+      const sol = solve();
+      if (!sol) {
+        // Off track: cut the path back to the last cell that agrees with the solution.
+        let k = 0;
+        while (k + 1 < path.length && P.path[k + 1] === path[k + 1]) k++;
+        return {
+          text: L(
+            'This path can’t cover every cell any more. Tap an earlier cell to cut it back there and try another way.',
+            'Ce chemin ne peut plus couvrir toutes les cases. Touchez une case plus tôt pour le couper là et essayez autrement.',
+          ),
+          at: [cells[path[k]]],
+          play: () => {
+            path.length = k + 1;
+            check();
+          },
+        };
+      }
+      const opts = options(head, on, next);
+      const pre = (en: string, fr: string) =>
+        path.length === 1
+          ? L(`The path starts on 1 and must visit every cell. ${en}`, `Le chemin part du 1 et doit passer par toutes les cases. ${fr}`)
+          : L(en, fr);
+      const forced = (): Hint | null => {
+        if (opts.length !== 1) return null;
+        // Follow the chain while each step stays the only way on.
+        const add: number[] = [];
+        const seen = new Set(on);
+        let cur = head,
+          nx = next;
+        for (;;) {
+          const o = options(cur, seen, nx);
+          if (o.length !== 1 || add.length >= 4) break;
+          add.push(o[0]);
+          seen.add(o[0]);
+          if (marks[o[0]]) nx++;
+          cur = o[0];
+        }
+        return {
+          text: pre(
+            `Only one way on from here: walls, the edge or the path itself block every other side. Go ${way(head, add[0])}${add.length > 1 ? ' and keep going while there’s no choice' : ''}.`,
+            `Une seule issue d’ici : les murs, le bord ou le chemin lui-même bloquent les autres côtés. Allez ${way(head, add[0])}${add.length > 1 ? ' et continuez tant qu’il n’y a pas de choix' : ''}.`,
+          ),
+          why: [cells[head]],
+          at: add.map((x) => cells[x]),
+          play: extend(add),
+        };
+      };
+      const deadEnd = (): Hint | null => {
+        for (const j of opts) {
+          if (j === end) continue;
+          const exits = freeNb(j, on).filter((x) => x !== head);
+          if (exits.length > 1) continue;
+          return {
+            text: pre(
+              `This cell has ${exits.length ? 'only one other neighbour it can connect to' : 'no other open neighbour'}. Enter it now, or it can only become a dead end later.`,
+              `Cette case n’a ${exits.length ? 'qu’une seule autre voisine accessible' : 'aucune autre voisine accessible'}. Entrez-y maintenant, sinon elle deviendra un cul-de-sac.`,
+            ),
+            why: [cells[head], ...exits.map((x) => cells[x])],
+            at: [cells[j]],
+            play: extend([j]),
+          };
+        }
+        return null;
+      };
+      const split = (): Hint | null => {
+        if (opts.length < 2) return null;
+        // Why a step fails: it cuts cells off, or leaves a cell with fewer than two ways in.
+        const flaw = opts.map((x) => {
+          const on2 = new Set([...on, x]);
+          const cut = strandedBy(x, on2);
+          if (cut.length) return { cut, dead: -1 };
+          for (let y = 0; y < N; y++) {
+            if (on2.has(y) || y === end) continue;
+            const deg = freeNb(y, on2).length + (adjacent(x, y, n) && open(x, y) ? 1 : 0);
+            if (deg < 2) return { cut, dead: y };
+          }
+          return null;
+        });
+        const good = opts.filter((_, k) => !flaw[k]);
+        if (good.length !== 1) return null;
+        const k = flaw.findIndex((f) => f);
+        const f = flaw[k]!;
+        const m = f.cut.length;
+        return {
+          text:
+            f.dead >= 0
+              ? pre(
+                  `Going ${way(head, opts[k])} would leave this cell with only one way in, so the path would get stuck there. Go ${way(head, good[0])}.`,
+                  `Aller ${way(head, opts[k])} laisserait cette case avec un seul accès : le chemin y resterait coincé. Allez ${way(head, good[0])}.`,
+                )
+              : pre(
+                  `Going ${way(head, opts[k])} would cut off ${m === 1 ? 'a cell' : `${m} cells`} from the rest, and the path could never come back for ${m === 1 ? 'it' : 'them'}. Go ${way(head, good[0])}.`,
+                  `Aller ${way(head, opts[k])} isolerait ${m === 1 ? 'une case' : `${m} cases`} du reste, et le chemin ne pourrait plus y revenir. Allez ${way(head, good[0])}.`,
+                ),
+          why: f.dead >= 0 ? [cells[f.dead]] : f.cut.map((x) => cells[x]),
+          at: [cells[good[0]]],
+          play: extend([good[0]]),
+        };
+      };
+      const checkpoint = (): Hint | null => {
+        const j = sol[path.length];
+        if (marks[j] !== next || !cps[next]) return null;
+        return {
+          text: pre(
+            `Numbers are passed in order, and ${next} is next. It sits right beside the end of the path: step onto it.`,
+            `Les numéros se franchissent dans l’ordre, et le ${next} est le prochain. Il est juste à côté du bout du chemin : avancez dessus.`,
+          ),
+          why: [cps[next - 1] ?? cells[head]],
+          at: [cells[j]],
+          play: extend([j]),
+        };
+      };
+      const rules = [forced, deadEnd, split, checkpoint];
+      for (const rule of [...rules.filter((r) => r !== lastRule), lastRule]) {
+        const found = rule?.();
+        if (found) {
+          lastRule = rule;
+          return found;
+        }
+      }
+      lastRule = undefined;
+      const j = sol[path.length];
+      if (j == null) return null;
+      return {
+        text: pre(
+          `Head ${way(head, j)}. Try the other ways and you’ll find they leave cells the path can’t cover before it reaches ${next} in order.`,
+          `Allez ${way(head, j)}. Les autres choix laissent des cases que le chemin ne pourrait plus couvrir en atteignant le ${next} dans l’ordre.`,
+        ),
+        why: cps[next] ? [cps[next]] : [cells[head]],
+        at: [cells[j]],
+        play: extend([j]),
+      };
+    };
+
     root.append(grid);
     render();
     return {
       snapshot: () => ({ path }),
+      hint,
       onKey(e) {
         const dir = keyDir(e);
         if (dir == null || finished) return false;

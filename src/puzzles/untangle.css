@@ -44,3 +44,10 @@
 [data-puzzle='untangle'].is-solved .untangle line {
   stroke: var(--ink);
 }
+.untangle .ghost {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 0.9;
+  stroke-dasharray: 2 1.5;
+  pointer-events: none;
+}

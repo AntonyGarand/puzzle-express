@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h, s } from '../core/ui';
 
 // Connection bits: N=1 E=2 S=4 W=8
@@ -152,15 +152,153 @@ export const pipes: PuzzleDef = {
       ctx.status(L(`${lit.size} / ${n * n} connected`, `${lit.size} / ${n * n} reliées`));
       return lit.size === n * n && loose === 0;
     };
+    let done = false;
     const turn = (i: number, k: number) => {
       ctx.touch();
       turns[i] += k;
-      if (render()) ctx.solved();
+      if (render()) {
+        done = true;
+        ctx.solved();
+      }
+    };
+
+    // ---- guide: deduce orientations from the border and from neighbours already pinned ----
+    const degOf = (m: number) => DIRS.filter((dd) => m & dd.bit).length;
+    const TYPE_EN = ['end piece', 'straight pipe', 'bend', 'T piece', 'cross'];
+    const TYPE_FR = ['ce bout', 'ce tuyau droit', 'ce coude', 'ce té', 'cette croix'];
+    const kind = (m: number) => {
+      const sd = degOf(m);
+      return sd === 1 ? 0 : sd === 2 ? (m === 5 || m === 10 ? 1 : 2) : sd === 3 ? 3 : 4;
+    };
+    const SIDE_EN = ['above', 'to the right', 'below', 'to the left'];
+    const SIDE_FR = ['au-dessus', 'à droite', 'au-dessous', 'à gauche'];
+    const nb = (i: number, sd: number) => {
+      const r = Math.floor(i / n) + DIRS[sd].dr,
+        c = (i % n) + DIRS[sd].dc;
+      return r >= 0 && r < n && c >= 0 && c < n ? r * n + c : -1;
+    };
+    type Fact = { i: number; mask: number; why: 'border' | 'open' | 'closed' | 'pair'; from: number[]; side: number };
+    const deduce = () => {
+      const N2 = n * n;
+      const cand = base.map((m) => [...new Set([0, 1, 2, 3].map((t) => rot(m, t)))]);
+      const edge = new Int8Array(N2 * 4).fill(-1);
+      const set = (i: number, sd: number, v: number) => {
+        edge[i * 4 + sd] = v;
+        const j = nb(i, sd);
+        if (j >= 0) edge[j * 4 + ((sd + 2) % 4)] = v;
+      };
+      for (let i = 0; i < N2; i++) for (let sd = 0; sd < 4; sd++) if (nb(i, sd) < 0) edge[i * 4 + sd] = 0;
+      const facts: Fact[] = [];
+      const fixed = new Uint8Array(N2);
+      // Rounds read the edges known at the start of the round, so simple (border) facts come first.
+      for (let changed = true, round = 0; changed; round++) {
+        changed = false;
+        const snap = edge.slice();
+        for (let i = 0; i < N2; i++) {
+          if (fixed[i]) continue;
+          const before = cand[i].length;
+          // Neighbour sides already known: these are the clues for this tile.
+          const sides = [0, 1, 2, 3].filter((sd) => nb(i, sd) >= 0 && snap[i * 4 + sd] >= 0);
+          let pair = -1;
+          cand[i] = cand[i].filter((m) =>
+            DIRS.every((dd, sd) => {
+              const e = snap[i * 4 + sd];
+              if (e >= 0 && ((m & dd.bit) > 0 ? 1 : 0) !== e) return false;
+              // Two end pieces joined to each other would be cut off from everything else.
+              const j = nb(i, sd);
+              if (round && m & dd.bit && j >= 0 && N2 > 2 && degOf(base[i]) === 1 && degOf(base[j]) === 1) {
+                pair = j;
+                return false;
+              }
+              return true;
+            }),
+          );
+          if (cand[i].length === before) continue;
+          changed = true;
+          for (let sd = 0; sd < 4; sd++) {
+            const v = cand[i].every((m) => m & DIRS[sd].bit) ? 1 : cand[i].every((m) => !(m & DIRS[sd].bit)) ? 0 : -1;
+            if (v >= 0 && edge[i * 4 + sd] < 0) set(i, sd, v);
+          }
+          if (cand[i].length === 1) {
+            fixed[i] = 1;
+            const openSide = sides.find((sd) => edge[i * 4 + sd] === 1 && fixed[nb(i, sd)]);
+            const fact: Fact =
+              pair >= 0
+                ? { i, mask: cand[i][0], why: 'pair', from: [pair], side: -1 }
+                : openSide != null
+                  ? { i, mask: cand[i][0], why: 'open', from: [nb(i, openSide)], side: openSide }
+                  : sides.length
+                    ? { i, mask: cand[i][0], why: 'closed', from: sides.map((sd) => nb(i, sd)), side: sides[0] }
+                    : { i, mask: cand[i][0], why: 'border', from: [], side: -1 };
+            facts.push(fact);
+          }
+        }
+      }
+      return facts;
+    };
+    const turnsTo = (i: number, mask: number) => [1, -1, 2].find((k) => rot(base[i], turns[i] + k) === mask) ?? 0;
+    let lastWhy = '';
+    const hint = (): Hint | null => {
+      if (done || base.every((m, i) => cur(i) === m)) return null;
+      // Tiles pinned by the deduction but turned wrong; their clue tiles must already sit right.
+      const facts = deduce();
+      const ready = facts.filter(
+        (x, k) => cur(x.i) !== x.mask && facts.slice(0, k).every((y) => !x.from.includes(y.i) || cur(y.i) === y.mask),
+      );
+      const f = ready.find((x) => x.why !== lastWhy) ?? ready[0];
+      if (f) lastWhy = f.why;
+      const play = (i: number, mask: number) => () => {
+        const k = turnsTo(i, mask);
+        for (let t = 0; t < Math.abs(k); t++) turn(i, Math.sign(k));
+      };
+      if (f) {
+        const t = kind(base[f.i]);
+        const en = TYPE_EN[t];
+        const fr = TYPE_FR[t];
+        const r = Math.floor(f.i / n),
+          c = f.i % n;
+        const corner = (r === 0 || r === n - 1) && (c === 0 || c === n - 1);
+        const edgy = r === 0 || r === n - 1 || c === 0 || c === n - 1;
+        const text =
+          f.why === 'border'
+            ? L(
+                `Pipes can’t point off the board, so this ${en} ${corner ? 'in the corner' : 'on the edge'} fits only one way. Tap to turn it.`,
+                `Aucun tuyau ne peut pointer hors de la grille : ${fr} ${corner ? 'dans le coin' : 'sur le bord'} n’a qu’une position. Touchez pour le tourner.`,
+              )
+            : f.why === 'open'
+              ? L(
+                  `The tile ${SIDE_EN[f.side]} points into this one, so this ${en} must connect back to it.`,
+                  `La tuile ${SIDE_FR[f.side]} pointe vers celle-ci : ${fr} doit donc s’y raccorder.`,
+                )
+              : f.why === 'pair'
+                ? L(
+                    `Two end pieces facing each other would be cut off from the source${edgy ? ', and pipes can’t point off the board' : ''}. That leaves one way for this end piece: tap to turn it.`,
+                    `Deux bouts face à face seraient coupés de la source${edgy ? ', et aucun tuyau ne pointe hors de la grille' : ''}. Il ne reste qu’une position pour ce bout : touchez pour le tourner.`,
+                  )
+                : L(
+                    `The tile ${SIDE_EN[f.side]} has no opening toward this one${edgy ? ' and nothing may point off the board' : ''}, so this ${en} fits only one way.`,
+                    `La tuile ${SIDE_FR[f.side]} n’a pas d’ouverture de ce côté${edgy ? ' et rien ne pointe hors de la grille' : ''} : ${fr} n’a qu’une position.`,
+                  );
+        return { text, why: f.from.map((j) => cells[j]), at: [cells[f.i]], play: play(f.i, f.mask) };
+      }
+      // No simple deduction left: join the lit network.
+      const lit = cells.map((el) => el.classList.contains('lit'));
+      const i = base.findIndex((m, j) => cur(j) !== m && [0, 1, 2, 3].some((sd) => nb(j, sd) >= 0 && lit[nb(j, sd)]));
+      const j = i >= 0 ? i : base.findIndex((m, x) => cur(x) !== m);
+      return {
+        text: L(
+          'Turn this tile so it joins the lit pipes without leaving a loose end. Everything must reach the source.',
+          'Tournez cette tuile pour la raccorder aux tuyaux allumés sans bout libre. Tout doit rejoindre la source.',
+        ),
+        why: [cells[src]],
+        at: [cells[j]],
+        play: play(j, base[j]),
+      };
     };
     const sv = ctx.saved as { turns?: number[] } | undefined;
     if (sv?.turns?.length === turns.length) sv.turns.forEach((t, i) => (turns[i] = t));
     root.append(grid);
     render();
-    return { snapshot: () => ({ turns }) };
+    return { hint, snapshot: () => ({ turns }) };
   },
 };

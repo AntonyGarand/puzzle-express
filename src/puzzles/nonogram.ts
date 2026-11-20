@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
 import './nonogram.css';
 
@@ -17,6 +17,41 @@ const runs = (line: boolean[]) => {
   return out;
 };
 const same = (a: number[], b: number[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/**
+ * Every way to place `clue`'s blocks in a line that agrees with `st` (1 filled, 2 ✕, 0 unknown),
+ * folded into "always filled" / "always empty" per cell. Null when nothing fits.
+ */
+function lineSolve(clue: number[], st: number[]): { fill: boolean[]; empty: boolean[]; ways: number } | null {
+  const n = st.length;
+  const fill = new Array<boolean>(n).fill(true);
+  const empty = new Array<boolean>(n).fill(true);
+  const cur = new Array<boolean>(n).fill(false);
+  let ways = 0;
+  const rec = (b: number, from: number) => {
+    if (b === clue.length) {
+      for (let i = from; i < n; i++) if (st[i] === 1) return;
+      ways++;
+      for (let i = 0; i < n; i++) {
+        if (!cur[i]) fill[i] = false;
+        else empty[i] = false;
+      }
+      return;
+    }
+    const len = clue[b];
+    for (let s = from; s + len <= n; s++) {
+      if (s > from && st[s - 1] === 1) break;
+      let ok = true;
+      for (let i = s; i < s + len && ok; i++) ok = st[i] !== 2;
+      if (!ok || st[s + len] === 1) continue;
+      for (let i = s; i < s + len; i++) cur[i] = true;
+      rec(b + 1, s + len + 1);
+      for (let i = s; i < s + len; i++) cur[i] = false;
+    }
+  };
+  rec(0, 0);
+  return ways ? { fill, empty, ways } : null;
+}
 
 export const nonogram: PuzzleDef = {
   id: 'nonogram',
@@ -191,8 +226,114 @@ export const nonogram: PuzzleDef = {
     root.append(wrap);
     render();
 
+    type Kind = 'zero' | 'fit' | 'overlap' | 'done' | 'fill' | 'empty';
+    let last: Kind | undefined;
+    const used = new Map<Kind, number>();
+    /** The next line deduction for the guide, from the clues and the cells already filled or marked. */
+    const hint = (): Hint | null => {
+      if (done) return null;
+      const found: { kind: Kind; row: boolean; k: number; clue: number[]; ix: number[]; v: number; ways: number }[] = [];
+      for (const isRow of [true, false])
+        for (let k = 0; k < n; k++) {
+          const ix = Array.from({ length: n }, (_, j) => (isRow ? k * n + j : j * n + k));
+          const clue = (isRow ? rowClues : colClues)[k];
+          const line = ix.map((i) => st[i]);
+          if (!line.includes(0)) continue;
+          const res = lineSolve(clue, line);
+          if (!res) continue;
+          const blank = line.every((v) => v === 0);
+          const fills = ix.filter((_, j) => line[j] === 0 && res.fill[j]);
+          const empties = ix.filter((_, j) => line[j] === 0 && res.empty[j]);
+          const sum = clue.reduce((a, b) => a + b, 0);
+          if (!clue.length) found.push({ kind: 'zero', row: isRow, k, clue, ix: empties, v: 2, ways: res.ways });
+          else if (fills.length)
+            found.push({
+              kind: sum + clue.length - 1 === n ? 'fit' : blank ? 'overlap' : 'fill',
+              row: isRow,
+              k,
+              clue,
+              ix: fills,
+              v: 1,
+              ways: res.ways,
+            });
+          if (clue.length && empties.length) {
+            const complete = line.filter((v) => v === 1).length === sum && empties.length === line.filter((v) => v === 0).length;
+            found.push({ kind: complete ? 'done' : 'empty', row: isRow, k, clue, ix: empties, v: 2, ways: res.ways });
+          }
+        }
+      const order: Kind[] = ['zero', 'fit', 'overlap', 'done', 'fill', 'empty'];
+      // Simplest rule first, but show rules not seen yet before repeating one.
+      const rank = (k: Kind) => ((used.get(k) ?? 0) + (k === last ? 1 : 0)) * order.length + order.indexOf(k);
+      found.sort((a, b) => rank(a.kind) - rank(b.kind) || b.ix.length - a.ix.length);
+      const f = found[0];
+      if (!f) {
+        // Nothing a single line decides: lean on the picture's solution, honestly.
+        const i = st.findIndex((v, j) => v === 0 && sol[j]);
+        if (i < 0) return null;
+        last = undefined;
+        return {
+          text: L(
+            'No single line decides more right now. This cell belongs to the picture: filling it fits both its row and its column.',
+            'Aucune ligne seule n’en dit plus pour l’instant. Cette case fait partie de l’image : la remplir convient à sa rangée comme à sa colonne.',
+          ),
+          at: [cells[i]],
+          play: () => set(i, 1),
+        };
+      }
+      last = f.kind;
+      used.set(f.kind, (used.get(f.kind) ?? 0) + 1);
+      const name = f.row ? L(`Row ${f.k + 1}`, `La rangée ${f.k + 1}`) : L(`Column ${f.k + 1}`, `La colonne ${f.k + 1}`);
+      const lower = name.toLowerCase();
+      const cl = f.clue.join(' ');
+      const many = f.clue.length > 1;
+      const them = f.ix.length > 1;
+      const text =
+        f.kind === 'zero'
+          ? L(
+              `${name}’s clue is 0: nothing is filled there. Mark it all ✕.`,
+              `L’indice de ${lower} est 0 : rien n’y est rempli. Marquez tout d’un ✕.`,
+            )
+          : f.kind === 'fit'
+            ? L(
+                `${many ? `The blocks ${cl} with their gaps take` : `The ${cl} takes`} all ${n} cells of ${lower}: no room to slide, so fill ${many ? 'them' : 'it'} in.`,
+                `${many ? `Les blocs ${cl} et leurs espaces prennent` : `Le ${cl} prend`} les ${n} cases de ${lower} : aucune marge, remplissez.`,
+              )
+            : f.kind === 'overlap'
+              ? L(
+                  `However you slide ${many ? `the blocks ${cl}` : `a block of ${cl}`} along ${lower}, ${them ? 'these cells are' : 'this cell is'} always covered. Fill ${them ? 'them' : 'it'}.`,
+                  `Peu importe où glissent ${many ? `les blocs ${cl}` : `les ${cl} cases du bloc`} dans ${lower}, ${them ? 'ces cases sont toujours couvertes' : 'cette case est toujours couverte'}. Remplissez.`,
+                )
+              : f.kind === 'done'
+                ? L(
+                    `${name} already shows all of its ${cl}, so its other cells are empty. Tap twice (or long-press) to mark ✕.`,
+                    `${name} montre déjà tout son ${cl} : ses autres cases sont vides. Touchez deux fois (ou appuyez longuement) pour un ✕.`,
+                  )
+                : f.kind === 'fill'
+                  ? f.ways === 1
+                    ? L(
+                        `With what’s already in ${lower}, ${cl} fits only one way, which fills ${them ? 'these cells' : 'this cell'}.`,
+                        `Avec ce qui est déjà dans ${lower}, ${cl} ne se place que d’une façon, qui remplit ${them ? 'ces cases' : 'cette case'}.`,
+                      )
+                    : L(
+                        `With what’s already in ${lower}, every way to fit ${cl} fills ${them ? 'these cells' : 'this cell'}.`,
+                        `Avec ce qui est déjà dans ${lower}, toutes les façons de placer ${cl} remplissent ${them ? 'ces cases' : 'cette case'}.`,
+                      )
+                  : L(
+                      `With what’s already in ${lower}, no way to fit ${cl} reaches ${them ? 'these cells' : 'this cell'}: mark ✕.`,
+                      `Avec ce qui est déjà dans ${lower}, aucune façon de placer ${cl} n’atteint ${them ? 'ces cases' : 'cette case'} : marquez ✕.`,
+                    );
+      const ix = f.ix;
+      return {
+        text,
+        why: [(f.row ? rowEls : colEls)[f.k]],
+        at: ix.map((i) => cells[i]),
+        play: () => ix.forEach((i) => !done && st[i] === 0 && set(i, f.v)),
+      };
+    };
+
     const DIRS: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
     return {
+      hint,
       snapshot: () => ({ st, cur }),
       onKey(e) {
         if (done) return false;

@@ -1,5 +1,5 @@
-import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { L, locale, P } from '../core/i18n';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, s as svg, shake } from '../core/ui';
 import { adjacent, findPath, makeGrid, points } from './wordkit/hunt-solver';
 import { dictReady, isWord, letterKey, whenDict } from './wordkit/lexicon';
@@ -320,8 +320,133 @@ export const hunt: PuzzleDef = {
     render();
     whenDict(() => renderWord());
 
+    // ---------- guide ----------
+    const CHUNKS = locale() === 'fr' ? ['qu', 'ou', 'on', 'en', 'er', 'es', 'ai', 'ch'] : ['th', 'ing', 'er', 'ed', 'st', 'ch', 'ea', 'ou'];
+    const up = (s: string) => s.toUpperCase();
+    const pts = (w: string) => P(points(w.length), ['pt', 'pts'], ['pt', 'pts']);
+    let lastRule = '';
+    const used = new Map<string, number>();
+    const hint = (): Hint | null => {
+      if (won) return null;
+      const left = listed
+        .filter((w) => !found.includes(w))
+        .map((w) => ({ w, p: findPath(letters, n, w)! }))
+        .filter((x) => x.p)
+        .sort((a, b) => a.w.length - b.w.length || (a.w < b.w ? -1 : 1));
+      if (!left.length) return null;
+      const els = (ix: number[]) => ix.map((i) => cells[i]);
+      const make = (x: { w: string; p: number[] }, text: string, why: Element[] = [], at = els(x.p)): Hint => ({
+        text,
+        why,
+        at,
+        play: () => {
+          path = x.p;
+          render();
+          submit();
+        },
+      });
+      const diagAt = (p: number[]) =>
+        p.findIndex((v, k) => k > 0 && Math.floor(v / n) !== Math.floor(p[k - 1] / n) && v % n !== p[k - 1] % n);
+      const rules: Record<string, () => Hint | null> = {
+        extend: () => {
+          for (const f of [...found].reverse()) {
+            const x = left.find((y) => y.w.length > f.length && y.w.startsWith(f));
+            const tag = [...foundEl.children].find((el) => el.textContent === f);
+            if (x)
+              return make(
+                x,
+                L(
+                  `You found ${up(f)}: add ${up(x.w.slice(f.length))} to make ${up(x.w)}, worth ${pts(x.w)}. Both words count.`,
+                  `Vous avez trouvé ${up(f)} : ajoutez ${up(x.w.slice(f.length))} pour former ${up(x.w)}, qui vaut ${pts(x.w)}. Les deux mots comptent.`,
+                ),
+                tag ? [tag] : [],
+              );
+          }
+          return null;
+        },
+        diag: () => {
+          const x = left.find((y) => diagAt(y.p) > 0);
+          if (!x) return null;
+          const k = diagAt(x.p);
+          return make(
+            x,
+            L(
+              `Diagonals count too: ${up(x.w)} goes corner to corner from ${up(x.w[k - 1])} to ${up(x.w[k])}.`,
+              `Les diagonales comptent aussi : ${up(x.w)} passe en diagonale entre ${up(x.w[k - 1])} et ${up(x.w[k])}.`,
+            ),
+          );
+        },
+        long: () => {
+          const x = left[left.length - 1];
+          if (x.w.length < minLen + 2) return null;
+          return make(
+            x,
+            L(
+              `Longer words pay more: ${up(x.w)} has ${x.w.length} letters and is worth ${pts(x.w)}, against 1 pt for 3 letters.`,
+              `Les mots longs rapportent plus : ${up(x.w)} a ${x.w.length} lettres et vaut ${pts(x.w)}, contre 1 pt pour 3 lettres.`,
+            ),
+            [bar],
+          );
+        },
+        chunk: () => {
+          for (const c of CHUNKS) {
+            const x = left.find((y) => y.w.includes(c) && y.w.length > c.length);
+            if (!x) continue;
+            const k = x.w.indexOf(c);
+            const inChunk = x.p.slice(k, k + c.length);
+            return make(
+              x,
+              L(
+                `Spot common chunks like ${up(c)}: build around these tiles and ${up(x.w)} appears.`,
+                `Repérez les groupes courants comme ${up(c)} : bâtissez autour de ces tuiles et ${up(x.w)} apparaît.`,
+              ),
+              els(inChunk),
+              els(x.p.filter((i) => !inChunk.includes(i))),
+            );
+          }
+          return null;
+        },
+        any: () => {
+          const x = left[0];
+          return make(
+            x,
+            L(
+              `${up(x.w)} is hidden here too. Each tile counts only once per word, but tiles can be reused in other words.`,
+              `${up(x.w)} se cache ici aussi. Une tuile ne sert qu’une fois par mot, mais elle peut resservir dans d’autres mots.`,
+            ),
+          );
+        },
+      };
+      if (!found.length) {
+        lastRule = 'start';
+        const x = left.find((y) => diagAt(y.p) < 0) ?? left[0];
+        return make(
+          x,
+          L(
+            `Start with short words: ${up(x.w)} is a chain of touching letters. Drag through them (or tap each one) to submit it for ${pts(x.w)}.`,
+            `Commencez par des mots courts : ${up(x.w)} est une chaîne de lettres qui se touchent. Glissez dessus (ou touchez-les une à une) pour ${pts(x.w)}.`,
+          ),
+        );
+      }
+      // Rules not shown yet first, then the least used; never the same one twice in a row if avoidable.
+      const order = ['extend', 'diag', 'long', 'chunk', 'any'];
+      const ranked = order
+        .map((o, k) => ({ o, k, n: (used.get(o) ?? 0) + (o === lastRule ? 100 : 0) }))
+        .sort((a, b) => a.n - b.n || a.k - b.k);
+      for (const { o } of ranked) {
+        const got = rules[o]();
+        if (got) {
+          lastRule = o;
+          used.set(o, (used.get(o) ?? 0) + 1);
+          return got;
+        }
+      }
+      return null;
+    };
+
     let typed = '';
     return {
+      hint,
       snapshot: () => ({ f: found, p: path }),
       onKey(e) {
         if (won) return false;

@@ -169,9 +169,20 @@ function solveBridges(
   return { count, complete: nodes <= budget };
 }
 
+/** How well the islands use the board: grid edges touched (0-4), then how many 3x3 zones are occupied. */
+function spread(n: number, isl: { r: number; c: number }[]) {
+  const rs = isl.map((s) => s.r),
+    cs = isl.map((s) => s.c);
+  const edges = +(Math.min(...rs) === 0) + +(Math.max(...rs) === n - 1) + +(Math.min(...cs) === 0) + +(Math.max(...cs) === n - 1);
+  const zone = (v: number) => Math.min(2, Math.floor((v * 3) / n));
+  const zones = new Set(isl.map((s) => zone(s.r) * 3 + zone(s.c))).size;
+  return edges * 10 + zones;
+}
+
 export function genBridges(n: number, target: number, rng: Rng): BridgesPuzzle {
   let best: BridgesPuzzle | null = null;
-  for (let attempt = 0; attempt < 25; attempt++) {
+  let bestScore = -1;
+  for (let attempt = 0; attempt < 40; attempt++) {
     const isl: { r: number; c: number }[] = [];
     const at = new Int16Array(n * n).fill(-1);
     const used = new Uint8Array(n * n); // cells covered by a bridge
@@ -185,21 +196,24 @@ export function genBridges(n: number, target: number, rng: Rng): BridgesPuzzle {
       cells.forEach((x) => (used[x] = 1));
       links.set(`${Math.min(a, b)},${Math.max(a, b)}`, rng.chance(0.35) ? 2 : 1);
     };
-    add(rng.int(0, n - 1), rng.int(0, n - 1));
-    for (let tries = 0; tries < target * 40 && isl.length < target; tries++) {
+    // Start on the border so the puzzle reaches the edges of the grid.
+    const side = rng.int(0, 3),
+      along = rng.int(0, n - 1);
+    add(side === 0 ? 0 : side === 1 ? n - 1 : along, side === 2 ? 0 : side === 3 ? n - 1 : along);
+    /** A random straight extension from an existing island, or null if it doesn't fit. */
+    const propose = () => {
       const a = rng.int(0, isl.length - 1);
       const [dr, dc] = rng.pick(DIRS);
-      const len = rng.int(2, Math.max(2, Math.ceil(n / 2)));
+      const len = rng.int(2, Math.max(2, n - 2));
       const { r, c } = isl[a];
       const cells: number[] = [];
-      let ok = true;
-      for (let k = 1; k < len && ok; k++) {
-        ok = free(r + dr * k, c + dc * k);
+      for (let k = 1; k < len; k++) {
+        if (!free(r + dr * k, c + dc * k)) return null;
         cells.push((r + dr * k) * n + c + dc * k);
       }
       const tr = r + dr * len,
         tc = c + dc * len;
-      if (!ok || !free(tr, tc)) continue;
+      if (!free(tr, tc)) return null;
       // Keep islands from sitting right next to each other.
       if (
         DIRS.some(([er, ec]) => {
@@ -208,9 +222,32 @@ export function genBridges(n: number, target: number, rng: Rng): BridgesPuzzle {
           return rr >= 0 && cc >= 0 && rr < n && cc < n && at[rr * n + cc] >= 0;
         })
       )
-        continue;
-      add(tr, tc);
-      link(a, isl.length - 1, cells);
+        return null;
+      return { a, tr, tc, cells };
+    };
+    // Of a few candidates, grow toward open space and grid edges nobody has reached yet.
+    const value = (tr: number, tc: number) => {
+      let near = Infinity;
+      for (const s of isl) near = Math.min(near, Math.abs(s.r - tr) + Math.abs(s.c - tc));
+      const reach = (v: number, k: 'r' | 'c') =>
+        (v === 0 && !isl.some((s) => s[k] === 0) ? 3 : 0) + (v === n - 1 && !isl.some((s) => s[k] === n - 1) ? 3 : 0);
+      return Math.min(near, 4) + reach(tr, 'r') + reach(tc, 'c') + rng.next();
+    };
+    for (let tries = 0; tries < target * 40 && isl.length < target; tries++) {
+      let pick: ReturnType<typeof propose> = null;
+      let pickValue = -1;
+      for (let k = 0; k < 6; k++) {
+        const cand = propose();
+        if (!cand) continue;
+        const v = value(cand.tr, cand.tc);
+        if (v > pickValue) {
+          pick = cand;
+          pickValue = v;
+        }
+      }
+      if (!pick) continue;
+      add(pick.tr, pick.tc);
+      link(pick.a, isl.length - 1, pick.cells);
     }
     if (isl.length < Math.min(target, 4) && attempt < 24) continue;
     // A few extra bridges to make loops.
@@ -240,8 +277,13 @@ export function genBridges(n: number, target: number, rng: Rng): BridgesPuzzle {
     const p: BridgesPuzzle = { n, islands, edges, cross, inc, sol, unique: false };
     const { count, complete } = solveBridges(p, 2);
     p.unique = complete && count === 1;
-    if (p.unique) return p;
-    best ??= p;
+    // Prefer unique puzzles, then the ones that spread over the whole grid.
+    const score = (p.unique ? 1000 : 0) + spread(n, isl) + (isl.length >= target ? 5 : 0);
+    if (score > bestScore) {
+      best = p;
+      bestScore = score;
+    }
+    if (p.unique && score >= 1000 + 40 + Math.min(9, Math.ceil(target / 2)) + 5) break;
   }
   return best!;
 }

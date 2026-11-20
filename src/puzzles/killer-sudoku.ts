@@ -4,6 +4,7 @@ import { byLevel, type PuzzleDef } from '../core/types';
 import { h } from '../core/ui';
 import { edgeClasses, entryGame, entryHelpSteps } from './sudokukit/entry';
 import { neighbours } from './sudokukit/regions';
+import { entryPlace, entryVals, lineHUnits, makeHint, type HUnit } from './sudokukit/hint';
 import { lineUnits, revealUntilUnique, solve, type Problem, type Unit } from './sudokukit/solver';
 
 const BOX: Record<number, [number, number]> = { 4: [2, 2], 6: [2, 3], 9: [3, 3] };
@@ -107,7 +108,8 @@ export const killerSudoku: PuzzleDef = {
 
     const sums = live.map((cells) => cells.reduce((s, c) => s + sol[c], 0));
     const head = live.map((cells) => Math.min(...cells));
-    return entryGame({
+    const cellEls: Element[] = [];
+    const inst = entryGame({
       ctx,
       cols: n,
       rows: n,
@@ -128,7 +130,23 @@ export const killerSudoku: PuzzleDef = {
         ].join(' ');
         el.append(h('span', { class: `cage ${cls}` }));
         if (head[k] === i) el.append(h('span', { class: 'sum' }, sums[k]));
+        cellEls[i] = el;
       },
     });
+    inst.hint = makeHint({
+      n,
+      givens: puzzle,
+      sol,
+      cells: cellEls,
+      units: [
+        ...lineHUnits(n),
+        ...Array.from({ length: n }, (_, b): HUnit => ({ kind: 'box', full: true, cells: box.flatMap((x, i) => (x === b ? [i] : [])) })),
+        ...live.map((cells, k): HUnit => ({ kind: 'cage', cells, sum: sums[k], clue: [cellEls[head[k]]] })),
+      ],
+      vals: entryVals(inst),
+      place: entryPlace(inst, cellEls),
+      scope: ['its row, column, box and cage', 'sa rangée, sa colonne, son bloc et sa cage'],
+    });
+    return inst;
   },
 };

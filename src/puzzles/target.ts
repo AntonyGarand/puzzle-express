@@ -1,6 +1,6 @@
 import { L } from '../core/i18n';
 import type { Rng } from '../core/rng';
-import { byLevel, type Difficulty, type PuzzleDef } from '../core/types';
+import { byLevel, type Difficulty, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, shake } from '../core/ui';
 
 type Op = '+' | '−' | '×' | '÷';
@@ -198,8 +198,110 @@ export const target: PuzzleDef = {
     ctx.controls(btn(L('Undo', 'Annuler'), undo, 'ghost'), btn(L('Reset', 'Recommencer'), reset, 'ghost'));
     render();
 
+    // ---- Guide ----
+    type Node = { id: number; v: number; expr: string; leaf: boolean };
+    type Step = { a: Node; op: Op; b: Node; v: number };
+    /** A sequence of merges reaching the goal; the first one may be pinned to a chip and an operator. */
+    const plan = (first?: number | null, firstOp?: Op | null): Step[] | null => {
+      const go = (list: Node[], steps: Step[]): Step[] | null => {
+        if (list.length === 1) return list[0].v === goal ? steps : null;
+        for (const a of list)
+          for (const b of list) {
+            if (a === b || (!steps.length && first != null && a.id !== first)) continue;
+            for (const o of allOps) {
+              if (!steps.length && firstOp && o !== firstOp) continue;
+              const v = apply(a.v, o, b.v);
+              if (v == null) continue;
+              const node: Node = { id: -1, v, expr: `(${a.expr} ${o} ${b.expr})`, leaf: false };
+              const found = go([...list.filter((x) => x !== a && x !== b), node], [...steps, { a, op: o, b, v }]);
+              if (found) return found;
+            }
+          }
+        return null;
+      };
+      return go(
+        chips.map((c) => ({ id: c.id, v: c.v, expr: String(c.v), leaf: true })),
+        [],
+      );
+    };
+    const chipEl = (id: number) => chipRow.children[chips.findIndex((c) => c.id === id)];
+    const opEl = (o: Op) => opRow.children[allOps.indexOf(o)];
+    const hint = (): Hint | null => {
+      if (chips.length < 2) return null;
+      const p = plan(sel, op);
+      if (!p) {
+        // The current selection leads nowhere: drop it (same as tapping the selected number again).
+        if (sel == null) return null;
+        const id = sel;
+        return {
+          text: L(
+            'No way to reach the target starts like this. Tap the selected number again to let go of it.',
+            'Aucune façon d’atteindre la cible ne commence ainsi. Touchez de nouveau le nombre choisi pour le relâcher.',
+          ),
+          at: [chipEl(id)],
+          play: () => tapChip(id),
+        };
+      }
+      const s = p[0];
+      const last = p.length === 1;
+      const whole = `${p[p.length - 1].a.expr} ${p[p.length - 1].op} ${p[p.length - 1].b.expr}`.replace(/^\((.*)\)$/, '$1');
+      if (sel == null)
+        return {
+          text: history.length
+            ? L(
+                `Next: ${s.a.v} ${s.op} ${s.b.v} = ${s.v}. Tap the ${s.a.v} to start that merge.`,
+                `Ensuite : ${s.a.v} ${s.op} ${s.b.v} = ${s.v}. Touchez le ${s.a.v} pour commencer cette fusion.`,
+              )
+            : L(
+                `Work backwards from ${goal}: ${whole} = ${goal} uses every number once. Start by tapping the ${s.a.v}.`,
+                `Partez de la cible ${goal} : ${whole} = ${goal} utilise chaque nombre une fois. Commencez par toucher le ${s.a.v}.`,
+              ),
+          why: [goalEl],
+          at: [chipEl(s.a.id)],
+          play: () => tapChip(s.a.id),
+        };
+      if (op == null)
+        return {
+          text: last
+            ? L(
+                `${history.length ? `The ${s.a.v} stays selected, so you can chain: ` : ''}${s.a.v} ${s.op} ${s.b.v} = ${goal}, exactly the target. Pick ${s.op}.`,
+                `${history.length ? `Le ${s.a.v} reste choisi, vous pouvez donc enchaîner : ` : ''}${s.a.v} ${s.op} ${s.b.v} = ${goal}, pile la cible. Choisissez ${s.op}.`,
+              )
+            : history.length
+              ? L(
+                  `The result stays selected, so you can chain: ${s.a.v} ${s.op} ${s.b.v} = ${s.v}. Pick ${s.op}.`,
+                  `Le résultat reste choisi : vous pouvez enchaîner. ${s.a.v} ${s.op} ${s.b.v} = ${s.v}. Choisissez ${s.op}.`,
+                )
+              : L(
+                  `Then pick the operator: ${s.a.v} ${s.op} ${s.b.v} = ${s.v}.`,
+                  `Choisissez ensuite l’opérateur : ${s.a.v} ${s.op} ${s.b.v} = ${s.v}.`,
+                ),
+          why: [chipEl(s.a.id)],
+          at: [opEl(s.op)],
+          play: () => tapOp(s.op),
+        };
+      const rule =
+        s.op === '−'
+          ? L(' (a subtraction must stay above zero)', ' (une soustraction doit rester au-dessus de zéro)')
+          : s.op === '÷'
+            ? L(' (a division must come out even)', ' (une division doit tomber juste)')
+            : '';
+      return {
+        text: last
+          ? L(
+              `Tap the ${s.b.v}: ${s.a.v} ${s.op} ${s.b.v} = ${goal}, and the last number left is the target.`,
+              `Touchez le ${s.b.v} : ${s.a.v} ${s.op} ${s.b.v} = ${goal}, et le dernier nombre qui reste est la cible.`,
+            )
+          : L(`Tap the ${s.b.v}: the two merge into ${s.v}${rule}.`, `Touchez le ${s.b.v} : les deux fusionnent en ${s.v}${rule}.`),
+        why: [chipEl(s.a.id), opEl(s.op)],
+        at: [chipEl(s.b.id)],
+        play: () => tapChip(s.b.id),
+      };
+    };
+
     return {
       snapshot: () => ({ chips, history, nextId, sel }),
+      hint,
       onKey(e) {
         const map: Record<string, Op> = { '+': '+', '-': '−', '*': '×', x: '×', '/': '÷' };
         if (map[e.key]) {

@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
 import { block, genMosaic } from './gridkit/mosaic';
 import './mosaic.css';
@@ -55,7 +55,7 @@ export const mosaic: PuzzleDef = {
   create(ctx) {
     const { root, rng, difficulty: d } = ctx;
     const n = byLevel(d, [5, 6, 7, 8, 10]);
-    const { clue } = genMosaic(n, byLevel(d, [0.6, 0.45, 0.3, 0.15, 0]), rng);
+    const { clue, sol } = genMosaic(n, byLevel(d, [0.6, 0.45, 0.3, 0.15, 0]), rng);
     const blocks = clue.map((_, i) => block(i, n));
 
     // 0 empty, 1 filled, 2 marked
@@ -170,9 +170,118 @@ export const mosaic: PuzzleDef = {
     root.append(grid);
     render();
 
+    // Guide: a square that is settled or needs everything, then two overlapping squares compared.
+    let lastKind = '';
+    let taught = false;
+    const hint = (): Hint | null => {
+      if (done) return null;
+      const info = clue
+        .map((k, i) => {
+          if (k < 0) return null;
+          const open = blocks[i].filter((j) => st[j] === 0);
+          const on = blocks[i].filter((j) => st[j] === 1).length;
+          return { i, k, open, need: k - on };
+        })
+        .filter((c) => c !== null && c.open.length > 0) as { i: number; k: number; open: number[]; need: number }[];
+      const els = (ix: number[]) => ix.map((j) => cells[j]);
+      const fill = (ix: number[], v: number) => () => ix.forEach((j) => st[j] !== v && set(j, v));
+      const cands: { kind: string; hint: Hint }[] = [];
+      for (const c of info) {
+        const size = blocks[c.i].length;
+        if (c.need === 0)
+          cands.push({
+            kind: c.k ? 'none' : 'zero',
+            hint: {
+              text: c.k
+                ? L(
+                    `This ${c.k} already has its ${c.k} filled cell${c.k > 1 ? 's' : ''}, so ${c.open.length === 1 ? 'its last open cell is empty: mark it' : 'the rest of its square is empty: mark those cells'} ✕.`,
+                    `Ce ${c.k} a déjà ${c.k > 1 ? `ses ${c.k} cases pleines` : 'sa case pleine'}  : ${c.open.length === 1 ? 'sa dernière case ouverte est vide, marquez-la' : 'le reste de son carré est vide, marquez ces cases'} d’un ✕.`,
+                  )
+                : L(
+                    'A 0: nothing in its 3×3 square is filled. Tap twice to mark those cells ✕.',
+                    'Un 0 : rien n’est plein dans son carré 3×3. Touchez deux fois pour marquer ces cases d’un ✕.',
+                  ),
+              why: [cells[c.i]],
+              at: els(c.open),
+              play: fill(c.open, 2),
+            },
+          });
+        else if (c.need === c.open.length)
+          cands.push({
+            kind: 'all',
+            hint: {
+              text:
+                c.k === 9 && c.open.length === 9
+                  ? L('A 9 fills its whole 3×3 square.', 'Un 9 remplit tout son carré 3×3.')
+                  : c.k === size && c.open.length === size
+                    ? L(
+                        `This ${c.k} sits ${size === 4 ? 'in a corner' : 'on the edge'}: its square has only ${size} cells, so all are filled.`,
+                        `Ce ${c.k} est ${size === 4 ? 'dans un coin' : 'sur le bord'} : son carré n’a que ${size} cases, elles sont toutes pleines.`,
+                      )
+                    : L(
+                        `This ${c.k} still needs ${c.need} and has exactly ${c.need} open cell${c.need > 1 ? 's' : ''} left: fill ${c.need > 1 ? 'them' : 'it'}.`,
+                        `Ce ${c.k} demande encore ${c.need} case${c.need > 1 ? 's' : ''}, et il en reste exactement ${c.need} ouverte${c.need > 1 ? 's' : ''} : remplissez-${c.need > 1 ? 'les' : 'la'}.`,
+                      ),
+              why: [cells[c.i]],
+              at: els(c.open),
+              play: fill(c.open, 1),
+            },
+          });
+      }
+      if (!cands.length || cands.every((c) => c.kind === lastKind))
+        for (const a of info)
+          for (const b of info) {
+            if (a === b || a.open.length >= b.open.length || !a.open.every((x) => b.open.includes(x))) continue;
+            const rest = b.open.filter((x) => !a.open.includes(x));
+            const m = b.need - a.need;
+            if (m !== 0 && m !== rest.length) continue;
+            cands.push({
+              kind: 'sub',
+              hint: {
+                text:
+                  m === 0
+                    ? L(
+                        `The ${a.k} needs ${a.need} more, all inside the square of this ${b.k}, which also needs ${b.need}: its other cells are empty.`,
+                        `Le ${a.k} demande encore ${a.need}, toutes dans le carré de ce ${b.k}, qui en demande aussi ${b.need} : ses autres cases sont vides.`,
+                      )
+                    : L(
+                        `The ${a.k} can add at most ${a.need} to this ${b.k}, which needs ${b.need}: its ${rest.length} other open cell${rest.length > 1 ? 's are' : ' is'} filled.`,
+                        `Le ${a.k} peut fournir au plus ${a.need} à ce ${b.k}, qui en demande ${b.need} : ${rest.length > 1 ? `ses ${rest.length} autres cases ouvertes sont pleines` : 'son autre case ouverte est pleine'}.`,
+                      ),
+                why: [cells[a.i], cells[b.i]],
+                at: els(rest),
+                play: fill(rest, m === 0 ? 2 : 1),
+              },
+            });
+            break;
+          }
+      const order = ['zero', 'all', 'none', 'sub'];
+      cands.sort((x, y) => order.indexOf(x.kind) - order.indexOf(y.kind));
+      const pick = cands.find((c) => c.kind !== lastKind) ?? cands[0];
+      if (pick) {
+        lastKind = pick.kind;
+        if (taught || pick.kind === 'zero' || pick.kind === 'none') return pick.hint;
+        taught = true;
+        return { ...pick.hint, text: pick.hint.text + L(' Tap a cell once to fill it.', ' Touchez une case une fois pour la remplir.') };
+      }
+      lastKind = '';
+      const j = st.findIndex((v, i) => v === 0 && sol[i]);
+      if (j < 0) return null;
+      return {
+        text: L(
+          'No single number decides here. Try both options: only a filled cell here agrees with all the numbers around it.',
+          'Aucun nombre ne décide seul ici. Essayez les deux options : seule une case pleine ici respecte tous les nombres autour.',
+        ),
+        why: els(clue.map((k, i) => (k >= 0 && blocks[i].includes(j) ? i : -1)).filter((i) => i >= 0)),
+        at: [cells[j]],
+        play: fill([j], 1),
+      };
+    };
+
     const DIRS: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
     return {
       snapshot: () => ({ st, cur }),
+      hint,
       onKey(e) {
         if (done) return false;
         const dir = DIRS[e.key];

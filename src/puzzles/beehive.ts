@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, s, shake } from '../core/ui';
 import { genBeehive } from './pathkit/beehive-gen';
 import { capture } from './pathkit/grid';
@@ -204,6 +204,155 @@ export const beehive: PuzzleDef = {
     }
     root.append(h('div', { class: 'beehive-wrap' }, svg));
     render();
-    return { snapshot: () => ({ chain }) };
+
+    // ---- guide: one number at a time, with the simplest rule that pins it ----
+    const hexEl = (i: number) => groups[i].g;
+    let lastRule = '';
+    const hint = (): Hint | null => {
+      if (finished) return null;
+      const sol = P.path;
+      let k = 0;
+      while (k < chain.length && chain[k] === sol[k]) k++;
+      if (k < chain.length) {
+        const back = sol[k - 1];
+        return {
+          text: L(
+            `This route strands part of the board. Tap ${k} to rewind to it and try another way.`,
+            `Ce chemin isole une partie de la grille. Touchez ${k} pour revenir à lui et essayer autrement.`,
+          ),
+          why: chain.slice(k).map(hexEl),
+          at: [hexEl(back)],
+          play: () => {
+            act(back, false);
+            check();
+          },
+        };
+      }
+      const len = chain.length;
+      const tip = chain[len - 1];
+      const next = len + 1;
+      const x = sol[len];
+      const play = () => {
+        act(x, false);
+        check();
+      };
+      const at = [hexEl(x)];
+      const used = new Set(chain);
+      const free = (i: number) => !used.has(i) && !givens[i];
+      if (givenAt.has(next)) {
+        // Printed numbers in a row: walk onto all of them.
+        let upto = next;
+        while (givenAt.has(upto + 1)) upto++;
+        const run = sol.slice(len, upto);
+        lastRule = 'given';
+        return {
+          text:
+            upto > next
+              ? L(
+                  `${upto === next + 1 ? `${next} and ${upto}` : `${next} to ${upto}`} are already printed, one after the other: step onto them in order. Given numbers must be reached exactly on their turn.`,
+                  `Les nombres ${next} ${upto === next + 1 ? 'et' : 'à'} ${upto} sont déjà inscrits à la suite : passez-y dans l’ordre. Un nombre donné doit être atteint pile à son tour.`,
+                )
+              : L(
+                  `${next} is already printed next to ${len}: step onto it. Given numbers must be reached exactly on their turn.`,
+                  `Le ${next} est déjà inscrit à côté du ${len} : allez-y. Un nombre donné doit être atteint pile à son tour.`,
+                ),
+          why: [hexEl(tip)],
+          at: run.map(hexEl),
+          play: () => {
+            for (const i of run) act(i, false);
+            check();
+          },
+        };
+      }
+      const cands = adj[tip].filter(free);
+      // Next given number ahead, and how many steps are left to reach it.
+      let g = next + 1;
+      while (g <= N && !givenAt.has(g)) g++;
+      const G = givenAt.get(g);
+      const dist = (from: number) => {
+        // Steps from `from` to G through free hexes.
+        const seen = new Map([[from, 0]]);
+        const q = [from];
+        while (q.length) {
+          const i = q.shift()!;
+          if (i === G) return seen.get(i)!;
+          for (const j of adj[i])
+            if (!seen.has(j) && (free(j) || j === G) && j !== tip) {
+              seen.set(j, seen.get(i)! + 1);
+              q.push(j);
+            }
+        }
+        return Infinity;
+      };
+      const rules: Record<string, () => Hint | null> = {
+        only: () =>
+          cands.length === 1 && cands[0] === x
+            ? {
+                text: L(
+                  `Only one empty hex touches ${len}, so ${next} has to go there.`,
+                  `Un seul hexagone libre touche le ${len} : le ${next} doit donc y aller.`,
+                ),
+                why: [hexEl(tip)],
+                at,
+                play,
+              }
+            : null,
+        stranded: () => {
+          // An empty neighbour with no other way in or out must be visited now, or it's lost.
+          // (Only sound when N is printed elsewhere: otherwise a skipped dead tip could be the last hex.)
+          const other = adj[x].filter((j) => !used.has(j));
+          if (cands.length < 2 || other.length > 1 || !givenAt.has(N) || givenAt.get(N) === x) return null;
+          return {
+            text: L(
+              `This hex touches only ${other.length ? 'one other open hex' : 'no other open hex'}. Skip it now and it gets stranded, so ${next} goes there.`,
+              `Cet hexagone ne touche ${other.length ? 'qu’un seul autre hexagone ouvert' : 'aucun autre hexagone ouvert'}. Si vous le sautez, il restera isolé : le ${next} va donc là.`,
+            ),
+            why: [hexEl(tip), ...other.map(hexEl)],
+            at,
+            play,
+          };
+        },
+        reach: () => {
+          if (G == null || cands.length < 2) return null;
+          const steps = g - next;
+          const ok = cands.filter((c) => dist(c) <= steps);
+          if (ok.length !== 1 || ok[0] !== x) return null;
+          return {
+            text: L(
+              `${g} must come ${steps} step${steps > 1 ? 's' : ''} after ${next}. Only this hex is close enough to ${g}.`,
+              `Le ${g} doit venir ${steps} pas après le ${next}. Seul cet hexagone est assez près du ${g}.`,
+            ),
+            why: [hexEl(G), hexEl(tip)],
+            at,
+            play,
+          };
+        },
+      };
+      const order = ['only', 'stranded', 'reach'];
+      for (const r of [...order.filter((o) => o !== lastRule), lastRule]) {
+        const found = rules[r]?.();
+        if (found) {
+          lastRule = r;
+          return found;
+        }
+      }
+      lastRule = '';
+      return {
+        text:
+          G != null
+            ? L(
+                `Head for ${g} without cutting off any empty hexes: ${next} goes here so every hex can still be visited.`,
+                `Visez le ${g} sans isoler d’hexagone libre : le ${next} va ici pour que tous restent accessibles.`,
+              )
+            : L(
+                `Sweep up the remaining hexes without leaving one behind: ${next} goes here.`,
+                `Ramassez les hexagones restants sans en laisser derrière : le ${next} va ici.`,
+              ),
+        why: G != null ? [hexEl(G)] : [hexEl(tip)],
+        at,
+        play,
+      };
+    };
+    return { hint, snapshot: () => ({ chain }) };
   },
 };

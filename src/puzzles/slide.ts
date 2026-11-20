@@ -1,6 +1,7 @@
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h } from '../core/ui';
+import { solveSlide } from './movekit/slide-hint';
 
 export const slide: PuzzleDef = {
   id: 'slide',
@@ -87,35 +88,166 @@ export const slide: PuzzleDef = {
       });
       ctx.status(P(moves, ['move', 'moves'], ['coup', 'coups']));
     };
-    /** Slide every tile between `i` and the gap (same row or column) one step. */
-    const tap = (i: number) => {
+    /** Step from the gap toward tile `i` (±1 or ±n), or 0 if `i` isn't in line with the gap. */
+    const towards = (i: number) => {
       const gr = Math.floor(gap / n),
         gc = gap % n,
         r = Math.floor(i / n),
         c = i % n;
-      if (i === gap || (gr !== r && gc !== c)) return;
+      if (i === gap || (gr !== r && gc !== c)) return 0;
+      return gr === r ? (c > gc ? 1 : -1) : r > gr ? n : -n;
+    };
+    /** Distance between neighbouring cells, in px. */
+    const pitch = () => cells[1].getBoundingClientRect().left - cells[0].getBoundingClientRect().left;
+    const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const shift = (delta: number, px: number) => {
+      const dx = Math.abs(delta) === 1 ? Math.sign(delta) * px : 0;
+      const dy = Math.abs(delta) === 1 ? 0 : Math.sign(delta) * px;
+      return `${dx}px ${dy}px`;
+    };
+    /** Glide back to rest from an offset (Web Animations: leaves no inline style behind, so resume matches). */
+    const glide = (el: HTMLElement, from: string, ms: number) => {
+      el.style.translate = '';
+      if (!calm() && typeof el.animate === 'function')
+        el.animate([{ translate: from }, { translate: '0 0' }], { duration: ms, easing: 'ease-out' });
+    };
+
+    /** Slide every tile between `i` and the gap (same row or column) one step. `dragged` px are already done. */
+    const tap = (i: number, dragged = 0) => {
+      const delta = towards(i);
+      if (!delta) return;
       ctx.touch();
-      const delta = gr === r ? (c > gc ? 1 : -1) : r > gr ? n : -n;
+      const landed: number[] = [];
       while (gap !== i) {
         const nx = gap + delta;
         tiles[gap] = tiles[nx];
         tiles[nx] = 0;
+        landed.push(gap);
         gap = nx;
         moves++;
       }
       render();
+      // Each moved tile glides in from where it was (or from where the finger left it).
+      cells.forEach((el) => (el.style.translate = ''));
+      const step = pitch();
+      for (const j of landed) glide(cells[j], shift(delta, Math.max(0, step - dragged)), 140);
       if (solved()) ctx.solved();
     };
+
+    // Drag a tile toward the gap; the tiles in between come along. Past a third of a cell it slides.
+    let drag: { i: number; delta: number; run: number[]; x: number; y: number; px: number } | null = null;
+    let dragged = false;
+    grid.addEventListener('pointerdown', (e) => {
+      const t = (e.target as Element).closest('.tile');
+      const i = t ? cells.indexOf(t as HTMLButtonElement) : -1;
+      dragged = false;
+      if (i < 0) return;
+      const delta = towards(i);
+      if (!delta) return;
+      const run: number[] = [];
+      for (let k = gap + delta; ; k += delta) {
+        run.push(k);
+        if (k === i) break;
+      }
+      drag = { i, delta, run, x: e.clientX, y: e.clientY, px: 0 };
+      grid.setPointerCapture(e.pointerId);
+    });
+    grid.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x,
+        dy = e.clientY - drag.y;
+      if (Math.hypot(dx, dy) > 6) dragged = true;
+      // Tiles move toward the gap, i.e. opposite to `delta`.
+      const along = Math.abs(drag.delta) === 1 ? -Math.sign(drag.delta) * dx : -Math.sign(drag.delta) * dy;
+      drag.px = Math.max(0, Math.min(pitch(), along));
+      for (const k of drag.run) cells[k].style.translate = drag.px ? shift(-drag.delta, drag.px) : '';
+    });
+    const endDrag = (commit: boolean) => {
+      if (!drag) return;
+      const d0 = drag;
+      drag = null;
+      if (commit && dragged && d0.px > pitch() / 3) {
+        tap(d0.i, d0.px);
+        return;
+      }
+      for (const k of d0.run) glide(cells[k], shift(-d0.delta, d0.px), 120);
+    };
+    grid.addEventListener('pointerup', () => endDrag(true));
+    grid.addEventListener('pointercancel', () => endDrag(false));
+    // A drag ends with a click on the tile; it was already handled (or deliberately cancelled).
+    grid.addEventListener(
+      'click',
+      (e) => {
+        if (!dragged) return;
+        dragged = false;
+        e.stopPropagation();
+      },
+      true,
+    );
     const sv = ctx.saved as { tiles?: number[]; moves?: number } | undefined;
     if (sv?.tiles?.length === tiles.length && [...sv.tiles].sort((a, b) => a - b).every((t, i) => t === i)) {
       tiles.splice(0, tiles.length, ...sv.tiles);
       gap = tiles.indexOf(0);
       moves = sv.moves ?? 0;
     }
+    /** Guide: follow a shortest solution, one tap at a time (a run of tiles in line slides together). */
+    const hint = (): Hint | null => {
+      if (solved()) return null;
+      const path = solveSlide(tiles, n);
+      if (!path?.length) return null;
+      // Simulate the solution to see where tiles land.
+      const sim = tiles.slice();
+      let g = gap;
+      const lands: { t: number; at: number; from: number }[] = [];
+      for (const x of path) {
+        lands.push({ t: sim[x], at: g, from: x });
+        sim[g] = sim[x];
+        sim[x] = 0;
+        g = x;
+      }
+      const delta = path[0] - gap;
+      let k = 1;
+      while (k < path.length && path[k] - path[k - 1] === delta) k++;
+      const run = lands.slice(0, k);
+      const far = path[k - 1];
+      const home = run.filter((m) => m.t === m.at + 1).map((m) => m.t);
+      const last = k === path.length;
+      const list = (ts: number[]) =>
+        ts.length < 2 ? String(ts[0]) : `${ts.slice(0, -1).join(', ')} ${L('and', 'et')} ${ts[ts.length - 1]}`;
+      let text: string;
+      if (last)
+        text = L(
+          `Last slide: ${list(run.map((m) => m.t))} ${k === 1 ? 'goes' : 'go'} home and every tile is in order.`,
+          `Dernier glissement : ${k === 1 ? 'le' : 'les tuiles'} ${list(run.map((m) => m.t))} ${k === 1 ? 'retrouve sa' : 'retrouvent leur'} place et tout est en ordre.`,
+        );
+      else if (k > 1)
+        text = L(
+          `Tiles ${list(run.map((m) => m.t))} are in line with the gap: tap ${tiles[far]} and ${k === 2 ? 'both' : 'they all'} slide together${home.length ? `, bringing ${list(home)} home` : ''}.`,
+          `Les tuiles ${list(run.map((m) => m.t))} sont alignées avec le trou : touchez le ${tiles[far]} et ${k === 2 ? 'les deux' : 'elles'} glissent ensemble${home.length ? `, ce qui met en place ${home.length === 1 ? 'le' : 'les tuiles'} ${list(home)}` : ''}.`,
+        );
+      else if (home.length)
+        text = L(
+          `${home[0]} belongs right where the gap is: slide it in. A tile in its home spot lights up.`,
+          `Le ${home[0]} va exactement à la place du trou : glissez-le. Une tuile bien placée s’allume.`,
+        );
+      else {
+        const next = lands.slice(1).find((m) => m.t === m.at + 1);
+        text = next
+          ? L(
+              `Slide ${run[0].t} into the gap to move the gap around toward ${next.t}, which still has to get home.`,
+              `Glissez le ${run[0].t} dans le trou pour amener le trou vers le ${next.t}, qui doit encore regagner sa place.`,
+            )
+          : L(`Slide ${run[0].t} into the gap to make room.`, `Glissez le ${run[0].t} dans le trou pour faire de la place.`);
+      }
+      if (moves === 0 && !last)
+        text = `${L('Tap a tile in line with the gap to slide it.', 'Touchez une tuile alignée avec le trou pour la glisser.')} ${text}`;
+      return { text, why: run.map((m) => cells[m.from]), at: [cells[gap]], play: () => tap(far) };
+    };
     root.append(grid);
     render();
     return {
       snapshot: () => ({ tiles, moves }),
+      hint,
       onKey(e) {
         const gr = Math.floor(gap / n),
           gc = gap % n;

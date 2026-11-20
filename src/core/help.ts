@@ -1,8 +1,8 @@
 import { L } from './i18n';
 import { Rng } from './rng';
 import { openSheet } from './sheet';
-import type { PuzzleDef, PuzzleInstance } from './types';
-import { btn, h } from './ui';
+import type { Hint, PuzzleDef, PuzzleInstance } from './types';
+import { btn, h, s as svg } from './ui';
 
 const SEEN_KEY = 'puzzle-express:help-seen';
 
@@ -24,39 +24,43 @@ function markSeen(id: string) {
   }
 }
 
+const GUIDE_STEPS = 6;
+const SHOW_MS = 3400;
+
+/** Centre of an element's box, relative to `origin`. */
+function centre(el: Element, origin: DOMRect) {
+  const r = el.getBoundingClientRect();
+  return { x: r.left - origin.left + r.width / 2, y: r.top - origin.top + r.height / 2 };
+}
+
 /**
- * A real, playable Easy board inside the guide. Nothing is recorded; solving it just says "nice"
- * and offers another one.
+ * The animated walkthrough: an Easy board that plays itself a few moves at a time. Each step
+ * outlines the clue, points an arrow at the move, explains it, then makes it.
  */
-function practiceBoard(def: PuzzleDef) {
-  const wrap = h('div', { class: 'practice-board', 'data-puzzle': def.id });
-  const note = h('p', { class: 'practice-note' });
+function walkthrough(def: PuzzleDef) {
+  const board = h('div', { class: 'guide-board', 'data-puzzle': def.id, inert: true });
+  const layer = svg('svg', { class: 'guide-layer', 'aria-hidden': 'true' });
+  const stage = h('div', { class: 'guide-stage' }, board, layer);
+  const caption = h('p', { class: 'guide-caption', 'aria-live': 'polite' });
+  const count = h('span', { class: 'guide-count' });
   let inst: PuzzleInstance = {};
-  let seed = 1;
-  const start = () => {
+  let step = 0;
+  let hint: Hint | null = null;
+  let timer = 0;
+  let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let ended = false;
+
+  const build = () => {
     inst.destroy?.();
     const root = h('div', { class: 'puzzle' });
-    wrap.replaceChildren(root);
-    note.textContent = L('Try it here — this one doesn’t count.', 'Essayez ici — cette partie ne compte pas.');
-    note.className = 'practice-note';
-    let finished = false;
+    board.replaceChildren(root);
     inst =
       def.create({
         difficulty: 1,
-        rng: new Rng(0x5eed + seed++),
+        rng: new Rng(0x5eed),
         root,
-        solved: () => {
-          if (finished) return;
-          finished = true;
-          note.textContent = L('Nice — that’s how it works!', 'Bravo — c’est comme ça qu’on joue!');
-          note.className = 'practice-note good';
-        },
-        failed: () => {
-          if (finished) return;
-          finished = true;
-          note.textContent = L('Not quite — try another one.', 'Presque — essayez-en une autre.');
-          note.className = 'practice-note bad';
-        },
+        solved() {},
+        failed() {},
         mistake() {},
         touch() {},
         status() {},
@@ -64,32 +68,171 @@ function practiceBoard(def: PuzzleDef) {
       }) || {};
     inst.activate?.();
   };
-  start();
-  const again = btn(L('Another one', 'Une autre'), start, 'ghost');
+
+  const draw = () => {
+    layer.replaceChildren();
+    if (!hint) return;
+    const origin = stage.getBoundingClientRect();
+    layer.setAttribute('viewBox', `0 0 ${origin.width} ${origin.height}`);
+    const ring = (el: Element, cls: string) => {
+      const r = el.getBoundingClientRect();
+      const pad = 3;
+      layer.append(
+        svg('rect', {
+          class: cls,
+          x: r.left - origin.left - pad,
+          y: r.top - origin.top - pad,
+          width: r.width + pad * 2,
+          height: r.height + pad * 2,
+          rx: 8,
+        }),
+      );
+    };
+    const why = hint.why ?? [];
+    why.forEach((el) => ring(el, 'guide-why'));
+    hint.at.forEach((el) => ring(el, 'guide-at'));
+    if (!why.length || !hint.at.length) return;
+    // Arrow from the middle of the clue(s) to the nearest move target, curved slightly.
+    const pts = why.map((el) => centre(el, origin));
+    const from = { x: pts.reduce((t, p) => t + p.x, 0) / pts.length, y: pts.reduce((t, p) => t + p.y, 0) / pts.length };
+    const to = hint.at
+      .map((el) => centre(el, origin))
+      .sort((a, b) => Math.hypot(a.x - from.x, a.y - from.y) - Math.hypot(b.x - from.x, b.y - from.y))[0];
+    const d = Math.hypot(to.x - from.x, to.y - from.y);
+    if (d < 12) return;
+    // Stop short of the target's centre so the head sits on the ring, not under the finger.
+    const k = Math.max(0, (d - 10) / d);
+    const end = { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k };
+    const bend = Math.min(40, d * 0.25);
+    const mx = (from.x + end.x) / 2 - ((end.y - from.y) / d) * bend;
+    const my = (from.y + end.y) / 2 + ((end.x - from.x) / d) * bend;
+    layer.append(
+      svg('path', { class: 'guide-arrow', d: `M${from.x},${from.y} Q${mx},${my} ${end.x},${end.y}` }),
+      svg('circle', { class: 'guide-dot', cx: from.x, cy: from.y, r: 4 }),
+    );
+    const ang = Math.atan2(end.y - my, end.x - mx);
+    const head = (a: number) => `${end.x - 11 * Math.cos(ang + a)},${end.y - 11 * Math.sin(ang + a)}`;
+    layer.append(svg('path', { class: 'guide-head', d: `M${head(0.45)} L${end.x},${end.y} L${head(-0.45)}` }));
+  };
+
+  /** Show the step after the current position, or the closing message. */
+  const show = () => {
+    hint = step < GUIDE_STEPS ? (inst.hint?.() ?? null) : null;
+    ended = !hint;
+    stage.classList.toggle('done', ended);
+    if (hint) {
+      caption.textContent = hint.text;
+      count.textContent = `${step + 1} / ${GUIDE_STEPS}`;
+    } else {
+      caption.textContent = L(
+        'Your turn! Close the guide and solve the rest the same way.',
+        'À vous! Fermez le guide et terminez de la même façon.',
+      );
+      count.textContent = '';
+      setPlaying(false);
+    }
+    requestAnimationFrame(draw);
+    schedule();
+  };
+
+  const next = () => {
+    if (ended) return restart();
+    if (!hint) return;
+    layer.replaceChildren();
+    const h0 = hint;
+    hint = null;
+    h0.play();
+    step++;
+    // Let the move's own animation start before pointing at the next thing.
+    clearTimeout(timer);
+    timer = window.setTimeout(show, 450);
+  };
+
+  const prev = () => {
+    if (step === 0) return;
+    const target = step - 1;
+    build();
+    step = 0;
+    ended = false;
+    for (; step < target; step++) {
+      const hh = inst.hint?.();
+      if (!hh) break;
+      hh.play();
+    }
+    setPlaying(false);
+    show();
+  };
+
+  const restart = () => {
+    build();
+    step = 0;
+    ended = false;
+    setPlaying(true);
+    show();
+  };
+
+  const schedule = () => {
+    clearTimeout(timer);
+    if (playing && hint) timer = window.setTimeout(next, SHOW_MS);
+  };
+
+  const playBtn = btn('', () => {
+    if (ended) return restart();
+    setPlaying(!playing);
+    if (playing) next();
+  });
+  const setPlaying = (v: boolean) => {
+    playing = v;
+    playBtn.textContent = ended && !v ? L('↺ Replay', '↺ Revoir') : v ? L('❚❚ Pause', '❚❚ Pause') : L('▶ Play', '▶ Lecture');
+    schedule();
+  };
+
+  build();
+  if (!inst.hint) {
+    inst.destroy?.();
+    return null;
+  }
+  const ro = new ResizeObserver(() => draw());
+  ro.observe(stage);
+  setPlaying(playing);
+  // Wait for the sheet to lay out before measuring.
+  requestAnimationFrame(show);
+
   return {
     el: h(
       'section',
-      { class: 'practice-section' },
-      h('h3', null, L('Practice', 'Pratique')),
-      wrap,
-      h('div', { class: 'practice-row' }, note, again),
+      { class: 'guide-section' },
+      h('h3', null, L('Watch how', 'Voyez comment'), count),
+      stage,
+      caption,
+      h(
+        'div',
+        { class: 'guide-row' },
+        btn('◀', prev, 'ghost'),
+        playBtn,
+        btn(
+          L('Next ▶', 'Suivant ▶'),
+          () => {
+            setPlaying(false);
+            next();
+          },
+          'ghost',
+        ),
+      ),
     ),
-    onKey: (e: KeyboardEvent) => inst.onKey?.(e) ?? false,
-    destroy: () => inst.destroy?.(),
+    destroy: () => {
+      clearTimeout(timer);
+      ro.disconnect();
+      inst.destroy?.();
+    },
   };
 }
 
-/** Show the how-to-play guide: goal, steps, a playable practice board and tips. */
+/** Show the how-to-play guide: goal, steps, the animated walkthrough and tips. */
 function openHelp(def: PuzzleDef, onClose?: () => void) {
   markSeen(def.id);
   const help = def.help?.();
-  const practice = practiceBoard(def);
-  const keys = (e: KeyboardEvent) => {
-    const t = e.target as HTMLElement | null;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT')) return;
-    if (practice.onKey(e)) e.preventDefault();
-  };
-  document.addEventListener('keydown', keys);
+  const guide = walkthrough(def);
   let close = () => {};
   close = openSheet({
     title: def.name,
@@ -105,7 +248,7 @@ function openHelp(def: PuzzleDef, onClose?: () => void) {
             h('ol', { class: 'help-steps' }, ...help.steps.map((s) => h('li', null, s))),
           )
         : null,
-      practice.el,
+      guide?.el ?? null,
       help?.tips?.length
         ? h(
             'section',
@@ -125,8 +268,7 @@ function openHelp(def: PuzzleDef, onClose?: () => void) {
     ],
     footer: [btn(L('Got it', 'Compris'), () => close(), 'primary')],
     onClose: () => {
-      document.removeEventListener('keydown', keys);
-      practice.destroy();
+      guide?.destroy();
       onClose?.();
     },
   });

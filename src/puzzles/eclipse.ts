@@ -1,9 +1,10 @@
 import './eclipse.css';
 import { L, P } from '../core/i18n';
 import type { Rng } from '../core/rng';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h, s } from '../core/ui';
 import { pressable } from './latinkit/entry';
+import { type TakuzuRule, takuzuStep } from './logickit/takuzu-hint';
 
 // Cell values: -1 empty, 0 sun, 1 moon. A row is a bitmask with bit c set for a moon in column c.
 
@@ -258,8 +259,58 @@ export const eclipse: PuzzleDef = {
     root.append(grid);
     render();
 
+    const lineName = (row: boolean, k: number) =>
+      row ? L(`Row ${k + 1}`, `La rangée ${k + 1}`) : L(`Column ${k + 1}`, `La colonne ${k + 1}`);
+    const one = (v: number) => (v === 0 ? L('a sun', 'un soleil') : L('a moon', 'une lune'));
+    const many = (v: number) => (v === 0 ? L('suns', 'soleils') : L('moons', 'lunes'));
+    const put = (ix: number[], vs: number[]) => () => ix.forEach((i, k) => set(i, vs[k]));
+    let last: TakuzuRule | undefined;
+    /** The next deduction for the guide, from the visible cells only. */
+    const hint = (): Hint | null => {
+      if (done || !g.includes(-1)) return null;
+      const st = takuzuStep(g, n, last, ['pair', 'gap', 'count', 'twin']);
+      if (!st) {
+        const i = g.indexOf(-1);
+        return {
+          text: L(
+            `Only ${one(sol[i])} fits here: the other symbol would break a rule (check its row and column).`,
+            `Seul${sol[i] ? 'e' : ''} ${one(sol[i])} convient ici : l’autre symbole briserait une règle (vérifiez sa rangée et sa colonne).`,
+          ),
+          at: [cells[i]],
+          play: put([i], [sol[i]]),
+        };
+      }
+      last = st.rule;
+      const name = lineName(st.row, st.line);
+      const lower = name.toLowerCase();
+      const w = 1 - st.v;
+      const both = st.at.length > 1;
+      const text =
+        st.rule === 'pair'
+          ? L(
+              `Two ${many(st.v)} side by side in ${lower}: ${both ? 'both ends get' : 'the next cell gets'} ${one(w)}, since three alike is not allowed.`,
+              `Deux ${many(st.v)} côte à côte dans ${lower} : ${both ? 'les deux bouts reçoivent' : 'la case suivante reçoit'} ${one(w)}, car trois pareils sont interdits.`,
+            )
+          : st.rule === 'gap'
+            ? L(
+                `Two ${many(st.v)} with one cell between them in ${lower}: the middle gets ${one(w)}, or there would be three in a row.`,
+                `Deux ${many(st.v)} séparé${st.v ? 'es' : 's'} d’une case dans ${lower} : celle du milieu reçoit ${one(w)}, sinon il y en aurait trois de suite.`,
+              )
+            : st.rule === 'count'
+              ? L(
+                  `${name} already has its ${n / 2} ${many(st.v)} (half of ${n}), so ${both ? `the other cells get ${many(w)}` : `the last cell gets ${one(w)}`}.`,
+                  `${name} a déjà ses ${n / 2} ${many(st.v)} (la moitié de ${n}) : ${both ? `les autres cases reçoivent des ${many(w)}` : `la dernière case reçoit ${one(w)}`}.`,
+                )
+              : L(
+                  `${name} would become a copy of ${lineName(st.row, st.other!).toLowerCase()} if filled the same way. Lines must differ, so swap the two symbols.`,
+                  `${name} deviendrait une copie de ${lineName(st.row, st.other!).toLowerCase()} si on la remplissait pareil. Les lignes doivent différer : inversez les deux symboles.`,
+                );
+      return { text, why: st.why.map((i) => cells[i]), at: st.at.map((i) => cells[i]), play: put(st.at, st.vals) };
+    };
+
     const DIRS: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
     return {
+      hint,
       snapshot: () => ({ g, cur }),
       onKey(e) {
         if (done) return false;

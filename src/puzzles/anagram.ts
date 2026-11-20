@@ -1,5 +1,5 @@
 import { L, locale } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, shake } from '../core/ui';
 import { answers, commonOfLength, isWord, letterKey } from './wordkit/lexicon';
 import { ANAGRAMS, anagramKey, WORDS } from './words';
@@ -123,7 +123,151 @@ export const anagram: PuzzleDef = {
     }
     root.append(slots, tiles);
     render();
+    // ---------- guide ----------
+    const ENDS = fr
+      ? ['tion', 'ment', 'euse', 'eur', 'ier', 'ble', 'er', 're', 'te']
+      : ['tion', 'ing', 'ness', 'ment', 'est', 'er', 'ed', 'ly'];
+    const STARTS = fr
+      ? ['ch', 'tr', 'pr', 'br', 'gr', 'pl', 'cl', 'qu', 're', 'de']
+      : ['th', 'sh', 'ch', 'st', 'tr', 'br', 'gr', 'pl', 'cl', 'wh', 'un', 're'];
+    const VOWELS = 'aeiouy';
+    const up = (s: string) => s.toUpperCase();
+    /** Unused tile indices spelling `s`, skipping the tiles in `skip`. */
+    const tilesFor = (s: string, skip: number[] = picked) => {
+      const used = [...skip];
+      const out: number[] = [];
+      for (const ch of s) {
+        const i = letters.findIndex((l, j) => l === ch && !used.includes(j));
+        if (i < 0) return null;
+        used.push(i);
+        out.push(i);
+      }
+      return out;
+    };
+    const tileEls = (ix: number[]) => ix.map((i) => tiles.children[i]);
+    const slotEls = (n: number) => Array.from(slots.children).slice(0, n);
+    const place = (s: string) => () => {
+      for (const ch of s) {
+        const i = letters.findIndex((l, j) => l === ch && !picked.includes(j));
+        if (i >= 0) pick(i);
+      }
+    };
+    const hint = (): Hint | null => {
+      const pre = picked.map((i) => letters[i]).join('');
+      if (pre.length === len) return null; // checked (solved, or clearing after a miss)
+      const target = word.startsWith(pre) ? word : [...valid].find((w) => w.startsWith(pre));
+      if (!target) {
+        // A wrong start: take back from the first letter that doesn't fit.
+        let k = 0;
+        while (k < pre.length && pre[k] === word[k]) k++;
+        return {
+          text: L(
+            `No word starts with ${up(pre)}. Tap a filled slot to take back that letter and the ones after it.`,
+            `Aucun mot ne commence par ${up(pre)}. Touchez une case remplie pour retirer cette lettre et les suivantes.`,
+          ),
+          at: slotEls(pre.length).slice(k, k + 1),
+          play: () => unpick(k),
+        };
+      }
+      const rest = target.slice(pre.length);
+      const one = (s: string, text: string, why: Element[] = []): Hint | null => {
+        const ix = tilesFor(s);
+        return ix ? { text, why, at: tileEls(ix), play: place(s) } : null;
+      };
+      if (!pre) {
+        const end = ENDS.find((e) => e.length < len - 1 && target.endsWith(e));
+        if (end) {
+          const head = target.slice(0, len - end.length);
+          const endIx = tilesFor(end, []);
+          return one(
+            target[0],
+            L(
+              `These letters can end in -${up(end)}. Set those aside: the start is made of ${up([...head].join(', '))}, so tap ${up(target[0])} first.`,
+              `Ces lettres peuvent finir en -${up(end)}. Mettez-les de côté : le début se fait avec ${up([...head].join(', '))}; touchez d’abord ${up(target[0])}.`,
+            ),
+            endIx ? tileEls(endIx) : [],
+          );
+        }
+        const st = STARTS.find((p) => target.startsWith(p));
+        if (st)
+          return one(
+            st,
+            L(
+              `${up(st)} is a common way to start a word, and both letters are here. Tap ${up(st[0])} then ${up(st[1])}: each tile fills the next slot.`,
+              `${up(st)} est un début de mot courant, et les deux lettres sont là. Touchez ${up(st[0])} puis ${up(st[1])} : chaque tuile remplit la case suivante.`,
+            ),
+          );
+        return one(
+          target[0],
+          L(
+            `Try each letter as the start and say it out loud. ${up(target[0])} leads somewhere: tap it to fill the first slot.`,
+            `Essayez chaque lettre en tête et prononcez le début. ${up(target[0])} mène quelque part : touchez-la pour remplir la première case.`,
+          ),
+        );
+      }
+      const why = slotEls(pre.length);
+      if (rest.length === 1)
+        return one(
+          rest,
+          L(
+            `Only ${up(rest)} is left, and ${up(pre)}${up(rest)} is a word. The word is checked as soon as every slot is full.`,
+            `Il ne reste que ${up(rest)}, et ${up(pre)}${up(rest)} est un mot. Le mot est vérifié dès que toutes les cases sont pleines.`,
+          ),
+          why,
+        );
+      const end = ENDS.find((e) => rest === e);
+      if (end)
+        return one(
+          end,
+          L(
+            `${up(pre)} needs an ending, and the tiles left spell -${up(end)}. Place them in order to finish the word.`,
+            `${up(pre)} a besoin d’une fin, et les tuiles restantes forment -${up(end)}. Placez-les dans l’ordre pour finir le mot.`,
+          ),
+          why,
+        );
+      if (pre.endsWith('q') && rest[0] === 'u')
+        return one(
+          'u',
+          L('Q is almost always followed by U, so U comes next.', 'Q est presque toujours suivi de U : U vient ensuite.'),
+          why,
+        );
+      const last = pre[pre.length - 1];
+      if (VOWELS.includes(rest[0]) && !VOWELS.includes(last))
+        return one(
+          rest[0],
+          L(
+            `After ${up(pre)}, a vowel makes it sayable. ${up(rest[0])} fits: ${up(pre + rest[0])}…`,
+            `Après ${up(pre)}, il faut une voyelle pour que ça se prononce. ${up(rest[0])} convient : ${up(pre + rest[0])}…`,
+          ),
+          why,
+        );
+      const pair = STARTS.find((p) => rest.startsWith(p) && rest.length > p.length);
+      if (pair)
+        return one(
+          pair,
+          L(
+            `${up(pair)} is a common pair of letters, and both tiles are free. Place them together after ${up(pre)}.`,
+            `${up(pair)} est une paire de lettres courante, et les deux tuiles sont libres. Placez-les ensemble après ${up(pre)}.`,
+          ),
+          why,
+        );
+      const after = rest.slice(1).toUpperCase();
+      return one(
+        rest[0],
+        after.length === 1
+          ? L(
+              `Keep the last tile, ${after}, for the end: ${up(pre)}${up(rest[0])}${after} reads well, so ${up(rest[0])} comes next.`,
+              `Gardez la dernière tuile, ${after}, pour la fin : ${up(pre)}${up(rest[0])}${after} se lit bien, donc ${up(rest[0])} vient ensuite.`,
+            )
+          : L(
+              `${up(pre)}${up(rest[0])}… sounds like the start of a word, and ${after.split('').join(', ')} can still follow it.`,
+              `${up(pre)}${up(rest[0])}… sonne comme un début de mot, et ${after.split('').join(', ')} peuvent encore suivre.`,
+            ),
+        why,
+      );
+    };
     return {
+      hint,
       snapshot: () => ({ letters, picked }),
       onKey(e) {
         if (e.key === 'Backspace') {

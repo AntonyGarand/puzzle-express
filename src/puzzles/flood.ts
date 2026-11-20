@@ -1,5 +1,5 @@
 import { L } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, h, PALETTE } from '../core/ui';
 import './flood.css';
 
@@ -41,6 +41,10 @@ function regionSize(g: number[], n: number): number {
   }
   return seen.size;
 }
+
+/** Colour names for the guide, matching PALETTE (French as nouns: « le vert »). */
+const NAMES_EN = ['orange', 'blue', 'green', 'yellow', 'purple', 'teal', 'pink', 'lime'];
+const NAMES_FR = ['l’orange', 'le bleu', 'le vert', 'le jaune', 'le violet', 'le turquoise', 'le rose', 'le lime'];
 
 export const floodPuzzle: PuzzleDef = {
   id: 'flood',
@@ -161,10 +165,107 @@ export const floodPuzzle: PuzzleDef = {
       g = sv.g;
       moves = sv.moves ?? 0;
     }
+    // ---- Guide ----
+    /** Cells of the top-left area. */
+    const area = (b: number[]) => {
+      const a = flood(b, n, b[0] === 0 ? 1 : 0);
+      return b.map((_, i) => i).filter((i) => a[i] !== b[i]);
+    };
+    const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
+    let lastKind = '';
+    const hint = (): Hint | null => {
+      const size = regionSize(g, n);
+      if (size === n * n || moves >= limit) return null;
+      const mine = new Set(area(g));
+      // Score each colour the way the move limit was set: grab now, plus the best follow-up.
+      const opts = [...Array(k).keys()]
+        .filter((c) => c !== g[0])
+        .map((c) => {
+          const a = flood(g, n, c);
+          const now = regionSize(a, n);
+          let next = now;
+          for (let c2 = 0; c2 < k; c2++) if (c2 !== c) next = Math.max(next, regionSize(flood(a, n, c2), n));
+          const reg = new Set(area(a));
+          const gone = !a.some((v, i) => v === c && !reg.has(i));
+          return { c, gain: now - size, more: next - now, score: Math.max(now * 4, now * 3 + next), gone, reg };
+        });
+      opts.sort((x, y) => y.score - x.score);
+      const best = opts[0];
+      const most = opts.reduce((x, y) => (y.gain > x.gain ? y : x));
+      const grabbed = [...best.reg].filter((i) => !mine.has(i));
+      const en = NAMES_EN[best.c],
+        fr = NAMES_FR[best.c];
+      const tiles = (m: number) => L(m === 1 ? '1 tile' : `${m} tiles`, m === 1 ? '1 case' : `${m} cases`);
+      const kinds: { kind: string; text: string }[] = [];
+      const left = new Set(g.filter((_, i) => !mine.has(i)));
+      if (left.size === 1)
+        kinds.push({
+          kind: 'last',
+          text: L(
+            `Only ${en} is left outside your area: pick it to cover the whole board.`,
+            `Il ne reste que ${fr} hors de votre zone : choisissez-le pour couvrir toute la grille.`,
+          ),
+        });
+      if (!moves)
+        kinds.push({
+          kind: 'start',
+          text: L(
+            `Your area starts in the top-left corner. Pick ${en}: your area turns ${en} and swallows the ${tiles(best.gain)} of that colour touching it.`,
+            `Votre zone part du coin en haut à gauche. Choisissez ${fr} : votre zone prend cette couleur et absorbe les ${tiles(best.gain)} voisines de cette couleur.`,
+          ),
+        });
+      if (best.gone && left.size > 1)
+        kinds.push({
+          kind: 'gone',
+          text: L(
+            `Pick ${en}: it takes every ${en} tile still on the board, so you never need that colour again.`,
+            `Choisissez ${fr} : vous prenez toutes les cases de cette couleur encore sur la grille, et vous n’en aurez plus besoin.`,
+          ),
+        });
+      if (best.c !== most.c && best.more > 0)
+        kinds.push({
+          kind: 'ahead',
+          text: L(
+            `${cap(NAMES_EN[most.c])} grabs more right now, but ${en} reaches deeper: it adds ${tiles(best.gain)} and sets up ${tiles(best.more)} more on the next move.`,
+            `${cap(NAMES_FR[most.c])} rapporte plus tout de suite, mais ${fr} va plus loin : ${tiles(best.gain)} maintenant et ${tiles(best.more)} de plus au coup suivant.`,
+          ),
+        });
+      kinds.push({
+        kind: 'most',
+        text:
+          best.c === most.c
+            ? L(
+                `Pick the colour that grabs the most: ${en} brings in ${tiles(best.gain)} from along your border.`,
+                `Prenez la couleur qui rapporte le plus : ${fr} ajoute ${tiles(best.gain)} le long de votre frontière.`,
+              )
+            : L(
+                `${cap(en)} adds ${tiles(best.gain)} and opens the way toward the far side of the board.`,
+                `${cap(fr)} ajoute ${tiles(best.gain)} et ouvre le chemin vers l’autre bout de la grille.`,
+              ),
+      });
+      if (best.c === most.c && moves)
+        kinds.push({
+          kind: 'border',
+          text: L(
+            `A bigger area has a longer border, so each pick grabs more: ${en} now brings in ${tiles(best.gain)} at once.`,
+            `Plus la zone grandit, plus sa frontière s’allonge et plus chaque choix rapporte : ${fr} ajoute maintenant ${tiles(best.gain)} d’un coup.`,
+          ),
+        });
+      const pick = kinds.find((x) => x.kind !== lastKind) ?? kinds[0];
+      lastKind = pick.kind;
+      return {
+        text: pick.text,
+        why: grabbed.map((i) => cells[i]),
+        at: [palette.children[best.c]],
+        play: () => choose(best.c),
+      };
+    };
+
     root.append(head, grid, palette);
     render();
     return {
       snapshot: () => ({ g, moves }),
+      hint,
       onKey(e) {
         const v = Number(e.key);
         if (v >= 1 && v <= k) {

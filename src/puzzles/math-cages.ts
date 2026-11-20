@@ -4,6 +4,7 @@ import type { Rng } from '../core/rng';
 import { byLevel, type PuzzleDef } from '../core/types';
 import { h } from '../core/ui';
 import { latinEntry, latinEntrySteps } from './latinkit/entry';
+import { and, cap, entryPlace, entryVals, isAre, lineHUnits, makeHint, or } from './sudokukit/hint';
 import { latinConflicts, latinUnique, randomLatin, revealLatin, type Table } from './latinkit/solver';
 
 type Op = '+' | '−' | '×' | '÷' | '';
@@ -191,7 +192,8 @@ export const mathCages: PuzzleDef = {
       }
       return bad;
     };
-    return latinEntry({
+    const cellEls: Element[] = [];
+    const inst = latinEntry({
       ctx,
       n,
       givens,
@@ -210,7 +212,91 @@ export const mathCages: PuzzleDef = {
         ].join(' ');
         el.append(h('span', { class: `cage ${cls}` }));
         if (cages[k].cells[0] === i) el.append(h('span', { class: 'lbl' }, `${cages[k].target}${cages[k].op}`));
+        cellEls[i] = el;
       },
     });
+    const label = (c: Cage) => L(`The “${c.target}${c.op}” cage`, `La cage « ${c.target}${c.op} »`);
+    /** "1 + 3", "3 − 1", "2 × 2 × 3"… */
+    const show = (c: Cage, vs: number[]) => {
+      const sorted = [...vs].sort((a, b) => (c.op === '−' || c.op === '÷' ? b - a : a - b));
+      return sorted.join(` ${c.op} `);
+    };
+    inst.hint = makeHint({
+      n,
+      givens,
+      sol,
+      cells: cellEls,
+      units: lineHUnits(n),
+      vals: entryVals(inst),
+      place: entryPlace(inst, cellEls),
+      scope: ['its row, column and cage', 'sa rangée, sa colonne et sa cage'],
+      pre: {
+        // A lone number is given away.
+        single(k) {
+          for (const c of cages) {
+            const i = c.cells[0];
+            if (c.op !== '' || k.vals[i] !== 0) continue;
+            return {
+              text: L(
+                `A cage with just “${c.target}” is one cell holding that number: free points.`,
+                `Une cage qui affiche seulement « ${c.target} » est une case qui vaut ce nombre : c’est donné.`,
+              ),
+              why: [],
+              at: [i],
+              moves: [[i, c.target]],
+            };
+          }
+          return null;
+        },
+      },
+      post: {
+        // Few ways to hit the target; the row and column pick one.
+        cage(k) {
+          for (let ci = 0; ci < cages.length; ci++) {
+            const c = cages[ci];
+            if (c.op === '') continue;
+            const m = c.cells.length;
+            const emp = c.cells.filter((i) => k.vals[i] === 0);
+            if (!emp.length) continue;
+            const { tuples } = tables[ci];
+            const fits: number[][] = [];
+            for (let t = 0; t < tuples.length; t += m) {
+              const tu = Array.from(tuples.subarray(t, t + m));
+              if (c.cells.every((i, p) => !k.vals[i] || k.vals[i] === tu[p])) fits.push(tu);
+            }
+            const opts = [...new Set(fits.map((tu) => show(c, tu)))];
+            if (!opts.length || opts.length > 3) continue;
+            for (const i of emp) {
+              const p = c.cells.indexOf(i);
+              const can = [...new Set(fits.map((tu) => tu[p]))].sort((a, b) => a - b);
+              const f = k.free(i);
+              const fit = can.filter((v) => f.includes(v));
+              if (fit.length !== 1) continue;
+              const v = fit[0];
+              const excl = can.filter((x) => x !== v);
+              const w = k.witness(i, excl);
+              const head = cellEls[c.cells[0]];
+              const known = c.cells.filter((j) => k.vals[j] > 0).map((j) => cellEls[j]);
+              return {
+                text: excl.length
+                  ? L(
+                      `${label(c)} can only be ${or(opts)}. ${cap(and(excl))} ${isAre(excl)} already in ${w.where}, so this cell is ${v}.`,
+                      `${label(c)} ne peut être que ${or(opts)}. ${cap(and(excl))} ${isAre(excl)} déjà dans ${w.where} : cette case vaut donc ${v}.`,
+                    )
+                  : L(
+                      `${label(c)} can only be ${or(opts)}, so this cell is ${v}.`,
+                      `${label(c)} ne peut être que ${or(opts)} : cette case vaut donc ${v}.`,
+                    ),
+                why: [...new Set([head, ...known, ...w.els])],
+                at: [i],
+                moves: [[i, v]],
+              };
+            }
+          }
+          return null;
+        },
+      },
+    });
+    return inst;
   },
 };

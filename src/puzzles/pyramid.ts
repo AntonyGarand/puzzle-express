@@ -1,8 +1,8 @@
 import './pyramid.css';
 import { L, P } from '../core/i18n';
-import { byLevel, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, shake } from '../core/ui';
-import { cardEl, deck, pileEl, rank, slotEl, tableEl } from './cardkit/cards';
+import { cardEl, deck, elAt, label, leCard, pileEl, rank, rankLabel, slotEl, tableEl, topEl } from './cardkit/cards';
 import { cardAt, canRecycle, clearedP, dealP, drawP, exposed, idx, removeP, solveP, stuckP, type PState } from './cardkit/pyramid';
 import { bindTable, History } from './cardkit/table';
 
@@ -222,7 +222,119 @@ export const pyramid: PuzzleDef = {
     render();
     status();
 
+    let lastRule = '';
+    const hint = (): Hint | null => {
+      if (over) return null;
+      const el = (p: string) => (p === 'w' ? elAt(table, 'w', 0) : elAt(table, p, 0))!;
+      const open: string[] = [];
+      for (let i = 0; i < 28; i++) if (exposed(s.pyr, i)) open.push('p' + i);
+      const wasteTop = cardAt(s, 'w');
+      /** Pyramid cards a removal would uncover. */
+      const frees = (ps: string[]) => {
+        const pyr = s.pyr.slice();
+        for (const p of ps) if (p !== 'w') pyr[Number(p.slice(1))] = -1;
+        const out: number[] = [];
+        for (let i = 0; i < 28; i++) if (pyr[i] >= 0 && !exposed(s.pyr, i) && exposed(pyr, i)) out.push(i);
+        return out;
+      };
+      /** "Q♦ + A♣ = 12 + 1 = 13" (values spelled out for letters), "8♠ + 5♥ = 13" otherwise. */
+      const sum = (a: number, b: number) =>
+        rank(a) > 10 || rank(a) === 1 || rank(b) > 10 || rank(b) === 1
+          ? `${label(a)} + ${label(b)} = ${rank(a)} + ${rank(b)} = 13`
+          : `${label(a)} + ${label(b)} = 13`;
+      const freed = (ps: string[]) => {
+        const f = frees(ps);
+        if (!f.length) return ['', ''];
+        const names = f.map((i) => label(s.pyr[i])).join(L(' and ', ' et '));
+        return [` That opens the ${names} above.`, ` Cela libère ${f.length > 1 ? 'les cartes ' + names : leCard(s.pyr[f[0]])} au-dessus.`];
+      };
+      const cands: { rule: string; h: Hint }[] = [];
+      // Kings leave on their own.
+      for (const p of [...open, ...(wasteTop != null ? ['w'] : [])]) {
+        const c = cardAt(s, p)!;
+        if (rank(c) !== 13) continue;
+        const [fe, ff] = freed([p]);
+        cands.push({
+          rule: 'king',
+          h: {
+            text: L(
+              `A king is worth 13 by itself: tap the ${label(c)} to remove it.${fe}`,
+              `Un roi vaut 13 à lui seul : touchez ${leCard(c)} pour le retirer.${ff}`,
+            ),
+            at: [el(p)],
+            play: () => pick(p),
+          },
+        });
+      }
+      // Pairs of open cards (pyramid + pyramid, or with the waste): prefer the one that uncovers most.
+      const pairs: { a: string; b: string; n: number }[] = [];
+      for (let x = 0; x < open.length; x++)
+        for (let y = x + 1; y < open.length; y++)
+          if (removeP(s, open[x], open[y], true)) pairs.push({ a: open[x], b: open[y], n: frees([open[x], open[y]]).length });
+      if (wasteTop != null) for (const a of open) if (removeP(s, 'w', a, true)) pairs.push({ a: 'w', b: a, n: frees([a]).length });
+      pairs.sort((x, y) => y.n - x.n || Number(y.b.slice(1)) - Number(x.b.slice(1)));
+      for (const { a, b } of pairs) {
+        const ca = cardAt(s, a)!;
+        const cb = cardAt(s, b)!;
+        const [fe, ff] = freed([a, b]);
+        const w = a === 'w';
+        if (cands.some((c) => c.rule === (w ? 'waste' : 'pair'))) continue;
+        cands.push({
+          rule: w ? 'waste' : 'pair',
+          h: {
+            text: w
+              ? L(
+                  `The waste’s top card is open too, and ${sum(ca, cb)}: pair the ${label(ca)} with the ${label(cb)}.${fe}`,
+                  `La carte du dessus du talon est libre aussi, et ${sum(ca, cb)} : associez ${leCard(ca)} et ${leCard(cb)}.${ff}`,
+                )
+              : L(
+                  `${sum(ca, cb)}, and both cards are open (nothing covers them): pair them.${fe}`,
+                  `${sum(ca, cb)}, et les deux cartes sont libres (rien ne les couvre) : associez-les.${ff}`,
+                ),
+            why: [el(a)],
+            at: [el(b)],
+            play: () => {
+              pick(a);
+              pick(b);
+            },
+          },
+        });
+      }
+      if (!cands.length) {
+        if (!s.stock.length && !canRecycle(s, passes)) return null;
+        lastRule = 'draw';
+        // What the open pyramid cards are waiting for, e.g. "a 9 for the 4♦".
+        const wants = [...new Set(open.map((p) => 13 - rank(cardAt(s, p)!)))].sort((x, y) => x - y).map(rankLabel);
+        const list = (or: string) => (wants.length > 1 ? wants.slice(0, -1).join(', ') + ` ${or} ` + wants[wants.length - 1] : wants[0]);
+        const pairable = () => {
+          const w = cardAt(s, 'w');
+          return w != null && (rank(w) === 13 || open.some((p) => removeP(s, 'w', p, true)));
+        };
+        return {
+          text: s.stock.length
+            ? L(
+                `No two open cards make 13. Turn stock cards until one completes a pair: the open cards need ${list('or')}.`,
+                `Aucune paire de cartes libres ne fait 13. Retournez des cartes de la pioche jusqu’à compléter une paire : il faut un ${list('ou')}.`,
+              )
+            : L('The stock is empty: tap ↻ to go through the waste again.', 'La pioche est vide : touchez ↻ pour reparcourir le talon.'),
+          at: [topEl(table, 's')!],
+          play: () => {
+            if (!s.stock.length) return draw();
+            // Tap the stock until a card that pairs shows up (or the stock runs out).
+            for (let n = s.stock.length; n > 0; n--) {
+              draw();
+              if (over || !s.stock.length || pairable()) break;
+            }
+          },
+        };
+      }
+      const best = cands.find((x) => x.rule !== lastRule) ?? cands[0];
+      lastRule = best.rule;
+      return best.h;
+    };
+
     return {
+      hint,
       snapshot: () => ({ s, hist: hist.stack, sel }),
       onKey(e) {
         if (e.key === 'z' || e.key === 'Backspace') {

@@ -2,6 +2,7 @@ import { L } from '../core/i18n';
 import type { Rng } from '../core/rng';
 import { byLevel, type PuzzleDef } from '../core/types';
 import { board, h, pad } from '../core/ui';
+import { lineHUnits, makeHint } from './sudokukit/hint';
 
 interface Shape {
   n: number;
@@ -143,7 +144,7 @@ export const sudoku: PuzzleDef = {
     const { root, rng, difficulty: d } = ctx;
     const s = SHAPES[byLevel(d, [4, 6, 6, 9, 9])];
     const { n } = s;
-    const { puzzle } = generate(s, byLevel(d, [8, 16, 22, 42, 52]), rng);
+    const { puzzle, sol } = generate(s, byLevel(d, [8, 16, 22, 42, 52]), rng);
     const given = puzzle.map((v) => v > 0);
     const vals = [...puzzle];
     let sel = given.indexOf(false);
@@ -213,8 +214,30 @@ export const sudoku: PuzzleDef = {
     );
     render();
 
+    const hint = makeHint({
+      n,
+      givens: puzzle,
+      sol,
+      cells,
+      units: [
+        ...lineHUnits(n),
+        ...Array.from({ length: n }, (_, b) => ({
+          kind: 'box' as const,
+          full: true,
+          cells: [...vals.keys()].filter((i) => boxOf(s, i) === b),
+        })),
+      ],
+      vals: () => vals,
+      place: (i, v) => {
+        select(i);
+        input(v);
+      },
+      scope: ['its row, column and box', 'sa rangée, sa colonne et son bloc'],
+    });
+
     return {
       snapshot: () => ({ vals, sel }),
+      hint,
       onKey(e) {
         const k = Number(e.key);
         if (k >= 1 && k <= n) {
