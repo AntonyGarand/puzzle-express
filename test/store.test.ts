@@ -10,7 +10,8 @@ describe('auto-levelling', () => {
   beforeEach(() => resetProfile());
 
   it('levels up after three clean solves within par', () => {
-    solve('a', 20_000); solve('a', 20_000);
+    solve('a', 20_000);
+    solve('a', 20_000);
     expect(prefs('a').level).toBe(1);
     const r = solve('a', 20_000);
     expect(r.levelChange).toEqual({ from: 1, to: 2 });
@@ -23,12 +24,15 @@ describe('auto-levelling', () => {
   });
 
   it('does not count slow or sloppy solves', () => {
-    solve('a', 20_000); solve('a', 40_000); solve('a', 20_000, 3);
+    solve('a', 20_000);
+    solve('a', 40_000);
+    solve('a', 20_000, 3);
     expect(prefs('a').level).toBe(1);
   });
 
   it('eases off after two misses', () => {
-    setLevel('a', 3); setLevel('a', 'auto');
+    setLevel('a', 3);
+    setLevel('a', 'auto');
     fail('a');
     expect(fail('a').levelChange).toEqual({ from: 3, to: 2 });
   });
@@ -43,13 +47,16 @@ describe('auto-levelling', () => {
   });
 
   it('resumes from the manual level when switched back to auto', () => {
-    setLevel('a', 4); setLevel('a', 'auto');
+    setLevel('a', 4);
+    setLevel('a', 'auto');
     solve('a', 1_000);
     expect(solve('a', 1_000).levelChange).toEqual({ from: 4, to: 5 });
   });
 
   it('tracks stats and bests', () => {
-    solve('a', 12_000); solve('a', 9_000); fail('a');
+    solve('a', 12_000);
+    solve('a', 9_000);
+    fail('a');
     const s = stats('a');
     expect([s.played, s.solved, s.failed]).toEqual([3, 2, 1]);
     expect(s.best[1]).toBe(9_000);

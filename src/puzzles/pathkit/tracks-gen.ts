@@ -47,7 +47,11 @@ function treePath(adj: number[][], a: number, b: number): number[] {
   while (q.length) {
     const i = q.shift()!;
     if (i === b) break;
-    for (const j of adj[i]) if (par[j] < 0) (par[j] = i), q.push(j);
+    for (const j of adj[i])
+      if (par[j] < 0) {
+        par[j] = i;
+        q.push(j);
+      }
   }
   const out = [b];
   while (out[out.length - 1] !== a) out.push(par[out[out.length - 1]]);
@@ -57,9 +61,12 @@ function treePath(adj: number[][], a: number, b: number): number[] {
 export function genTracks(rng: Rng, d: Difficulty): TracksPuzzle {
   const n = byLevel(d, [5, 6, 7, 8, 9]);
   const giveFrac = byLevel(d, [0.3, 0.2, 0.12, 0.06, 0]);
-  const lo = n * n * 0.36, hi = n * n * 0.66;
+  const lo = n * n * 0.36,
+    hi = n * n * 0.66;
   let best: number[] | null = null;
-  let bestA = 0, bestB = 0, side: 'bottom' | 'right' = 'bottom';
+  let bestA = 0,
+    bestB = 0,
+    side: 'bottom' | 'right' = 'bottom';
   for (let attempt = 0; attempt < 60; attempt++) {
     const a = rng.int(0, n - 1) * n;
     const s: 'bottom' | 'right' = rng.chance(0.5) ? 'bottom' : 'right';

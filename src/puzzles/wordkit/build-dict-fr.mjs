@@ -22,7 +22,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const pkgFile = (pkg, file) => join(dirname(require.resolve(`${pkg}/package.json`)), file);
 
 export const fold = (w) =>
-  w.toLowerCase().replace(/œ/g, 'oe').replace(/æ/g, 'ae').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  w
+    .toLowerCase()
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
 const COMMON_SIZE = 6000;
 
@@ -114,9 +119,74 @@ semblent signifie souhaite soutient souviens souvient tiendrai tracasse vaudrait
 napoleon portland victoria virginie superman ressenti transmis souffert parcouru corrompu suspendu reverend
 soul bouge brille ennuie degage admire retiens savions aimeriez meprenez enverrai devrions consiste jan rob kit fonce`.split(/\s+/);
 
-const STRICT_VERB = ['ez', 'ons', 'aient', 'iez', 'ions', 'erai', 'eras', 'erez', 'eront', 'erait', 'erais', 'eraient', 'èrent', 'âmes', 'âtes', 'assent', 'issons', 'issez', 'issent', 'issait', 'issais', 'irent', 'irai', 'iras', 'iront', 'irait', 'é', 'ée', 'és', 'ées'];
-const AMB_VERB = ['e', 'es', 'ent', 'ant', 'ait', 'ais', 'ai', 'as', 'a', 'era', 'u', 'ue', 'us', 'ues', 'i', 'ie', 'is', 'it', 'ies', 'ra', 'rai', 'ras'];
-const FEM = [['e', ''], ['euse', 'eur'], ['ive', 'if'], ['elle', 'el'], ['enne', 'en'], ['ette', 'et'], ['ère', 'er'], ['rice', 'eur'], ['onne', 'on'], ['ienne', 'ien']];
+const STRICT_VERB = [
+  'ez',
+  'ons',
+  'aient',
+  'iez',
+  'ions',
+  'erai',
+  'eras',
+  'erez',
+  'eront',
+  'erait',
+  'erais',
+  'eraient',
+  'èrent',
+  'âmes',
+  'âtes',
+  'assent',
+  'issons',
+  'issez',
+  'issent',
+  'issait',
+  'issais',
+  'irent',
+  'irai',
+  'iras',
+  'iront',
+  'irait',
+  'é',
+  'ée',
+  'és',
+  'ées',
+];
+const AMB_VERB = [
+  'e',
+  'es',
+  'ent',
+  'ant',
+  'ait',
+  'ais',
+  'ai',
+  'as',
+  'a',
+  'era',
+  'u',
+  'ue',
+  'us',
+  'ues',
+  'i',
+  'ie',
+  'is',
+  'it',
+  'ies',
+  'ra',
+  'rai',
+  'ras',
+];
+const FEM = [
+  ['e', ''],
+  ['euse', 'eur'],
+  ['ive', 'if'],
+  ['elle', 'el'],
+  ['enne', 'en'],
+  ['ette', 'et'],
+  ['ère', 'er'],
+  ['rice', 'eur'],
+  ['onne', 'on'],
+  ['ienne', 'ien'],
+];
 
 export function buildFr() {
   const all = require('an-array-of-french-words');
@@ -150,7 +220,9 @@ export function buildFr() {
 
   // ---- common words + answers ----
   const rank = new Map();
-  freq.forEach((w, i) => { if (!rank.has(w)) rank.set(w, i); });
+  freq.forEach((w, i) => {
+    if (!rank.has(w)) rank.set(w, i);
+  });
   const R = (w) => rank.get(w) ?? Infinity;
   const has = (w) => acc.has(w);
 

@@ -41,7 +41,8 @@ export function entryGame(o: EntryOpts): PuzzleInstance {
   const valEls: HTMLElement[] = [];
   const baseCls: string[] = [];
   const cells = puzzle.map((_, i) => {
-    const lastC = i % cols === cols - 1 ? ' lc' : '', lastR = Math.floor(i / cols) === rows - 1 ? ' lr' : '';
+    const lastC = i % cols === cols - 1 ? ' lc' : '',
+      lastR = Math.floor(i / cols) === rows - 1 ? ' lr' : '';
     const extra = (o.cellClass?.(i) ?? '') + lastC + lastR;
     let el: HTMLElement;
     if (active(i)) {
@@ -102,14 +103,19 @@ export function entryGame(o: EntryOpts): PuzzleInstance {
   }
   if (typeof saved?.sel === 'number' && (saved.sel === -1 || (saved.sel >= 0 && saved.sel < size && active(saved.sel)))) sel = saved.sel;
 
-  ctx.root.append(grid, pad(keys, (v) => (v === '0' ? sel >= 0 && vals[sel] > 0 && input(vals[sel]) : input(Number(v)))));
+  ctx.root.append(
+    grid,
+    pad(keys, (v) => (v === '0' ? sel >= 0 && vals[sel] > 0 && input(vals[sel]) : input(Number(v)))),
+  );
   render();
 
   const step = (dr: number, dc: number) => {
-    let r = sel < 0 ? 0 : Math.floor(sel / cols), c = sel < 0 ? 0 : sel % cols;
+    let r = sel < 0 ? 0 : Math.floor(sel / cols),
+      c = sel < 0 ? 0 : sel % cols;
     if (sel < 0 && active(0)) return select(0);
     for (;;) {
-      r += dr; c += dc;
+      r += dr;
+      c += dc;
       if (r < 0 || c < 0 || r >= rows || c >= cols) return;
       if (active(r * cols + c)) return select(r * cols + c);
     }
@@ -119,13 +125,19 @@ export function entryGame(o: EntryOpts): PuzzleInstance {
     snapshot: () => ({ vals, sel }),
     onKey(e) {
       const k = Number(e.key);
-      if (k >= 1 && k <= N) { input(k); return true; }
+      if (k >= 1 && k <= N) {
+        input(k);
+        return true;
+      }
       if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
         if (sel >= 0 && vals[sel] > 0) input(vals[sel]);
         return true;
       }
       const mv: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
-      if (mv[e.key]) { step(...mv[e.key]); return true; }
+      if (mv[e.key]) {
+        step(...mv[e.key]);
+        return true;
+      }
       return false;
     },
   };
@@ -147,7 +159,8 @@ export function entryHelpSteps(): string[] {
 
 /** Right/bottom thick-edge classes for a region map (`er` / `eb`), skipping the outer frame. */
 export function edgeClasses(region: number[], cols: number, rows: number, i: number): string {
-  const r = Math.floor(i / cols), c = i % cols;
+  const r = Math.floor(i / cols),
+    c = i % cols;
   const out: string[] = [];
   if (c < cols - 1 && region[i] !== region[i + 1]) out.push('er');
   if (r < rows - 1 && region[i] !== region[i + cols]) out.push('eb');

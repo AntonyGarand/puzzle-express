@@ -7,9 +7,13 @@ import './stars.css';
 
 export const stars: PuzzleDef = {
   id: 'stars',
-  get name() { return L('Stars', 'Étoiles'); },
+  get name() {
+    return L('Stars', 'Étoiles');
+  },
   category: 'logic',
-  get rules() { return L('One star per row, column and region. Stars never touch.', 'Une étoile par rangée, colonne et région. Jamais collées.'); },
+  get rules() {
+    return L('One star per row, column and region. Stars never touch.', 'Une étoile par rangée, colonne et région. Jamais collées.');
+  },
   help: () => ({
     goal: L(
       'Place exactly one star in every row, every column and every coloured region.',
@@ -22,7 +26,10 @@ export const stars: PuzzleDef = {
         'Tap a cell once to mark it ✕ (no star), twice for a star, a third time to clear it.',
         'Touchez une case une fois pour la marquer ✕ (pas d’étoile), deux fois pour une étoile, trois fois pour l’effacer.',
       ),
-      L('Clashing stars are marked. The footer counts the stars placed.', 'Les étoiles en conflit sont signalées. Le bas de la carte compte les étoiles placées.'),
+      L(
+        'Clashing stars are marked. The footer counts the stars placed.',
+        'Les étoiles en conflit sont signalées. Le bas de la carte compte les étoiles placées.',
+      ),
     ],
     tips: [
       L(
@@ -41,7 +48,8 @@ export const stars: PuzzleDef = {
     const n = byLevel(d, [5, 6, 7, 8, 9]);
     const { region } = genStars(n, rng);
     // Distinct colours while the palette lasts; otherwise neighbours differ.
-    const colour = n <= 8 ? rng.shuffle([0, 1, 2, 3, 4, 5, 6, 7]).slice(0, n) : colourRegions(n, regionAdjacency(region, n, n, n), rng.int(0, 7));
+    const colour =
+      n <= 8 ? rng.shuffle([0, 1, 2, 3, 4, 5, 6, 7]).slice(0, n) : colourRegions(n, regionAdjacency(region, n, n, n), rng.int(0, 7));
     const edges = edgeClasses(n, n, (i) => region[i]);
 
     // 0 empty, 1 marked ✕, 2 star
@@ -62,12 +70,15 @@ export const stars: PuzzleDef = {
     const render = () => {
       const starsAt = st.map((v, i) => (v === 2 ? i : -1)).filter((i) => i >= 0);
       const bad = new Set<number>();
-      for (const a of starsAt) for (const b of starsAt) {
-        if (a >= b) continue;
-        const clash =
-          Math.floor(a / n) === Math.floor(b / n) || a % n === b % n || region[a] === region[b] || nb8(a, n, n).includes(b);
-        if (clash) { bad.add(a); bad.add(b); }
-      }
+      for (const a of starsAt)
+        for (const b of starsAt) {
+          if (a >= b) continue;
+          const clash = Math.floor(a / n) === Math.floor(b / n) || a % n === b % n || region[a] === region[b] || nb8(a, n, n).includes(b);
+          if (clash) {
+            bad.add(a);
+            bad.add(b);
+          }
+        }
       cells.forEach((el, i) => {
         el.classList.toggle('star', st[i] === 2);
         el.classList.toggle('x', st[i] === 1);
@@ -82,7 +93,10 @@ export const stars: PuzzleDef = {
       if (done) return;
       ctx.touch();
       st[i] = (st[i] + 1) % 3;
-      if (render()) { done = true; ctx.solved(); }
+      if (render()) {
+        done = true;
+        ctx.solved();
+      }
     };
 
     const sv = ctx.saved as { st?: unknown } | undefined;

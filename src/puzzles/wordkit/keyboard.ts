@@ -16,7 +16,11 @@ export function keyboard(onKey: (k: string) => void, enterLabel = L('Enter', 'En
   const keys = new Map<string, HTMLButtonElement>();
   const names: Record<string, string> = { enter: L('Enter', 'Entrée'), back: L('Delete', 'Effacer') };
   const key = (label: string, value: string, cls = '') => {
-    const b = h('button', { type: 'button', class: `key ${cls}`.trim(), 'aria-label': names[value] ?? value, onclick: () => onKey(value) }, label);
+    const b = h(
+      'button',
+      { type: 'button', class: `key ${cls}`.trim(), 'aria-label': names[value] ?? value, onclick: () => onKey(value) },
+      label,
+    );
     if (value.length === 1) keys.set(value, b);
     return b;
   };

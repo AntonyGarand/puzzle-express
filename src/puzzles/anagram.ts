@@ -6,27 +6,40 @@ import { ANAGRAMS, anagramKey, WORDS } from './words';
 
 export const anagram: PuzzleDef = {
   id: 'anagram',
-  get name() { return L('Anagram', 'Anagramme'); },
+  get name() {
+    return L('Anagram', 'Anagramme');
+  },
   category: 'words',
-  get rules() { return L('Unscramble the word. Tap the letters or type.', 'Remettez les lettres dans l’ordre. Touchez ou tapez.'); },
+  get rules() {
+    return L('Unscramble the word. Tap the letters or type.', 'Remettez les lettres dans l’ordre. Touchez ou tapez.');
+  },
   localized: true,
   help: () => ({
-    goal: L(
-      'Rearrange the scrambled letters to spell a word.',
-      'Replacez les lettres mélangées dans le bon ordre pour former un mot.',
-    ),
+    goal: L('Rearrange the scrambled letters to spell a word.', 'Replacez les lettres mélangées dans le bon ordre pour former un mot.'),
     steps: [
       L('The word gets longer with the level: from 4 letters up to 8.', 'Le mot s’allonge avec le niveau : de 4 à 8 lettres.'),
-      L('Tap the tiles in order to fill the slots. The word is checked as soon as every slot is full.', 'Touchez les tuiles dans l’ordre pour remplir les cases. Le mot est vérifié dès que toutes les cases sont pleines.'),
-      L('Tap a filled slot to take back that letter and the ones after it.', 'Touchez une case remplie pour retirer cette lettre et celles qui la suivent.'),
-      L('A wrong word shakes, counts as a mistake and clears the slots.', 'Un mauvais mot fait trembler les cases, compte comme une erreur et les vide.'),
+      L(
+        'Tap the tiles in order to fill the slots. The word is checked as soon as every slot is full.',
+        'Touchez les tuiles dans l’ordre pour remplir les cases. Le mot est vérifié dès que toutes les cases sont pleines.',
+      ),
+      L(
+        'Tap a filled slot to take back that letter and the ones after it.',
+        'Touchez une case remplie pour retirer cette lettre et celles qui la suivent.',
+      ),
+      L(
+        'A wrong word shakes, counts as a mistake and clears the slots.',
+        'Un mauvais mot fait trembler les cases, compte comme une erreur et les vide.',
+      ),
       L(
         'Keyboard: type the letters; Backspace removes the last one, Escape clears. Shuffle mixes the tiles again.',
         'Clavier : tapez les lettres (sans accents, É = E); Retour arrière retire la dernière, Échap vide tout. « Mélanger » brasse les tuiles.',
       ),
     ],
     tips: [
-      L('Look for common endings such as -ING, -ER or -TION, and build from there.', 'Repérez les terminaisons courantes comme -ER, -EUR ou -TION, puis complétez le début.'),
+      L(
+        'Look for common endings such as -ING, -ER or -TION, and build from there.',
+        'Repérez les terminaisons courantes comme -ER, -EUR ou -TION, puis complétez le début.',
+      ),
       L('Stuck? Shuffle: a new order often makes the word jump out.', 'Bloqué? Mélangez : un nouvel ordre fait souvent apparaître le mot.'),
     ],
   }),
@@ -52,7 +65,11 @@ export const anagram: PuzzleDef = {
     const render = () => {
       slots.replaceChildren(
         ...Array.from({ length: len }, (_, k) =>
-          h('button', { type: 'button', class: `cell slot ${picked[k] != null ? 'filled' : ''}`, onclick: () => unpick(k) }, picked[k] != null ? letters[picked[k]] : ''),
+          h(
+            'button',
+            { type: 'button', class: `cell slot ${picked[k] != null ? 'filled' : ''}`, onclick: () => unpick(k) },
+            picked[k] != null ? letters[picked[k]] : '',
+          ),
         ),
       );
       tiles.replaceChildren(
@@ -68,7 +85,10 @@ export const anagram: PuzzleDef = {
       else {
         ctx.mistake();
         shake(slots);
-        setTimeout(() => { picked = []; render(); }, 350);
+        setTimeout(() => {
+          picked = [];
+          render();
+        }, 350);
       }
     };
     const pick = (i: number) => {
@@ -88,7 +108,11 @@ export const anagram: PuzzleDef = {
       rng.shuffle(letters);
       // re-map picked letters onto the new order
       const used = new Set<number>();
-      picked = chosen.map((ch) => { const i = letters.findIndex((l, j) => l === ch && !used.has(j)); used.add(i); return i; });
+      picked = chosen.map((ch) => {
+        const i = letters.findIndex((l, j) => l === ch && !used.has(j));
+        used.add(i);
+        return i;
+      });
       render();
     };
     ctx.controls(btn(L('Shuffle', 'Mélanger'), reshuffle, 'ghost'));
@@ -102,8 +126,15 @@ export const anagram: PuzzleDef = {
     return {
       snapshot: () => ({ letters, picked }),
       onKey(e) {
-        if (e.key === 'Backspace') { unpick(picked.length - 1); return true; }
-        if (e.key === 'Escape') { picked = []; render(); return true; }
+        if (e.key === 'Backspace') {
+          unpick(picked.length - 1);
+          return true;
+        }
+        if (e.key === 'Escape') {
+          picked = [];
+          render();
+          return true;
+        }
         const ch = letterKey(e.key);
         if (ch) {
           const i = letters.findIndex((l, j) => l === ch && !picked.includes(j));

@@ -1,1 +1,3 @@
-[data-puzzle='spider'] { --accent: var(--p7); }
+[data-puzzle='spider'] {
+  --accent: var(--p7);
+}

@@ -1,6 +1,6 @@
 import type { Difficulty } from './types';
 
-export type Outcome = 'solved' | 'failed' | 'skipped';
+type Outcome = 'solved' | 'failed' | 'skipped';
 /** 0 = off, 1 = less, 2 = normal, 3 = more */
 export type Weight = 0 | 1 | 2 | 3;
 export type Theme = 'system' | 'light' | 'dark';
@@ -75,7 +75,7 @@ export const onChange = (fn: Listener) => {
 };
 const emit: Listener = (kind, id) => listeners.forEach((fn) => fn(kind, id));
 
-export function save() {
+function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify(profile));
   } catch {

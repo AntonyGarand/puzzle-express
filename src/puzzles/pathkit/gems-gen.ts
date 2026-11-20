@@ -16,10 +16,12 @@ export interface GemsPuzzle {
 /** Slide from i in direction dir; returns the cells passed through (excluding i). */
 export function slide(n: number, rock: Uint8Array, i: number, dir: number): number[] {
   const [dr, dc] = ORTHO[dir];
-  let r = Math.floor(i / n), c = i % n;
+  let r = Math.floor(i / n),
+    c = i % n;
   const out: number[] = [];
   for (;;) {
-    const rr = r + dr, cc = c + dc;
+    const rr = r + dr,
+      cc = c + dc;
     if (rr < 0 || rr >= n || cc < 0 || cc >= n || rock[rr * n + cc]) break;
     r = rr;
     c = cc;
@@ -29,7 +31,7 @@ export function slide(n: number, rock: Uint8Array, i: number, dir: number): numb
 }
 
 /** BFS over (position, collected mask). Returns fewest moves, or -1. */
-export function solveGems(n: number, rock: Uint8Array, start: number, gems: number[]): number {
+function solveGems(n: number, rock: Uint8Array, start: number, gems: number[]): number {
   const G = gems.length;
   const gemBit = new Int32Array(n * n).fill(0);
   gems.forEach((g, k) => (gemBit[g] = 1 << k));
@@ -48,13 +50,15 @@ export function solveGems(n: number, rock: Uint8Array, start: number, gems: numb
   const full = (1 << G) - 1;
   const dist = new Int16Array(N << G).fill(-1);
   const q = new Int32Array(N << G);
-  let head = 0, tail = 0;
+  let head = 0,
+    tail = 0;
   // the start cell never holds a gem, so we begin with an empty mask
   dist[start] = 0;
   q[tail++] = start;
   while (head < tail) {
     const st = q[head++];
-    const m = Math.floor(st / N), i = st % N;
+    const m = Math.floor(st / N),
+      i = st % N;
     const dd = dist[st];
     if (m === full) return dd;
     for (let d = 0; d < 4; d++) {
@@ -86,7 +90,8 @@ export function genGems(rng: Rng, d: Difficulty): GemsPuzzle {
     const start = rng.pick(free);
     // random walk of slides; gems go on cells it passes
     const seen: number[] = [];
-    let at = start, lastDir = -1;
+    let at = start,
+      lastDir = -1;
     for (let k = 0; k < walk; k++) {
       const opts = [0, 1, 2, 3].filter((dir) => dir !== (lastDir + 2) % 4 && slide(n, rock, at, dir).length);
       if (!opts.length) break;

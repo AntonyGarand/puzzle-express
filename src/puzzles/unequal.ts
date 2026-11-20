@@ -7,16 +7,23 @@ import { isUnique, lineUnits, revealUntilUnique, solve, type Problem } from './s
 
 export const unequal: PuzzleDef = {
   id: 'unequal',
-  get name() { return L('Unequal', 'Inégalités'); },
+  get name() {
+    return L('Unequal', 'Inégalités');
+  },
   category: 'logic',
-  get rules() { return L('Each number once per row and column; obey the signs.', 'Chiffres uniques par rangée et colonne; suivez les signes.'); },
+  get rules() {
+    return L('Each number once per row and column; obey the signs.', 'Chiffres uniques par rangée et colonne; suivez les signes.');
+  },
   help: () => ({
     goal: L(
       'Fill the grid so each number appears once in every row and column, and every sign between two cells is true.',
       'Remplissez la grille pour que chaque chiffre apparaisse une fois par rangée et par colonne, en respectant tous les signes.',
     ),
     steps: [
-      L('Use the numbers 1 up to the grid size (1 to 4 on a 4×4 grid).', 'Utilisez les chiffres de 1 jusqu’à la taille de la grille (1 à 4 sur une grille 4 × 4).'),
+      L(
+        'Use the numbers 1 up to the grid size (1 to 4 on a 4×4 grid).',
+        'Utilisez les chiffres de 1 jusqu’à la taille de la grille (1 à 4 sur une grille 4 × 4).',
+      ),
       L(
         'A chevron between two cells points at the smaller number, like < and >.',
         'Un chevron entre deux cases pointe vers le plus petit chiffre, comme < et >.',
@@ -58,10 +65,7 @@ export const unequal: PuzzleDef = {
     // Strip clues (signs and any givens) while the solution stays unique.
     const minSigns = Math.round(pairs.length * keepFrac);
     type Item = { sign: number } | { cell: number };
-    const items: Item[] = rng.shuffle([
-      ...pairs.map((_, k) => ({ sign: k })),
-      ...puzzle.flatMap((v, i) => (v ? [{ cell: i }] : [])),
-    ]);
+    const items: Item[] = rng.shuffle([...pairs.map((_, k) => ({ sign: k })), ...puzzle.flatMap((v, i) => (v ? [{ cell: i }] : []))]);
     let signs = pairs.length;
     for (const it of items) {
       if ('sign' in it) {
@@ -83,7 +87,8 @@ export const unequal: PuzzleDef = {
     const signsAt: [string, string, string][][] = Array.from({ length: n * n }, () => []);
     pairs.forEach(([a, b], k) => {
       if (!on[k]) return;
-      const p = Math.min(a, b), q = Math.max(a, b);
+      const p = Math.min(a, b),
+        q = Math.max(a, b);
       const across = q === p + 1;
       const pSmaller = a === p;
       // chevron points towards the smaller cell
@@ -99,7 +104,9 @@ export const unequal: PuzzleDef = {
       boardClass: 'unequal',
       decorate(el, i) {
         for (const [dir, pts, label] of signsAt[i]) {
-          el.append(h('span', { class: `sg ${dir}`, 'data-sign': label }, s('svg', { viewBox: '0 0 100 100' }, s('polyline', { points: pts }))));
+          el.append(
+            h('span', { class: `sg ${dir}`, 'data-sign': label }, s('svg', { viewBox: '0 0 100 100' }, s('polyline', { points: pts }))),
+          );
         }
       },
     });

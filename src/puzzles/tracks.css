@@ -1,4 +1,6 @@
-[data-puzzle='tracks'] { --accent: var(--p8); }
+[data-puzzle='tracks'] {
+  --accent: var(--p8);
+}
 
 [data-puzzle='tracks'] .tracks-wrap {
   --board: min(78vw, calc(100dvh - var(--head) - var(--tabs) - 290px), 400px);
@@ -13,8 +15,14 @@
   box-shadow: var(--sh) var(--sh) 0 var(--ink);
   user-select: none;
 }
-[data-puzzle='tracks'] .cols { display: grid; grid-template-columns: repeat(var(--cols), 1fr); }
-[data-puzzle='tracks'] .rows { display: grid; grid-template-rows: repeat(var(--cols), 1fr); }
+[data-puzzle='tracks'] .cols {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+}
+[data-puzzle='tracks'] .rows {
+  display: grid;
+  grid-template-rows: repeat(var(--cols), 1fr);
+}
 [data-puzzle='tracks'] .clue {
   display: flex;
   align-items: center;
@@ -23,10 +31,16 @@
   font-size: clamp(13px, calc(var(--board) / var(--cols) * 0.42), 20px);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  transition: opacity 0.2s, color 0.2s;
+  transition:
+    opacity 0.2s,
+    color 0.2s;
 }
-[data-puzzle='tracks'] .clue.done { opacity: 0.3; }
-[data-puzzle='tracks'] .clue.over { color: var(--bad); }
+[data-puzzle='tracks'] .clue.done {
+  opacity: 0.3;
+}
+[data-puzzle='tracks'] .clue.over {
+  color: var(--bad);
+}
 
 [data-puzzle='tracks'] .tracks-grid {
   position: relative;
@@ -35,7 +49,8 @@
   border: var(--bw) solid var(--ink);
   border-radius: 4px;
   background-color: var(--cell);
-  background-image: linear-gradient(to right, var(--line) 1px, transparent 1px), linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px), linear-gradient(to bottom, var(--line) 1px, transparent 1px);
   background-size: calc(100% / var(--cols)) calc(100% / var(--cols));
   background-position: -0.5px -0.5px;
   --line: color-mix(in srgb, var(--ink) 28%, transparent);
@@ -49,8 +64,16 @@
   font-size: calc(var(--board) / var(--cols) * 0.36);
   cursor: pointer;
 }
-[data-puzzle='tracks'] .tracks-grid .cell.on { background: color-mix(in srgb, var(--accent) 30%, transparent); }
-[data-puzzle='tracks'] .tracks-grid .cell.end { align-items: flex-start; justify-content: flex-start; padding: 1px 3px; font-size: calc(var(--board) / var(--cols) * 0.26); line-height: 1; }
+[data-puzzle='tracks'] .tracks-grid .cell.on {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+[data-puzzle='tracks'] .tracks-grid .cell.end {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 1px 3px;
+  font-size: calc(var(--board) / var(--cols) * 0.26);
+  line-height: 1;
+}
 [data-puzzle='tracks'] .tracks-grid .cell.given::after {
   content: '';
   width: 26%;
@@ -67,6 +90,16 @@
   overflow: visible;
   pointer-events: none;
 }
-.tracks-line polyline { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.tracks-line .under { stroke: var(--ink); stroke-width: 0.3; }
-.tracks-line .over { stroke: var(--accent); stroke-width: 0.16; }
+.tracks-line polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tracks-line .under {
+  stroke: var(--ink);
+  stroke-width: 0.3;
+}
+.tracks-line .over {
+  stroke: var(--accent);
+  stroke-width: 0.16;
+}

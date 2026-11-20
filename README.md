@@ -1,14 +1,48 @@
 # puzzle express
 
-An endless, scroll-snapping feed of short puzzles. It's a static site with no backend: your profile, stats and preferences live in `localStorage`.
+An endless, scroll-snapping feed of short puzzles: 45 games in English and Québec French. It's a static site with no backend; your profile, stats, preferences and unfinished games live in `localStorage`.
+
+**Play:** https://puzzle.garand.dev
+
+## Development
+
+The toolchain is pinned in [`mise.toml`](mise.toml) (Node 24).
 
 ```sh
-npm install
-npm run dev     # local dev server
-npm test        # generator, resume round-trip and auto-levelling tests
-npm run audit   # plays puzzles in Chrome against a running dev server
-npm run shots   # screenshots of every puzzle into shots/
-npm run build   # static output in dist/
+mise install          # once: installs the pinned Node
+npm ci
+npm run dev           # dev server on http://localhost:5180 (also on your LAN)
+npm run check         # everything CI runs: fmt:check, lint, typecheck, knip, test
+```
+
+| Command                             | What it does                                                                                          |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `npm run dev` / `build` / `preview` | Vite dev server, production build into `dist/`, preview of the build                                  |
+| `npm run fmt` / `fmt:check`         | Format with [oxfmt](https://oxc.rs)                                                                   |
+| `npm run lint` / `lint:fix`         | Lint with [oxlint](https://oxc.rs) (warnings fail)                                                    |
+| `npm run typecheck`                 | Type-check with [tsrs](https://github.com/oxc-project/tsrs), a Rust port of the TypeScript 7 compiler |
+| `npm run knip`                      | Unused files, exports and dependencies                                                                |
+| `npm test` / `test:watch`           | Vitest: generation speed, resume round-trip, i18n, auto-levelling                                     |
+| `npm run e2e:audit`                 | Plays games in Chrome against the running dev server                                                  |
+| `npm run e2e:shots`                 | Screenshots every game into `shots/` (`IDS=`, `LEVELS=`, `LOCALE=fr`, `HELP=1`, `VP=mobile,desktop`)  |
+| `npm run dict`                      | Rebuilds the word dictionaries from the npm word lists                                                |
+
+The same commands are available as mise tasks (`mise run check`, `mise run fix`, …).
+
+**CI and deploy:** pull requests run `npm run check` and a build (`.github/workflows/ci.yml`). Pushes to `main` run the same check, then deploy `dist/` to GitHub Pages (`deploy.yml`). The custom domain is set by `public/CNAME`. `puzzles.garand.dev` redirects here from the separate [puzzles-redirect](https://github.com/AntonyGarand/puzzles-redirect) repo.
+
+## Layout
+
+```
+src/
+  main.ts            app shell: tabs, routing (#/, #/games, #/game/<id>, #/play/<id>, #/stats, #/settings)
+  styles.css         design tokens + shared components (neo-brutalist)
+  core/              feed, card, store (profile/stats/auto-levelling), saves, i18n, help dialog, ui helpers
+  pages/             Games, single-game view, Profile, Settings
+  puzzles/<id>.ts    one game per file, auto-registered (see docs/ADDING_GAMES.md)
+  puzzles/*kit/      shared engines: sudokukit, logickit, pathkit, movekit, cardkit, chesskit, wordkit
+test/                vitest suites (happy-dom)
+scripts/             Playwright audit + screenshot tools (use your installed Chrome)
 ```
 
 ## Games
@@ -18,31 +52,29 @@ There are 45 games in seven categories (`src/core/categories.ts`):
 - **Logic:** Sudoku, Jigsaw Sudoku, Killer Sudoku, Cross Sums, Unequal, Binary, Queens, Stars, Tents, Tiles, Mines, Bridges, Nonogram, Lights, Code Breaker
 - **Paths & links:** Pipes, Connect, Beehive, Tracks, Untangle, Maze
 - **Numbers:** Quick Math, Sequence, Target, Guess, Merge
-- **Words:** Anagram, Word Guess, Hunt, Tower
+- **Words:** Anagram, Word Guess, Hunt, Tower (English and French word lists)
 - **Moves:** Slide, Unblock, Push, Gems, Arrange, Blocks, Flood
 - **Cards & chess:** Solitaire, FreeCell, Spider, Pyramid, Chess (mate in 1 or 2)
 - **Memory & eyes:** Memory, Pairs, Odd Shade
 
-Every game is generated from a seed and has five levels: Easy, Medium, Hard, Expert, Master. Shared helpers live in `src/puzzles/*kit/` folders. The word games validate against a lazily loaded dictionary (`src/puzzles/wordkit/dict.txt`, built from SCOWL via `wordlist-english` by `wordkit/build-dict.mjs`).
+Every game is generated from a seed, has five levels (Easy to Master) and a how-to-play tutorial behind its "?" button.
 
-## Navigation
+**Word data:**
 
-- **Feed**: an endless mixed feed. `#/play/<id>` gives an endless feed of a single puzzle.
-- **Games**: every game grouped by category; pick any puzzle and level. Unfinished puzzles from the feed or Labs are saved, with their seed, board state and time, so you can resume them here.
-- **Profile**: your stats, plus export, import and reset.
-- **Settings**: theme, auto-advance, starting level, and how often each puzzle appears and at what level.
+- **English:** SCOWL, via `wordlist-english`.
+- **French:** validation from `an-array-of-french-words`, frequencies from `@zxcvbn-ts/language-fr` (OpenSubtitles, ODC-BY), filtered with `french-badwords-list`.
 
-On phones, the tabs move to a bottom bar.
+Each language's dictionary is a lazily loaded chunk.
 
 ## Difficulty
 
-Each puzzle type starts on **Auto**:
+Each game starts on **Auto**:
 
 - **Up a level** after 3 clean solves within par time, or 2 flawless solves in under half of par.
 - **Down a level** after 2 misses in a row, where a miss is a failure or a skip.
 
-If you pick a level yourself (on the card or in Settings), it's locked and auto-levelling stops for that puzzle. Choose *Auto* to turn it back on.
+If you pick a level yourself (on the card or in Settings), it's locked and auto-levelling stops for that game. Choose _Auto_ to turn it back on.
 
-## Adding a puzzle
+## Adding a game
 
-See [docs/ADDING_GAMES.md](docs/ADDING_GAMES.md). Any `src/puzzles/<id>.ts` that exports a `PuzzleDef` is registered automatically. Use the shared building blocks from `src/core/ui.ts` (`board`, `.cell`, `pad`, `btn`, `PALETTE`) so the new puzzle matches the rest. Implement `snapshot()` and read `ctx.saved` so the puzzle can be resumed. Generate everything from `ctx.rng`, because resuming re-creates the puzzle from its seed.
+See [docs/ADDING_GAMES.md](docs/ADDING_GAMES.md). Any `src/puzzles/<id>.ts` that exports a `PuzzleDef` is registered automatically. Generate everything from `ctx.rng`, implement `snapshot()`/`ctx.saved` for resume, use the shared UI building blocks, and write every string with `L(en, fr)`.

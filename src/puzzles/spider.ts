@@ -8,7 +8,13 @@ import { bindTable, History } from './cardkit/table';
 
 const TOP = 1.7;
 
-interface Cfg { suits: number[]; copies: number; cols: number; dealt: number; tab: number }
+interface Cfg {
+  suits: number[];
+  copies: number;
+  cols: number;
+  dealt: number;
+  tab: number;
+}
 
 function validState(v: unknown, cfg: Cfg): v is SState {
   const s = v as SState;
@@ -20,7 +26,9 @@ function validState(v: unknown, cfg: Cfg): v is SState {
 
 export const spider: PuzzleDef = {
   id: 'spider',
-  get name() { return L('Spider', 'Araignée'); },
+  get name() {
+    return L('Spider', 'Araignée');
+  },
   category: 'cards',
   get rules() {
     return L('Stack down; full K→A runs of one suit clear away.', 'Empilez en descendant; les suites R→A d’une sorte partent.');
@@ -53,8 +61,14 @@ export const spider: PuzzleDef = {
       ),
     ],
     tips: [
-      L('Build in the same suit whenever you can: mixed runs get stuck.', 'Empilez dans la même sorte dès que possible : les suites mélangées bloquent.'),
-      L('An empty column is precious; use it to reorder runs before dealing.', 'Une colonne vide est précieuse; servez-vous-en pour réordonner avant de donner.'),
+      L(
+        'Build in the same suit whenever you can: mixed runs get stuck.',
+        'Empilez dans la même sorte dès que possible : les suites mélangées bloquent.',
+      ),
+      L(
+        'An empty column is precious; use it to reorder runs before dealing.',
+        'Une colonne vide est précieuse; servez-vous-en pour réordonner avant de donner.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [240, 360, 540, 900, 1500]),
@@ -110,7 +124,12 @@ export const spider: PuzzleDef = {
       render();
       if (wonS(s)) {
         over = true;
-        ctx.status(L(`All ${runs} runs cleared in ${s.moves} moves`, `Les ${runs} suites sont faites en ${P(s.moves, ['coup', 'coups'], ['coup', 'coups'])}`));
+        ctx.status(
+          L(
+            `All ${runs} runs cleared in ${s.moves} moves`,
+            `Les ${runs} suites sont faites en ${P(s.moves, ['coup', 'coups'], ['coup', 'coups'])}`,
+          ),
+        );
         ctx.solved();
         return;
       }
@@ -145,10 +164,16 @@ export const spider: PuzzleDef = {
       tap(p, i) {
         if (over) return;
         ctx.touch();
-        if (p === 's') { deal(); return; }
+        if (p === 's') {
+          deal();
+          return;
+        }
         if (i < 0 || p === 'done') return;
         const to = bestDestS(s, p, i);
-        if (!to) { bump(p, i); return; }
+        if (!to) {
+          bump(p, i);
+          return;
+        }
         hist.push(s);
         moveS(s, p, i, to);
         after();
@@ -180,8 +205,17 @@ export const spider: PuzzleDef = {
     return {
       snapshot: () => ({ s, hist: hist.stack }),
       onKey(e) {
-        if (e.key === 'z' || e.key === 'Backspace') { undo(); return true; }
-        if (e.key === ' ' || e.key === 'd') { if (!over) { ctx.touch(); deal(); } return true; }
+        if (e.key === 'z' || e.key === 'Backspace') {
+          undo();
+          return true;
+        }
+        if (e.key === ' ' || e.key === 'd') {
+          if (!over) {
+            ctx.touch();
+            deal();
+          }
+          return true;
+        }
         return false;
       },
     };

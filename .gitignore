@@ -1,3 +1,7 @@
-node_modules
-dist
-shots*
+node_modules/
+dist/
+shots*/
+*.log
+.DS_Store
+.vite/
+coverage/

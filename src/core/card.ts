@@ -147,7 +147,16 @@ export class Card {
     this.controlsEl.replaceChildren();
     this.foot.replaceChildren(
       this.statusEl,
-      h('div', { class: 'actions' }, this.controlsEl, btn(this.opts.lab ? L('Give up', 'Abandonner') : L('Skip', 'Passer'), () => this.finish(this.opts.lab ? 'failed' : 'skipped'), 'ghost')),
+      h(
+        'div',
+        { class: 'actions' },
+        this.controlsEl,
+        btn(
+          this.opts.lab ? L('Give up', 'Abandonner') : L('Skip', 'Passer'),
+          () => this.finish(this.opts.lab ? 'failed' : 'skipped'),
+          'ghost',
+        ),
+      ),
     );
     this.syncLevelSel();
     this.tick();
@@ -203,7 +212,15 @@ export class Card {
     } catch {
       state = undefined;
     }
-    putSave(this.def.id, { seed: this.seed, level: this.level, elapsed: Math.round(this.time()), mistakes: this.mistakes, state, at: Date.now(), locale: locale() });
+    putSave(this.def.id, {
+      seed: this.seed,
+      level: this.level,
+      elapsed: Math.round(this.time()),
+      mistakes: this.mistakes,
+      state,
+      at: Date.now(),
+      locale: locale(),
+    });
   }
 
   time() {
@@ -262,7 +279,13 @@ export class Card {
     if (res.best) parts.push(` · ${L('new best', 'nouveau record')}`);
     if (res.levelChange) {
       const up = res.levelChange.to > res.levelChange.from;
-      parts.push(h('span', { class: 'lvl-change' }, ` · ${up ? L('Level up', 'Niveau supérieur') : L('Easing off', 'On ralentit')} → ${LEVEL_NAMES[res.levelChange.to]}`));
+      parts.push(
+        h(
+          'span',
+          { class: 'lvl-change' },
+          ` · ${up ? L('Level up', 'Niveau supérieur') : L('Easing off', 'On ralentit')} → ${LEVEL_NAMES[res.levelChange.to]}`,
+        ),
+      );
     }
 
     this.foot.replaceChildren(

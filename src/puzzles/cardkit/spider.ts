@@ -1,7 +1,10 @@
 import { rank, suit, type Card } from './cards';
 
 /** Spider rules engine (pure; no DOM). */
-export interface SCol { d: Card[]; u: Card[] }
+interface SCol {
+  d: Card[];
+  u: Card[];
+}
 export interface SState {
   cols: SCol[];
   stock: Card[]; // top = end
@@ -17,12 +20,10 @@ export function dealS(cards: Card[], ncols: number, dealt: number): SState {
   return { cols, stock: c, done: [], moves: 0 };
 }
 
-export const cloneS = (s: SState): SState => ({ cols: s.cols.map((c) => ({ d: c.d.slice(), u: c.u.slice() })), stock: s.stock.slice(), done: s.done.slice(), moves: s.moves });
-
 const seqOk = (a: Card, b: Card) => suit(a) === suit(b) && rank(a) === rank(b) + 1;
 
 /** Index (within u) where the movable same-suit run at the top starts. */
-export function runStartS(u: Card[]): number {
+function runStartS(u: Card[]): number {
   let k = u.length - 1;
   while (k > 0 && seqOk(u[k - 1], u[k])) k--;
   return Math.max(0, k);
@@ -65,7 +66,7 @@ export function moveS(s: SState, p: string, i: number, to: string, dry = false):
   return true;
 }
 
-export const tableCount = (s: SState) => s.cols.reduce((a, c) => a + c.d.length + c.u.length, 0);
+const tableCount = (s: SState) => s.cols.reduce((a, c) => a + c.d.length + c.u.length, 0);
 /** A row may be dealt when no column is empty (or there aren't enough cards to fill them). */
 export const canDealS = (s: SState) =>
   s.stock.length >= s.cols.length && (s.cols.every((c) => c.u.length) || tableCount(s) < s.cols.length);

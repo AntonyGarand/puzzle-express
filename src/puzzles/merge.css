@@ -1,6 +1,15 @@
-[data-puzzle='merge'] { --accent: var(--p1); }
-[data-puzzle='merge'] .merge-grid { touch-action: none; }
-[data-puzzle='merge'] .cell { background: var(--cell-alt); box-shadow: none; border-style: dashed; border-color: color-mix(in srgb, var(--ink) 35%, transparent); }
+[data-puzzle='merge'] {
+  --accent: var(--p1);
+}
+[data-puzzle='merge'] .merge-grid {
+  touch-action: none;
+}
+[data-puzzle='merge'] .cell {
+  background: var(--cell-alt);
+  box-shadow: none;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--ink) 35%, transparent);
+}
 [data-puzzle='merge'] .cell.mg {
   background: var(--c, var(--ink));
   color: var(--on-tone);
@@ -8,8 +17,18 @@
   border-color: var(--ink);
   box-shadow: var(--csh) var(--csh) 0 var(--ink);
 }
-[data-puzzle='merge'] .cell.mg.lo { color: var(--fg); }
-[data-puzzle='merge'] .cell.mg.top { color: var(--bg); }
-[data-puzzle='merge'] .cell.d3 { font-size: calc(var(--board) / var(--cols) * 0.34); }
-[data-puzzle='merge'] .cell.d4 { font-size: calc(var(--board) / var(--cols) * 0.27); }
-[data-puzzle='merge'] .cell.d5 { font-size: calc(var(--board) / var(--cols) * 0.22); }
+[data-puzzle='merge'] .cell.mg.lo {
+  color: var(--fg);
+}
+[data-puzzle='merge'] .cell.mg.top {
+  color: var(--bg);
+}
+[data-puzzle='merge'] .cell.d3 {
+  font-size: calc(var(--board) / var(--cols) * 0.34);
+}
+[data-puzzle='merge'] .cell.d4 {
+  font-size: calc(var(--board) / var(--cols) * 0.27);
+}
+[data-puzzle='merge'] .cell.d5 {
+  font-size: calc(var(--board) / var(--cols) * 0.22);
+}

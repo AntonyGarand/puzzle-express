@@ -9,24 +9,43 @@ const SQ3 = Math.sqrt(3);
 
 export const beehive: PuzzleDef = {
   id: 'beehive',
-  get name() { return L('Beehive', 'Ruche'); },
+  get name() {
+    return L('Beehive', 'Ruche');
+  },
   category: 'paths',
-  get rules() { return L('Count 1 to N through touching hexes. Tap to step.', 'Comptez de 1 à N d’un hexagone voisin à l’autre.'); },
+  get rules() {
+    return L('Count 1 to N through touching hexes. Tap to step.', 'Comptez de 1 à N d’un hexagone voisin à l’autre.');
+  },
   help: () => ({
     goal: L(
       'Fill every hex with the numbers 1 to N so that each number touches the next one. Some numbers are already given.',
       'Remplissez chaque hexagone avec les nombres de 1 à N : chaque nombre doit toucher le suivant. Certains nombres sont déjà donnés.',
     ),
     steps: [
-      L('Your chain starts at 1. Tap a neighbouring hex to place the next number there.', 'Votre chaîne part de 1. Touchez un hexagone voisin pour y placer le nombre suivant.'),
+      L(
+        'Your chain starts at 1. Tap a neighbouring hex to place the next number there.',
+        'Votre chaîne part de 1. Touchez un hexagone voisin pour y placer le nombre suivant.',
+      ),
       L('You can also drag across several hexes in a row.', 'Vous pouvez aussi glisser le doigt sur plusieurs hexagones d’affilée.'),
-      L('A given number must be reached exactly on its turn: you can’t pass it early, and when it’s next, you must step onto it.', 'Un nombre donné doit être atteint pile à son tour : impossible d’y passer trop tôt, et quand c’est lui le suivant, vous devez y aller.'),
+      L(
+        'A given number must be reached exactly on its turn: you can’t pass it early, and when it’s next, you must step onto it.',
+        'Un nombre donné doit être atteint pile à son tour : impossible d’y passer trop tôt, et quand c’est lui le suivant, vous devez y aller.',
+      ),
       L('Highlighted hexes show where the next number can go.', 'Les hexagones en surbrillance montrent où peut aller le prochain nombre.'),
-      L('Tap a placed number to rewind to it. Undo removes the last number; Reset starts over from 1.', 'Touchez un nombre placé pour revenir à lui. Annuler retire le dernier nombre; Repartir revient à 1.'),
+      L(
+        'Tap a placed number to rewind to it. Undo removes the last number; Reset starts over from 1.',
+        'Touchez un nombre placé pour revenir à lui. Annuler retire le dernier nombre; Repartir revient à 1.',
+      ),
     ],
     tips: [
-      L('Aim for the next given number: your path must reach it in exactly the right number of steps.', 'Visez le prochain nombre donné : votre chemin doit l’atteindre en exactement le bon nombre de pas.'),
-      L('Don’t leave a lone hex behind you; you can never come back for it.', 'Ne laissez pas d’hexagone isolé derrière vous : vous ne pourrez plus y revenir.'),
+      L(
+        'Aim for the next given number: your path must reach it in exactly the right number of steps.',
+        'Visez le prochain nombre donné : votre chemin doit l’atteindre en exactement le bon nombre de pas.',
+      ),
+      L(
+        'Don’t leave a lone hex behind you; you can never come back for it.',
+        'Ne laissez pas d’hexagone isolé derrière vous : vous ne pourrez plus y revenir.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [30, 60, 90, 150, 220]),
@@ -43,9 +62,12 @@ export const beehive: PuzzleDef = {
     const cx = cells.map((c) => SQ3 * (c.q + c.r / 2));
     const cy = cells.map((c) => 1.5 * c.r);
     const pad = 0.25;
-    const minX = Math.min(...cx) - SQ3 / 2 - pad, maxX = Math.max(...cx) + SQ3 / 2 + pad;
-    const minY = Math.min(...cy) - 1 - pad, maxY = Math.max(...cy) + 1 + pad;
-    const vw = maxX - minX, vh = maxY - minY;
+    const minX = Math.min(...cx) - SQ3 / 2 - pad,
+      maxX = Math.max(...cx) + SQ3 / 2 + pad;
+    const minY = Math.min(...cy) - 1 - pad,
+      maxY = Math.max(...cy) + 1 + pad;
+    const vw = maxX - minX,
+      vh = maxY - minY;
     const svg = s('svg', { class: 'beehive', viewBox: `${minX} ${minY} ${vw} ${vh}`, style: `aspect-ratio:${vw}/${vh}` });
     const corners = Array.from({ length: 6 }, (_, k) => {
       const a = (Math.PI / 180) * (60 * k + 30);
@@ -75,7 +97,10 @@ export const beehive: PuzzleDef = {
         const num = givens[i] || (k != null ? k + 1 : 0);
         t.textContent = num ? String(num) : '';
         const canStep = !finished && k == null && adj[end].includes(i) && (givens[i] ? givens[i] === next : !givenAt.has(next));
-        g.setAttribute('class', `hex${givens[i] ? ' given' : ''}${k != null ? ' placed' : ''}${i === end ? ' end' : ''}${canStep ? ' next' : ''}`);
+        g.setAttribute(
+          'class',
+          `hex${givens[i] ? ' given' : ''}${k != null ? ' placed' : ''}${i === end ? ' end' : ''}${canStep ? ' next' : ''}`,
+        );
       });
       ctx.status(`${chain.length} / ${N}`);
       return chain.length === N;
@@ -115,10 +140,14 @@ export const beehive: PuzzleDef = {
       if (!r.width) return -1;
       const x = minX + ((e.clientX - r.left) / r.width) * vw;
       const y = minY + ((e.clientY - r.top) / r.height) * vh;
-      let best = -1, bd = 0.8;
+      let best = -1,
+        bd = 0.8;
       for (let i = 0; i < N; i++) {
         const dd = Math.hypot(cx[i] - x, cy[i] - y);
-        if (dd < bd) (bd = dd), (best = i);
+        if (dd < bd) {
+          bd = dd;
+          best = i;
+        }
       }
       return best;
     };
@@ -145,12 +174,26 @@ export const beehive: PuzzleDef = {
     svg.addEventListener('pointercancel', end);
 
     ctx.controls(
-      btn(L('Undo', 'Annuler'), () => {
-        if (!finished && chain.length > 1) chain.pop(), render();
-      }, 'ghost'),
-      btn(L('Reset', 'Repartir'), () => {
-        if (!finished) (chain.length = 1), render();
-      }, 'ghost'),
+      btn(
+        L('Undo', 'Annuler'),
+        () => {
+          if (!finished && chain.length > 1) {
+            chain.pop();
+            render();
+          }
+        },
+        'ghost',
+      ),
+      btn(
+        L('Reset', 'Repartir'),
+        () => {
+          if (!finished) {
+            chain.length = 1;
+            render();
+          }
+        },
+        'ghost',
+      ),
     );
 
     // ---- resume: replay the saved chain through the same rules ----

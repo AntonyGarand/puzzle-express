@@ -7,24 +7,46 @@ import './tracks.css';
 
 export const tracks: PuzzleDef = {
   id: 'tracks',
-  get name() { return L('Tracks', 'Tracé'); },
+  get name() {
+    return L('Tracks', 'Tracé');
+  },
   category: 'paths',
-  get rules() { return L('Draw A to B. Edge numbers count path cells per line.', 'Tracez de A à B. Les chiffres comptent les cases par ligne.'); },
+  get rules() {
+    return L('Draw A to B. Edge numbers count path cells per line.', 'Tracez de A à B. Les chiffres comptent les cases par ligne.');
+  },
   help: () => ({
     goal: L(
       'Draw one track from A to B. The numbers around the grid say how many track cells each row and column must hold.',
       'Tracez un seul chemin de A à B. Les chiffres autour de la grille indiquent combien de cases du tracé compte chaque rangée et chaque colonne.',
     ),
     steps: [
-      L('Drag from A (or from the end of your track) through neighbouring cells to lay track.', 'Glissez à partir de A (ou du bout de votre tracé) de case voisine en case voisine.'),
-      L('The track can’t cross itself or branch, and it stops once it reaches B.', 'Le tracé ne peut ni se croiser ni bifurquer, et il s’arrête en atteignant B.'),
+      L(
+        'Drag from A (or from the end of your track) through neighbouring cells to lay track.',
+        'Glissez à partir de A (ou du bout de votre tracé) de case voisine en case voisine.',
+      ),
+      L(
+        'The track can’t cross itself or branch, and it stops once it reaches B.',
+        'Le tracé ne peut ni se croiser ni bifurquer, et il s’arrête en atteignant B.',
+      ),
       L('Cells with a small square must be on the track.', 'Les cases marquées d’un petit carré doivent faire partie du tracé.'),
-      L('A number fades when its line is right and turns red when it has too many cells.', 'Un chiffre pâlit quand sa ligne est juste et devient rouge si elle a trop de cases.'),
-      L('Tap a cell on your track to cut it back there. Clear restarts from A.', 'Touchez une case du tracé pour le couper à cet endroit. Effacer repart de A.'),
+      L(
+        'A number fades when its line is right and turns red when it has too many cells.',
+        'Un chiffre pâlit quand sa ligne est juste et devient rouge si elle a trop de cases.',
+      ),
+      L(
+        'Tap a cell on your track to cut it back there. Clear restarts from A.',
+        'Touchez une case du tracé pour le couper à cet endroit. Effacer repart de A.',
+      ),
     ],
     tips: [
-      L('A 0 means the track never enters that line; a number equal to the grid size means the whole line is used.', 'Un 0 veut dire que le tracé n’entre jamais dans cette ligne; un chiffre égal à la taille de la grille, qu’elle est remplie au complet.'),
-      L('Plan how to pass through the marked cells before you start drawing.', 'Prévoyez comment passer par les cases marquées avant de tracer.'),
+      L(
+        'A 0 means the track never enters that line; a number equal to the grid size means the whole line is used.',
+        'Un 0 veut dire que le tracé n’entre jamais dans cette ligne; un chiffre égal à la taille de la grille, qu’elle est remplie au complet.',
+      ),
+      L(
+        'Plan how to pass through the marked cells before you start drawing.',
+        'Prévoyez comment passer par les cases marquées avant de tracer.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [35, 60, 90, 140, 210]),
@@ -65,8 +87,12 @@ export const tracks: PuzzleDef = {
       cells.forEach((el, i) => {
         el.className = `cell${on.has(i) ? ' on' : ''}${given.has(i) ? ' given' : ''}${i === a || i === b ? ' end' : ''}`;
       });
-      const rc = new Array<number>(n).fill(0), cc = new Array<number>(n).fill(0);
-      for (const i of trail) rc[Math.floor(i / n)]++, cc[i % n]++;
+      const rc = new Array<number>(n).fill(0),
+        cc = new Array<number>(n).fill(0);
+      for (const i of trail) {
+        rc[Math.floor(i / n)]++;
+        cc[i % n]++;
+      }
       let ok = true;
       const mark = (el: HTMLElement, have: number, want: number) => {
         el.classList.toggle('done', have === want);
@@ -89,7 +115,10 @@ export const tracks: PuzzleDef = {
           ? ok && !missing
             ? L('Done!', 'Terminé!')
             : missing
-              ? L(`${missing} marked cell${missing > 1 ? 's' : ''} missed`, missing > 1 ? `${missing} cases marquées oubliées` : '1 case marquée oubliée')
+              ? L(
+                  `${missing} marked cell${missing > 1 ? 's' : ''} missed`,
+                  missing > 1 ? `${missing} cases marquées oubliées` : '1 case marquée oubliée',
+                )
               : L('Counts don’t match', 'Les chiffres ne collent pas')
           : L(`${len} cells`, `${len} case${len > 1 ? 's' : ''}`),
       );
@@ -145,18 +174,30 @@ export const tracks: PuzzleDef = {
     grid.addEventListener('pointercancel', end);
 
     ctx.controls(
-      btn(L('Clear', 'Effacer'), () => {
-        if (finished) return;
-        trail.length = 1;
-        render();
-      }, 'ghost'),
+      btn(
+        L('Clear', 'Effacer'),
+        () => {
+          if (finished) return;
+          trail.length = 1;
+          render();
+        },
+        'ghost',
+      ),
     );
 
     const sv = ctx.saved as { trail?: unknown } | undefined;
     if (Array.isArray(sv?.trail) && sv.trail[0] === a) {
       const t = sv.trail as number[];
       const seen = new Set<number>();
-      const ok = t.every((v, i) => Number.isInteger(v) && v >= 0 && v < N && !seen.has(v) && (seen.add(v), i === 0 || adjacent(t[i - 1], v, n)) && (v !== b || i === t.length - 1));
+      const ok = t.every(
+        (v, i) =>
+          Number.isInteger(v) &&
+          v >= 0 &&
+          v < N &&
+          !seen.has(v) &&
+          (seen.add(v), i === 0 || adjacent(t[i - 1], v, n)) &&
+          (v !== b || i === t.length - 1),
+      );
       if (ok) trail.splice(0, trail.length, ...t);
     }
     root.append(wrap);

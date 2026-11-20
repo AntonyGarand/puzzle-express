@@ -7,24 +7,40 @@ import './connect.css';
 
 export const connect: PuzzleDef = {
   id: 'connect',
-  get name() { return L('Connect', 'Relier'); },
+  get name() {
+    return L('Connect', 'Relier');
+  },
   category: 'paths',
-  get rules() { return L('Link same-colour dots. Fill every cell, no crossing.', 'Reliez les points de même couleur. Remplissez tout.'); },
+  get rules() {
+    return L('Link same-colour dots. Fill every cell, no crossing.', 'Reliez les points de même couleur. Remplissez tout.');
+  },
   help: () => ({
     goal: L(
       'Join each pair of same-colour dots with a path, and fill every cell of the grid. Paths can’t cross.',
       'Reliez chaque paire de points de même couleur par un chemin et remplissez toutes les cases. Les chemins ne se croisent pas.',
     ),
     steps: [
-      L('Drag from a dot to draw a path; it follows your finger from cell to cell.', 'Glissez à partir d’un point pour tracer un chemin : il suit votre doigt de case en case.'),
+      L(
+        'Drag from a dot to draw a path; it follows your finger from cell to cell.',
+        'Glissez à partir d’un point pour tracer un chemin : il suit votre doigt de case en case.',
+      ),
       L('Reach the other dot of the same colour to link the pair.', 'Rejoignez l’autre point de la même couleur pour relier la paire.'),
-      L('Drag back along a path to shorten it, or grab it in the middle to redraw from there.', 'Revenez sur un chemin pour le raccourcir, ou reprenez-le au milieu pour le retracer à partir de là.'),
+      L(
+        'Drag back along a path to shorten it, or grab it in the middle to redraw from there.',
+        'Revenez sur un chemin pour le raccourcir, ou reprenez-le au milieu pour le retracer à partir de là.',
+      ),
       L('Drawing over another colour cuts that path.', 'Tracer par-dessus une autre couleur coupe ce chemin.'),
       L('Clear erases every path.', 'Effacer supprime tous les chemins.'),
     ],
     tips: [
-      L('Start with dots on the edges or close together; paths along the walls rarely get in the way.', 'Commencez par les points en bordure ou proches l’un de l’autre : les chemins le long des bords gênent rarement.'),
-      L('Every cell must be used, so let long paths wind through empty areas.', 'Toutes les cases doivent servir : faites serpenter les longs chemins dans les zones vides.'),
+      L(
+        'Start with dots on the edges or close together; paths along the walls rarely get in the way.',
+        'Commencez par les points en bordure ou proches l’un de l’autre : les chemins le long des bords gênent rarement.',
+      ),
+      L(
+        'Every cell must be used, so let long paths wind through empty areas.',
+        'Toutes les cases doivent servir : faites serpenter les longs chemins dans les zones vides.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [30, 50, 80, 120, 180]),
@@ -155,11 +171,15 @@ export const connect: PuzzleDef = {
     grid.addEventListener('pointercancel', end);
 
     ctx.controls(
-      btn(L('Clear', 'Effacer'), () => {
-        if (finished) return;
-        paths.forEach((p) => (p.length = 0));
-        render();
-      }, 'ghost'),
+      btn(
+        L('Clear', 'Effacer'),
+        () => {
+          if (finished) return;
+          paths.forEach((p) => (p.length = 0));
+          render();
+        },
+        'ghost',
+      ),
     );
 
     // ---- resume ----
@@ -168,8 +188,14 @@ export const connect: PuzzleDef = {
       const used = new Set<number>();
       sv.paths.forEach((p, c) => {
         if (!Array.isArray(p) || !p.length || dot[p[0]] !== c) return;
-        const ok = p.every((v, i) =>
-          Number.isInteger(v) && v >= 0 && v < N && !used.has(v) && (i === 0 || adjacent(p[i - 1], v, n)) && (i === 0 || dot[v] < 0 || (dot[v] === c && i === p.length - 1)),
+        const ok = p.every(
+          (v, i) =>
+            Number.isInteger(v) &&
+            v >= 0 &&
+            v < N &&
+            !used.has(v) &&
+            (i === 0 || adjacent(p[i - 1], v, n)) &&
+            (i === 0 || dot[v] < 0 || (dot[v] === c && i === p.length - 1)),
         );
         if (!ok) return;
         p.forEach((v: number) => used.add(v));

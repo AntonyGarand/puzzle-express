@@ -1,4 +1,6 @@
-[data-puzzle='unequal'] { --accent: var(--p1); }
+[data-puzzle='unequal'] {
+  --accent: var(--p1);
+}
 [data-puzzle='unequal'] .grid.unequal {
   --g: calc(var(--board) / var(--cols) * 0.34);
   gap: var(--g);

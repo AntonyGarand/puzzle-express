@@ -9,7 +9,20 @@ function segmented<T extends string | number>(options: { label: string; value: T
   const draw = (cur: T) =>
     el.replaceChildren(
       ...options.map((o) =>
-        h('button', { type: 'button', role: 'radio', 'aria-checked': String(o.value === cur), class: o.value === cur ? 'on' : '', onclick: () => { onpick(o.value); draw(o.value); } }, o.label),
+        h(
+          'button',
+          {
+            type: 'button',
+            role: 'radio',
+            'aria-checked': String(o.value === cur),
+            class: o.value === cur ? 'on' : '',
+            onclick: () => {
+              onpick(o.value);
+              draw(o.value);
+            },
+          },
+          o.label,
+        ),
       ),
     );
   draw(current);
@@ -49,13 +62,22 @@ export function renderSettings(el: HTMLElement, defs: PuzzleDef[]) {
       h(
         'div',
         null,
-        h('a', { class: 'name', href: `#/game/${d.id}`, title: `${L('Open', 'Ouvrir')} ${d.name}` }, h('span', { class: 'swatchlet' }), d.name, h('span', { class: 'play-link' }, L('play →', 'jouer →'))),
+        h(
+          'a',
+          { class: 'name', href: `#/game/${d.id}`, title: `${L('Open', 'Ouvrir')} ${d.name}` },
+          h('span', { class: 'swatchlet' }),
+          d.name,
+          h('span', { class: 'play-link' }, L('play →', 'jouer →')),
+        ),
         h('div', { class: 'muted small' }, d.rules),
       ),
       h(
         'div',
         { class: 'row' },
-        segmented(weights, prefs(d.id).weight, (v) => { setWeight(d.id, v); renderSettings(el, defs); }),
+        segmented(weights, prefs(d.id).weight, (v) => {
+          setWeight(d.id, v);
+          renderSettings(el, defs);
+        }),
         levelSelect(d.id),
       ),
     );
@@ -68,32 +90,73 @@ export function renderSettings(el: HTMLElement, defs: PuzzleDef[]) {
       h(
         'div',
         { class: 'setting' },
-        h('div', null, h('div', null, L('Language', 'Langue')), h('div', { class: 'muted small' }, L('Interface and word games.', 'Interface et jeux de mots.'))),
-        segmented<Locale>(LOCALES.map((l) => ({ label: l.name, value: l.id })), locale(), (v) => setLocale(v)),
+        h(
+          'div',
+          null,
+          h('div', null, L('Language', 'Langue')),
+          h('div', { class: 'muted small' }, L('Interface and word games.', 'Interface et jeux de mots.')),
+        ),
+        segmented<Locale>(
+          LOCALES.map((l) => ({ label: l.name, value: l.id })),
+          locale(),
+          (v) => setLocale(v),
+        ),
       ),
       h(
         'div',
         { class: 'setting' },
         h('div', null, h('div', null, L('Theme', 'Thème'))),
-        segmented<Theme>([{ label: L('System', 'Système'), value: 'system' }, { label: L('Light', 'Clair'), value: 'light' }, { label: L('Dark', 'Sombre'), value: 'dark' }], p.theme, (v) => update({ theme: v })),
+        segmented<Theme>(
+          [
+            { label: L('System', 'Système'), value: 'system' },
+            { label: L('Light', 'Clair'), value: 'light' },
+            { label: L('Dark', 'Sombre'), value: 'dark' },
+          ],
+          p.theme,
+          (v) => update({ theme: v }),
+        ),
       ),
       h(
         'div',
         { class: 'setting' },
-        h('div', null, h('div', null, L('Auto-advance', 'Avance automatique')), h('div', { class: 'muted small' }, L('Scroll to the next puzzle after a solve.', 'Passer au jeu suivant après une réussite.'))),
-        segmented([{ label: L('On', 'Oui'), value: 1 }, { label: L('Off', 'Non'), value: 0 }], p.autoAdvance ? 1 : 0, (v) => update({ autoAdvance: v === 1 })),
+        h(
+          'div',
+          null,
+          h('div', null, L('Auto-advance', 'Avance automatique')),
+          h('div', { class: 'muted small' }, L('Scroll to the next puzzle after a solve.', 'Passer au jeu suivant après une réussite.')),
+        ),
+        segmented(
+          [
+            { label: L('On', 'Oui'), value: 1 },
+            { label: L('Off', 'Non'), value: 0 },
+          ],
+          p.autoAdvance ? 1 : 0,
+          (v) => update({ autoAdvance: v === 1 }),
+        ),
       ),
       h(
         'div',
         { class: 'setting' },
-        h('div', null, h('div', null, L('Starting level', 'Niveau de départ')), h('div', { class: 'muted small' }, L('For games you have not played yet.', 'Pour les jeux pas encore joués.'))),
-        segmented(LEVELS.map((l) => ({ label: LEVEL_NAMES[l], value: l })), p.startLevel, (v) => update({ startLevel: v })),
+        h(
+          'div',
+          null,
+          h('div', null, L('Starting level', 'Niveau de départ')),
+          h('div', { class: 'muted small' }, L('For games you have not played yet.', 'Pour les jeux pas encore joués.')),
+        ),
+        segmented(
+          LEVELS.map((l) => ({ label: LEVEL_NAMES[l], value: l })),
+          p.startLevel,
+          (v) => update({ startLevel: v }),
+        ),
       ),
       h('h3', null, L('Games', 'Jeux')),
       h(
         'p',
         { class: 'muted small' },
-        L('Auto raises the level when you solve quickly and cleanly, and eases off after misses. Picking a level yourself locks it.', 'Le mode Auto monte le niveau quand vous résolvez vite et sans faute, et le baisse après des échecs. Choisir un niveau vous-même le fixe.'),
+        L(
+          'Auto raises the level when you solve quickly and cleanly, and eases off after misses. Picking a level yourself locks it.',
+          'Le mode Auto monte le niveau quand vous résolvez vite et sans faute, et le baisse après des échecs. Choisir un niveau vous-même le fixe.',
+        ),
       ),
       ...CATEGORIES.map((c) => ({ c, games: defs.filter((d) => d.category === c.id) }))
         .filter((x) => x.games.length)
@@ -106,10 +169,14 @@ export function renderSettings(el: HTMLElement, defs: PuzzleDef[]) {
               'div',
               { class: 'pref-cat-head' },
               h('h4', null, c.name, h('span', { class: 'muted small' }, ` · ${games.length}`)),
-              btn(allOff ? L('Turn all on', 'Tout activer') : L('Turn all off', 'Tout désactiver'), () => {
-                games.forEach((d) => setWeight(d.id, allOff ? 2 : 0));
-                renderSettings(el, defs);
-              }, 'ghost'),
+              btn(
+                allOff ? L('Turn all on', 'Tout activer') : L('Turn all off', 'Tout désactiver'),
+                () => {
+                  games.forEach((d) => setWeight(d.id, allOff ? 2 : 0));
+                  renderSettings(el, defs);
+                },
+                'ghost',
+              ),
             ),
             h('div', { class: 'puzzle-prefs' }, ...games.map(prefRow)),
           );
@@ -117,8 +184,22 @@ export function renderSettings(el: HTMLElement, defs: PuzzleDef[]) {
       h(
         'div',
         { class: 'row' },
-        btn(L('All on', 'Tout activer'), () => { defs.forEach((d) => prefs(d.id).weight === 0 && setWeight(d.id, 2)); renderSettings(el, defs); }, 'ghost'),
-        btn(L('All levels to auto', 'Tous les niveaux en Auto'), () => { resetAllToAuto(); renderSettings(el, defs); }, 'ghost'),
+        btn(
+          L('All on', 'Tout activer'),
+          () => {
+            defs.forEach((d) => prefs(d.id).weight === 0 && setWeight(d.id, 2));
+            renderSettings(el, defs);
+          },
+          'ghost',
+        ),
+        btn(
+          L('All levels to auto', 'Tous les niveaux en Auto'),
+          () => {
+            resetAllToAuto();
+            renderSettings(el, defs);
+          },
+          'ghost',
+        ),
       ),
     ),
   );

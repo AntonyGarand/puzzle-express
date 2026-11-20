@@ -11,15 +11,15 @@ export const SUITS = ['♠', '♥', '♦', '♣'].map((s) => s + TEXT);
 const RANKS_EN = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const RANKS_FR = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'V', 'D', 'R'];
 /** Rank letters for the current locale (French: valet, dame, roi). */
-export const ranks = () => (locale() === 'fr' ? RANKS_FR : RANKS_EN);
+const ranks = () => (locale() === 'fr' ? RANKS_FR : RANKS_EN);
 /** Letter shown for a rank (1 = ace … 13 = king). */
-export const rankName = (r: number) => ranks()[r - 1];
+const rankName = (r: number) => ranks()[r - 1];
 
 export const rank = (c: Card) => (c % 13) + 1;
 export const suit = (c: Card) => Math.floor(c / 13) % 4;
 export const isRed = (c: Card) => suit(c) === 1 || suit(c) === 2;
-export const make = (s: number, r: number): Card => s * 13 + r - 1;
-export const label = (c: Card) => rankName(rank(c)) + SUITS[suit(c)];
+const make = (s: number, r: number): Card => s * 13 + r - 1;
+const label = (c: Card) => rankName(rank(c)) + SUITS[suit(c)];
 
 /** Shuffled deck. `suits` picks which suits appear, `copies` repeats each suit (Spider). */
 export function deck(rng: Rng, suits: number[] = [0, 1, 2, 3], copies = 1): Card[] {
@@ -31,7 +31,7 @@ export function deck(rng: Rng, suits: number[] = [0, 1, 2, 3], copies = 1): Card
 const n3 = (v: number) => Math.round(v * 1000) / 1000;
 
 /** Position helper for absolute layout inside a pile / table: x in card slots, y and dx in card widths. */
-export function pos(x: number, y: number, dx = 0): string {
+function pos(x: number, y: number, dx = 0): string {
   let st = '';
   if (x) st += `--x:${n3(x)};`;
   if (y) st += `--y:${n3(y)};`;
@@ -42,12 +42,26 @@ export function pos(x: number, y: number, dx = 0): string {
 /** A card element. `p` = pile id, `i` = index in that pile (drives tap / drag). */
 export function cardEl(c: Card, up: boolean, p: string, i: number, style = '', extra = ''): HTMLButtonElement {
   if (!up) {
-    return h('button', { type: 'button', class: `pc down ${extra}`.trim(), 'data-p': p, 'data-i': i, style: style || null, 'aria-label': L('face-down card', 'carte face cachée') });
+    return h('button', {
+      type: 'button',
+      class: `pc down ${extra}`.trim(),
+      'data-p': p,
+      'data-i': i,
+      style: style || null,
+      'aria-label': L('face-down card', 'carte face cachée'),
+    });
   }
   const s = SUITS[suit(c)];
   return h(
     'button',
-    { type: 'button', class: `pc ${isRed(c) ? 'red' : 'blk'} ${extra}`.trim(), 'data-p': p, 'data-i': i, style: style || null, 'aria-label': label(c) },
+    {
+      type: 'button',
+      class: `pc ${isRed(c) ? 'red' : 'blk'} ${extra}`.trim(),
+      'data-p': p,
+      'data-i': i,
+      style: style || null,
+      'aria-label': label(c),
+    },
     h('span', { class: 'pc-r' }, rankName(rank(c)), h('i', null, s)),
     h('span', { class: 'pc-s' }, s),
   );

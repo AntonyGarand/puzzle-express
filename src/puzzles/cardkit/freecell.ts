@@ -14,18 +14,23 @@ export function dealF(cards: Card[], cells: number): FState {
   return { cells: new Array(cells).fill(-1), found: [0, 0, 0, 0], cas, moves: 0 };
 }
 
-export const cloneF = (s: FState): FState => ({ cells: s.cells.slice(), found: s.found.slice(), cas: s.cas.map((c) => c.slice()), moves: s.moves });
-export const fitsOnF = (c: Card, top: Card) => rank(top) === rank(c) + 1 && isRed(top) !== isRed(c);
-export const fitsFoundF = (s: FState, c: Card) => s.found[suit(c)] === rank(c) - 1;
+const cloneF = (s: FState): FState => ({
+  cells: s.cells.slice(),
+  found: s.found.slice(),
+  cas: s.cas.map((c) => c.slice()),
+  moves: s.moves,
+});
+const fitsOnF = (c: Card, top: Card) => rank(top) === rank(c) + 1 && isRed(top) !== isRed(c);
+const fitsFoundF = (s: FState, c: Card) => s.found[suit(c)] === rank(c) - 1;
 export const wonF = (s: FState) => s.found.every((f) => f === 13);
 const freeCells = (s: FState) => s.cells.reduce((a, c) => a + (c < 0 ? 1 : 0), 0);
 const emptyCols = (s: FState) => s.cas.reduce((a, c) => a + (c.length ? 0 : 1), 0);
 
 /** Largest run that may move at once (supermove). */
-export const maxRun = (s: FState, toEmpty: boolean) => (freeCells(s) + 1) * 2 ** Math.max(0, emptyCols(s) - (toEmpty ? 1 : 0));
+const maxRun = (s: FState, toEmpty: boolean) => (freeCells(s) + 1) * 2 ** Math.max(0, emptyCols(s) - (toEmpty ? 1 : 0));
 
 /** Index where the ordered run at the top of a cascade starts. */
-export function runStart(col: Card[]): number {
+function runStart(col: Card[]): number {
   let k = col.length - 1;
   while (k > 0 && fitsOnF(col[k], col[k - 1])) k--;
   return Math.max(0, k);
@@ -87,13 +92,22 @@ export function autoF(s: FState): number {
     const red = isRed(c);
     return [0, 1, 2, 3].every((su) => (su === 1 || su === 2) === red || s.found[su] >= r - 1);
   };
-  for (let moved = true; moved; ) {
+  for (let moved = true; moved;) {
     moved = false;
     for (let k = 0; k < s.cells.length; k++) {
-      if (s.cells[k] >= 0 && safe(s.cells[k])) { s.found[suit(s.cells[k])]++; s.cells[k] = -1; moved = true; n++; }
+      if (s.cells[k] >= 0 && safe(s.cells[k])) {
+        s.found[suit(s.cells[k])]++;
+        s.cells[k] = -1;
+        moved = true;
+        n++;
+      }
     }
     for (const col of s.cas) {
-      if (col.length && safe(col[col.length - 1])) { s.found[suit(col.pop()!)]++; moved = true; n++; }
+      if (col.length && safe(col[col.length - 1])) {
+        s.found[suit(col.pop()!)]++;
+        moved = true;
+        n++;
+      }
     }
   }
   return n;
@@ -129,7 +143,7 @@ function hashF(s: FState): number {
   }
   let cs = 0;
   for (const c of s.cells) if (c >= 0) cs = (cs + Math.imul(c + 7, 0x9e3779b1)) | 0;
-  return (h ^ Math.imul(cs, 31) ^ (s.found[0] | (s.found[1] << 4) | (s.found[2] << 8) | (s.found[3] << 12)) * 2654435761) | 0;
+  return (h ^ Math.imul(cs, 31) ^ ((s.found[0] | (s.found[1] << 4) | (s.found[2] << 8) | (s.found[3] << 12)) * 2654435761)) | 0;
 }
 
 function scoreF(s: FState): number {
@@ -148,11 +162,26 @@ function scoreF(s: FState): number {
 
 function childrenF(s: FState): FState[] {
   const out: FState[] = [];
-  const push = (n: FState) => { autoF(n); out.push(n); };
+  const push = (n: FState) => {
+    autoF(n);
+    out.push(n);
+  };
   const nc = s.cells.length;
   // foundation plays
-  for (let k = 0; k < nc; k++) if (s.cells[k] >= 0 && fitsFoundF(s, s.cells[k])) { const n = cloneF(s); moveF(n, 'c' + k, 0, 'f'); push(n); }
-  for (let a = 0; a < 8; a++) { const col = s.cas[a]; if (col.length && fitsFoundF(s, col[col.length - 1])) { const n = cloneF(s); moveF(n, 't' + a, col.length - 1, 'f'); push(n); } }
+  for (let k = 0; k < nc; k++)
+    if (s.cells[k] >= 0 && fitsFoundF(s, s.cells[k])) {
+      const n = cloneF(s);
+      moveF(n, 'c' + k, 0, 'f');
+      push(n);
+    }
+  for (let a = 0; a < 8; a++) {
+    const col = s.cas[a];
+    if (col.length && fitsFoundF(s, col[col.length - 1])) {
+      const n = cloneF(s);
+      moveF(n, 't' + a, col.length - 1, 'f');
+      push(n);
+    }
+  }
   // cell to cascade
   for (let k = 0; k < nc; k++) {
     const c = s.cells[k];
@@ -162,7 +191,9 @@ function childrenF(s: FState): FState[] {
       const dst = s.cas[b];
       if (dst.length ? fitsOnF(c, dst[dst.length - 1]) : !emptyDone) {
         if (!dst.length) emptyDone = true;
-        const n = cloneF(s); moveF(n, 'c' + k, 0, 't' + b); push(n);
+        const n = cloneF(s);
+        moveF(n, 'c' + k, 0, 't' + b);
+        push(n);
       }
     }
   }
@@ -182,17 +213,34 @@ function childrenF(s: FState): FState[] {
         const need = rank(t) - 1;
         // find the card in the run that fits on t
         for (let i = Math.max(rs, col.length - lim); i < col.length; i++) {
-          if (rank(col[i]) === need && isRed(col[i]) !== isRed(t)) { const n = cloneF(s); moveF(n, 't' + a, i, 't' + b); push(n); break; }
+          if (rank(col[i]) === need && isRed(col[i]) !== isRed(t)) {
+            const n = cloneF(s);
+            moveF(n, 't' + a, i, 't' + b);
+            push(n);
+            break;
+          }
         }
       } else if (!emptyDone) {
         emptyDone = true;
         const i = Math.max(rs, col.length - limE);
-        if (i > 0) { const n = cloneF(s); moveF(n, 't' + a, i, 't' + b); push(n); }
-        if (i !== col.length - 1 && col.length > 1) { const n = cloneF(s); moveF(n, 't' + a, col.length - 1, 't' + b); push(n); }
+        if (i > 0) {
+          const n = cloneF(s);
+          moveF(n, 't' + a, i, 't' + b);
+          push(n);
+        }
+        if (i !== col.length - 1 && col.length > 1) {
+          const n = cloneF(s);
+          moveF(n, 't' + a, col.length - 1, 't' + b);
+          push(n);
+        }
       }
     }
     // to a free cell
-    if (s.cells.includes(-1)) { const n = cloneF(s); moveF(n, 't' + a, col.length - 1, 'c'); push(n); }
+    if (s.cells.includes(-1)) {
+      const n = cloneF(s);
+      moveF(n, 't' + a, col.length - 1, 'c');
+      push(n);
+    }
   }
   return out;
 }
@@ -221,7 +269,8 @@ export function solveF(s0: FState, budget = 3000): boolean {
       heap[0] = last;
       let i = 0;
       for (;;) {
-        const l = 2 * i + 1, r = l + 1;
+        const l = 2 * i + 1,
+          r = l + 1;
         let m = i;
         if (l < heap.length && heap[l].f < heap[m].f) m = l;
         if (r < heap.length && heap[r].f < heap[m].f) m = r;

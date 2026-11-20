@@ -14,7 +14,8 @@ export interface Room {
 
 /** Neighbour of cell i in direction d (0 up, 1 right, 2 down, 3 left), or -1 off the grid. */
 export const stepper = (w: number, h: number) => (i: number, d: number) => {
-  const r = Math.floor(i / w), c = i % w;
+  const r = Math.floor(i / w),
+    c = i % w;
   if (d === 0) return r === 0 ? -1 : i - w;
   if (d === 2) return r === h - 1 ? -1 : i + w;
   if (d === 1) return c === w - 1 ? -1 : i + 1;
@@ -43,7 +44,16 @@ function liveCells(w: number, h: number, floor: boolean[], targets: number[]) {
 }
 
 /** Push-optimal BFS. Returns min pushes, or -1 when unsolvable or out of node/time budget. */
-export function solvePushes(w: number, h: number, floor: boolean[], targets: number[], boxes: number[], player: number, cap = 20000, work: { left: number } = { left: Infinity }): number {
+function solvePushes(
+  w: number,
+  h: number,
+  floor: boolean[],
+  targets: number[],
+  boxes: number[],
+  player: number,
+  cap = 20000,
+  work: { left: number } = { left: Infinity },
+): number {
   const nb = stepper(w, h);
   const n = w * h;
   const live = liveCells(w, h, floor, targets);
@@ -112,16 +122,24 @@ function makeFloor(w: number, h: number, rng: Rng, wallP: number) {
   const floor = Array.from({ length: w * h }, () => !rng.chance(wallP));
   // keep the largest connected component
   const comp = new Int32Array(w * h).fill(-1);
-  let best = -1, bestSize = 0;
+  let best = -1,
+    bestSize = 0;
   for (let i = 0, id = 0; i < w * h; i++) {
     if (!floor[i] || comp[i] >= 0) continue;
     const q = [i];
     comp[i] = id;
-    for (let k = 0; k < q.length; k++) for (let d = 0; d < 4; d++) {
-      const y = nb(q[k], d);
-      if (y >= 0 && floor[y] && comp[y] < 0) { comp[y] = id; q.push(y); }
+    for (let k = 0; k < q.length; k++)
+      for (let d = 0; d < 4; d++) {
+        const y = nb(q[k], d);
+        if (y >= 0 && floor[y] && comp[y] < 0) {
+          comp[y] = id;
+          q.push(y);
+        }
+      }
+    if (q.length > bestSize) {
+      bestSize = q.length;
+      best = id;
     }
-    if (q.length > bestSize) { bestSize = q.length; best = id; }
     id++;
   }
   return floor.map((f, i) => f && comp[i] === best);
@@ -133,10 +151,14 @@ function dist(w: number, h: number, floor: boolean[], from: number) {
   const dd = new Array<number>(w * h).fill(-1);
   dd[from] = 0;
   const q = [from];
-  for (let k = 0; k < q.length; k++) for (let d = 0; d < 4; d++) {
-    const y = nb(q[k], d);
-    if (y >= 0 && floor[y] && dd[y] < 0) { dd[y] = dd[q[k]] + 1; q.push(y); }
-  }
+  for (let k = 0; k < q.length; k++)
+    for (let d = 0; d < 4; d++) {
+      const y = nb(q[k], d);
+      if (y >= 0 && floor[y] && dd[y] < 0) {
+        dd[y] = dd[q[k]] + 1;
+        q.push(y);
+      }
+    }
   return dd;
 }
 
@@ -155,7 +177,11 @@ export function generateRoom(rng: Rng, w: number, h: number, nBoxes: number, min
     const floor = makeFloor(w, h, rng, 0.17 + rng.next() * 0.15);
     const cells = floor.map((f, i) => (f ? i : -1)).filter((i) => i >= 0);
     if (cells.length < nBoxes * 3 + 8) continue;
-    const deg = (i: number) => [0, 1, 2, 3].filter((d) => { const y = nb(i, d); return y >= 0 && floor[y]; }).length;
+    const deg = (i: number) =>
+      [0, 1, 2, 3].filter((d) => {
+        const y = nb(i, d);
+        return y >= 0 && floor[y];
+      }).length;
     const ok = cells.filter((i) => deg(i) >= 2);
     if (ok.length < nBoxes + 1) continue;
     const targets = rng.shuffle(ok.slice()).slice(0, nBoxes);

@@ -8,9 +8,13 @@ import './tower.css';
 
 export const tower: PuzzleDef = {
   id: 'tower',
-  get name() { return L('Tower', 'Tour de mots'); },
+  get name() {
+    return L('Tower', 'Tour de mots');
+  },
   category: 'words',
-  get rules() { return L('Climb to the top word, changing one letter per floor.', 'Grimpez jusqu’au mot du sommet, une lettre par étage.'); },
+  get rules() {
+    return L('Climb to the top word, changing one letter per floor.', 'Grimpez jusqu’au mot du sommet, une lettre par étage.');
+  },
   localized: true,
   help: () => ({
     goal: L(
@@ -36,8 +40,14 @@ export const tower: PuzzleDef = {
       ),
     ],
     tips: [
-      L('Compare with the top word: change the letters that differ, one at a time.', 'Comparez avec le mot du sommet : changez une à une les lettres qui diffèrent.'),
-      L('Blocked? Take a detour through a letter that is in neither word.', 'Bloqué? Faites un détour par une lettre qui n’est dans aucun des deux mots.'),
+      L(
+        'Compare with the top word: change the letters that differ, one at a time.',
+        'Comparez avec le mot du sommet : changez une à une les lettres qui diffèrent.',
+      ),
+      L(
+        'Blocked? Take a detour through a letter that is in neither word.',
+        'Bloqué? Faites un détour par une lettre qui n’est dans aucun des deux mots.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [45, 70, 110, 150, 220]),
@@ -52,7 +62,7 @@ export const tower: PuzzleDef = {
     const steps = path.length - 1;
     const floors = steps - 1 + slack; // rungs between start and goal
 
-    let rungs: string[] = [];
+    const rungs: string[] = [];
     let cur = '';
     let won = false;
 
@@ -99,9 +109,16 @@ export const tower: PuzzleDef = {
       ctx.solved();
     };
     const submit = () => {
-      if (cur.length < len) { shake(grid); status(L('Not enough letters', 'Pas assez de lettres')); return; }
+      if (cur.length < len) {
+        shake(grid);
+        status(L('Not enough letters', 'Pas assez de lettres'));
+        return;
+      }
       const prev = last();
-      if (cur === goal && diff(prev, goal) === 1) { win(); return; }
+      if (cur === goal && diff(prev, goal) === 1) {
+        win();
+        return;
+      }
       const n = diff(prev, cur);
       if (n !== 1) {
         shake(grid);
@@ -109,14 +126,32 @@ export const tower: PuzzleDef = {
         status(n === 0 ? L('Change one letter', 'Changez une lettre') : L('Only one letter may change', 'Une seule lettre peut changer'));
         return;
       }
-      if (cur === start || rungs.includes(cur)) { shake(grid); status(L('Already used', 'Déjà utilisé')); return; }
+      if (cur === start || rungs.includes(cur)) {
+        shake(grid);
+        status(L('Already used', 'Déjà utilisé'));
+        return;
+      }
       const ok = isWord(cur);
-      if (ok === null) { status(L('loading words…', 'chargement des mots…')); return; }
-      if (!ok) { shake(grid); status(L('Not in word list', 'Mot inconnu')); return; }
-      if (rungs.length >= floors) { shake(grid); status(noFloors()); return; }
+      if (ok === null) {
+        status(L('loading words…', 'chargement des mots…'));
+        return;
+      }
+      if (!ok) {
+        shake(grid);
+        status(L('Not in word list', 'Mot inconnu'));
+        return;
+      }
+      if (rungs.length >= floors) {
+        shake(grid);
+        status(noFloors());
+        return;
+      }
       rungs.push(cur);
       cur = '';
-      if (diff(rungs[rungs.length - 1], goal) === 1) { win(); return; }
+      if (diff(rungs[rungs.length - 1], goal) === 1) {
+        win();
+        return;
+      }
       render();
       status(rungs.length >= floors ? noFloors() : undefined);
     };
@@ -125,9 +160,14 @@ export const tower: PuzzleDef = {
       if (won) return;
       ctx.touch();
       if (k === 'enter') submit();
-      else if (k === 'back') { cur = cur.slice(0, -1); render(); status(); }
-      else if (rungs.length < floors && cur.length < len) { cur += k; render(); }
-      else shake(grid);
+      else if (k === 'back') {
+        cur = cur.slice(0, -1);
+        render();
+        status();
+      } else if (rungs.length < floors && cur.length < len) {
+        cur += k;
+        render();
+      } else shake(grid);
     };
     const undo = () => {
       if (won || (!rungs.length && !cur)) return;
@@ -154,11 +194,17 @@ export const tower: PuzzleDef = {
     root.append(grid, kb.el);
     render();
     status();
-    whenDict(() => { if (!won) status(); });
+    whenDict(() => {
+      if (!won) status();
+    });
     return {
       snapshot: () => ({ r: rungs, cur }),
       onKey(e) {
-        if (e.key === 'Escape') { cur = ''; render(); return true; }
+        if (e.key === 'Escape') {
+          cur = '';
+          render();
+          return true;
+        }
         const v = keyValue(e);
         if (!v) return false;
         press(v);

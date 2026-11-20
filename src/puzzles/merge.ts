@@ -49,23 +49,42 @@ export const canMove = (b: number[], n: number) =>
 
 export const merge: PuzzleDef = {
   id: 'merge',
-  get name() { return L('Merge', 'Fusion'); },
+  get name() {
+    return L('Merge', 'Fusion');
+  },
   category: 'numbers',
-  get rules() { return L('Slide to merge equal tiles. Reach the goal tile.', 'Glissez pour fusionner les tuiles égales. Visez l’objectif.'); },
+  get rules() {
+    return L('Slide to merge equal tiles. Reach the goal tile.', 'Glissez pour fusionner les tuiles égales. Visez l’objectif.');
+  },
   help: () => ({
     goal: L(
       'Slide the tiles to merge equal numbers and build the goal tile, from 64 on Easy up to 1024 on Master.',
       'Faites glisser les tuiles pour fusionner les nombres égaux et obtenir la tuile objectif, de 64 en Facile à 1024 en Maître.',
     ),
     steps: [
-      L('Swipe on the board or press the arrow keys / WASD: every tile slides as far as it can that way.', 'Balayez le plateau ou utilisez les touches fléchées / WASD : toutes les tuiles glissent le plus loin possible.'),
-      L('Two equal tiles that meet merge into one worth double, and the sum is added to your score.', 'Deux tuiles égales qui se rencontrent fusionnent en une seule de valeur double, ajoutée à votre pointage.'),
+      L(
+        'Swipe on the board or press the arrow keys / WASD: every tile slides as far as it can that way.',
+        'Balayez le plateau ou utilisez les touches fléchées / WASD : toutes les tuiles glissent le plus loin possible.',
+      ),
+      L(
+        'Two equal tiles that meet merge into one worth double, and the sum is added to your score.',
+        'Deux tuiles égales qui se rencontrent fusionnent en une seule de valeur double, ajoutée à votre pointage.',
+      ),
       L('After each move, a new 2 or 4 appears in an empty cell.', 'Après chaque coup, un 2 ou un 4 apparaît dans une case vide.'),
-      L('If the board is full and nothing can merge, the game is lost.', 'Si le plateau est plein et que rien ne peut fusionner, la partie est perdue.'),
+      L(
+        'If the board is full and nothing can merge, the game is lost.',
+        'Si le plateau est plein et que rien ne peut fusionner, la partie est perdue.',
+      ),
     ],
     tips: [
-      L('Keep your biggest tile in a corner and build towards it.', 'Gardez votre plus grosse tuile dans un coin et construisez vers elle.'),
-      L('Mostly use two or three directions; avoid the one that pulls your big tile out of its corner.', 'Jouez surtout dans deux ou trois directions; évitez celle qui sort votre grosse tuile de son coin.'),
+      L(
+        'Keep your biggest tile in a corner and build towards it.',
+        'Gardez votre plus grosse tuile dans un coin et construisez vers elle.',
+      ),
+      L(
+        'Mostly use two or three directions; avoid the one that pulls your big tile out of its corner.',
+        'Jouez surtout dans deux ou trois directions; évitez celle qui sort votre grosse tuile de son coin.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [60, 120, 240, 480, 900]),
@@ -118,7 +137,9 @@ export const merge: PuzzleDef = {
         const e = Math.round(Math.log2(v));
         const t = TONES[e];
         const digits = String(v).length;
-        el.className = `cell mg ${t ? (t.lo ? 'lo' : '') : 'top'} ${digits >= 3 ? `d${Math.min(digits, 5)}` : ''}`.replace(/\s+/g, ' ').trim();
+        el.className = `cell mg ${t ? (t.lo ? 'lo' : '') : 'top'} ${digits >= 3 ? `d${Math.min(digits, 5)}` : ''}`
+          .replace(/\s+/g, ' ')
+          .trim();
         el.textContent = String(v);
         if (t) el.setAttribute('style', `--c:${t.c}`);
         else el.removeAttribute('style');
@@ -129,7 +150,10 @@ export const merge: PuzzleDef = {
     const move = (dir: Dir) => {
       if (over) return;
       const res = slideBoard(cells, n, dir);
-      if (!res.moved) { shake(grid); return; }
+      if (!res.moved) {
+        shake(grid);
+        return;
+      }
       ctx.touch();
       cells = res.b;
       score += res.gained;
@@ -137,8 +161,10 @@ export const merge: PuzzleDef = {
       render();
       for (const i of res.merged) anim(els[i], POP, 150);
       if (born >= 0) anim(els[born], GROW, 140);
-      if (best() >= goal) { over = true; ctx.solved(); }
-      else if (!canMove(cells, n)) {
+      if (best() >= goal) {
+        over = true;
+        ctx.solved();
+      } else if (!canMove(cells, n)) {
         over = true;
         shake(grid);
         ctx.status(L(`No moves left · score ${score}`, `Plus aucun coup · pointage ${score}`));

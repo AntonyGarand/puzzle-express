@@ -19,12 +19,13 @@ export interface Layout {
   optimal: number;
 }
 
-export const cellsOf = (b: Block, p: number) =>
-  Array.from({ length: b.len }, (_, k) => (b.hz ? b.line * N + p + k : (p + k) * N + b.line));
+const cellsOf = (b: Block, p: number) => Array.from({ length: b.len }, (_, k) => (b.hz ? b.line * N + p + k : (p + k) * N + b.line));
 
-export function occupancy(blocks: Block[], pos: number[], skip = -1) {
+function occupancy(blocks: Block[], pos: number[], skip = -1) {
   const occ = new Uint8Array(N * N);
-  blocks.forEach((b, i) => { if (i !== skip) for (const c of cellsOf(b, pos[i])) occ[c] = 1; });
+  blocks.forEach((b, i) => {
+    if (i !== skip) for (const c of cellsOf(b, pos[i])) occ[c] = 1;
+  });
   return occ;
 }
 
@@ -33,7 +34,8 @@ export function range(blocks: Block[], pos: number[], i: number): [number, numbe
   const occ = occupancy(blocks, pos, i);
   const b = blocks[i];
   const at = (p: number) => (b.hz ? b.line * N + p : p * N + b.line);
-  let lo = pos[i], hi = pos[i];
+  let lo = pos[i],
+    hi = pos[i];
   while (lo - 1 >= 0 && !occ[at(lo - 1)]) lo--;
   while (hi + b.len < N && !occ[at(hi + b.len)]) hi++;
   return [lo, hi];
@@ -46,7 +48,7 @@ const POW = Array.from({ length: 20 }, (_, i) => N ** i);
  * Returns per-state distances, or null if the cluster is too big (or out of time) or has no solved state.
  */
 /** `work.left` is a deterministic budget of explored states shared across calls (no wall-clock: resume must regenerate identically). */
-export function analyse(blocks: Block[], start: number[], cap: number, work: { left: number }) {
+function analyse(blocks: Block[], start: number[], cap: number, work: { left: number }) {
   const nb = blocks.length;
   const base = blocks.map((b) => (b.hz ? b.line * N : b.line));
   const stride = blocks.map((b) => (b.hz ? 1 : N));
@@ -57,7 +59,9 @@ export function analyse(blocks: Block[], start: number[], cap: number, work: { l
   // open-addressing hash (keys < 6^16 fit exactly in doubles); much faster than a Map
   let bits = 10;
   while (1 << bits < cap * 2) bits++;
-  const size = 1 << bits, mask = size - 1, shift = 32 - bits;
+  const size = 1 << bits,
+    mask = size - 1,
+    shift = 32 - bits;
   const hk = new Float64Array(size);
   const hv = new Int32Array(size).fill(-1);
   const slot = (k: number) => {
@@ -65,7 +69,11 @@ export function analyse(blocks: Block[], start: number[], cap: number, work: { l
     while (hv[h] >= 0 && hk[h] !== k) h = (h + 1) & mask;
     return h;
   };
-  { const h0 = slot(k0); hk[h0] = k0; hv[h0] = 0; }
+  {
+    const h0 = slot(k0);
+    hk[h0] = k0;
+    hv[h0] = 0;
+  }
   const adjStart: number[] = [];
   const adj: number[] = [];
   const occ = new Uint8Array(N * N);
@@ -80,7 +88,10 @@ export function analyse(blocks: Block[], start: number[], cap: number, work: { l
     adjStart.push(adj.length);
     const ks = keys[s];
     for (let i = 0; i < nb; i++) {
-      const orig = states[off + i], len = blocks[i].len, st = stride[i], b0 = base[i];
+      const orig = states[off + i],
+        len = blocks[i].len,
+        st = stride[i],
+        b0 = base[i];
       for (let dir = -1; dir <= 1; dir += 2) {
         for (let q = orig + dir; q >= 0 && q + len <= N; q += dir) {
           const edge = dir < 0 ? q : q + len - 1;
@@ -105,13 +116,20 @@ export function analyse(blocks: Block[], start: number[], cap: number, work: { l
   const total = keys.length;
   const dist = new Int32Array(total).fill(-1);
   const q: number[] = [];
-  for (let s = 0; s < total; s++) if (states[s * nb] === N - blocks[0].len) { dist[s] = 0; q.push(s); }
+  for (let s = 0; s < total; s++)
+    if (states[s * nb] === N - blocks[0].len) {
+      dist[s] = 0;
+      q.push(s);
+    }
   if (!q.length) return null;
   for (let k = 0; k < q.length; k++) {
     const x = q[k];
     for (let e = adjStart[x]; e < adjStart[x + 1]; e++) {
       const t = adj[e];
-      if (dist[t] < 0) { dist[t] = dist[x] + 1; q.push(t); }
+      if (dist[t] < 0) {
+        dist[t] = dist[x] + 1;
+        q.push(t);
+      }
     }
   }
   return { states, dist, nb };
@@ -140,14 +158,15 @@ function randomBoard(rng: Rng): { blocks: Block[]; pos: number[] } {
   const blocks: Block[] = [{ hz: true, len: 2, line: EXIT_ROW }];
   const pos = [N - 2]; // start from a solved position: the cluster then always contains a solution
   const occ = occupancy(blocks, pos);
-  const want = rng.int(10,13);
+  const want = rng.int(10, 13);
   while (blocks.length < want && addBlock(rng, blocks, pos, occ, 60));
   return { blocks, pos };
 }
 
 /** Small change to a board: remove and/or add a block (key stays). */
 function mutate(rng: Rng, blocks: Block[], pos: number[]) {
-  const bs = blocks.slice(), ps = pos.slice();
+  const bs = blocks.slice(),
+    ps = pos.slice();
   const op = rng.int(0, 2);
   if (op !== 1 && bs.length > 6) {
     const k = rng.int(1, bs.length - 1);
@@ -181,13 +200,20 @@ export function generateUnblock(rng: Rng, lo: number, hi: number, budget = 60000
     const c = fresh ? randomBoard(rng) : mutate(rng, cur!.blocks, deepest(cur!));
     if (fresh) stale = 0;
     const res = analyse(c.blocks, c.pos, 2000, work);
-    if (!res) { stale++; continue; }
+    if (!res) {
+      stale++;
+      continue;
+    }
     let max = 0;
     for (let s = 0; s < res.dist.length; s++) if (res.dist[s] > max) max = res.dist[s];
-    if (max < 1) { stale++; continue; }
+    if (max < 1) {
+      stale++;
+      continue;
+    }
     const cand: Cand = { ...c, max, res };
     if (!cur || fresh || max >= cur.max) {
-      if (cur && max > cur.max) stale = 0; else stale++;
+      if (cur && max > cur.max) stale = 0;
+      else stale++;
       cur = cand;
     } else stale++;
     if (!best || max > best.max) best = cand;
@@ -203,7 +229,10 @@ export function generateUnblock(rng: Rng, lo: number, hi: number, budget = 60000
   }
   // Fallback: the key needs one blocker moved first.
   return {
-    blocks: [{ hz: true, len: 2, line: EXIT_ROW }, { hz: false, len: 2, line: 5 }],
+    blocks: [
+      { hz: true, len: 2, line: EXIT_ROW },
+      { hz: false, len: 2, line: 5 },
+    ],
     pos: [0, 2],
     optimal: 2,
   };

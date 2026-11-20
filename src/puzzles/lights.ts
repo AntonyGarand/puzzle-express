@@ -4,20 +4,42 @@ import { board, h } from '../core/ui';
 
 export const lights: PuzzleDef = {
   id: 'lights',
-  get name() { return L('Lights', 'Lumières'); },
+  get name() {
+    return L('Lights', 'Lumières');
+  },
   category: 'logic',
-  get rules() { return L('A tap flips a tile and its neighbours. Lights out!', 'Une touche inverse la case et ses voisines. Éteignez tout!'); },
+  get rules() {
+    return L('A tap flips a tile and its neighbours. Lights out!', 'Une touche inverse la case et ses voisines. Éteignez tout!');
+  },
   help: () => ({
     goal: L('Switch off every light on the board.', 'Éteignez toutes les lumières de la grille.'),
     steps: [
-      L('Tapping a tile flips it, along with the tiles directly above, below, left and right of it.', 'Toucher une case l’inverse, ainsi que les cases juste au-dessus, au-dessous, à gauche et à droite.'),
-      L('Lit tiles are coloured. You win when none are left.', 'Les cases allumées sont en couleur. Vous gagnez quand il n’en reste aucune.'),
-      L('The status line shows your moves and how many tiles are still lit.', 'La ligne d’état affiche vos coups et le nombre de cases encore allumées.'),
-      L('Higher levels mean bigger boards and more scrambled starts.', 'Les niveaux supérieurs donnent des grilles plus grandes et plus mélangées.'),
+      L(
+        'Tapping a tile flips it, along with the tiles directly above, below, left and right of it.',
+        'Toucher une case l’inverse, ainsi que les cases juste au-dessus, au-dessous, à gauche et à droite.',
+      ),
+      L(
+        'Lit tiles are coloured. You win when none are left.',
+        'Les cases allumées sont en couleur. Vous gagnez quand il n’en reste aucune.',
+      ),
+      L(
+        'The status line shows your moves and how many tiles are still lit.',
+        'La ligne d’état affiche vos coups et le nombre de cases encore allumées.',
+      ),
+      L(
+        'Higher levels mean bigger boards and more scrambled starts.',
+        'Les niveaux supérieurs donnent des grilles plus grandes et plus mélangées.',
+      ),
     ],
     tips: [
-      L('Tapping the same tile twice cancels out, and the order of taps doesn’t matter.', 'Toucher deux fois la même case l’annule, et l’ordre des touches n’a pas d’importance.'),
-      L('Chase the lights down: clear each row by tapping the tiles just below its lit ones.', 'Poussez les lumières vers le bas : videz chaque rangée en touchant les cases juste sous ses lumières.'),
+      L(
+        'Tapping the same tile twice cancels out, and the order of taps doesn’t matter.',
+        'Toucher deux fois la même case l’annule, et l’ordre des touches n’a pas d’importance.',
+      ),
+      L(
+        'Chase the lights down: clear each row by tapping the tiles just below its lit ones.',
+        'Poussez les lumières vers le bas : videz chaque rangée en touchant les cases juste sous ses lumières.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [15, 30, 60, 100, 160]),
@@ -29,9 +51,17 @@ export const lights: PuzzleDef = {
     let moves = 0;
 
     const toggle = (i: number) => {
-      const r = Math.floor(i / n), c = i % n;
-      for (const [dr, dc] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const rr = r + dr, cc = c + dc;
+      const r = Math.floor(i / n),
+        c = i % n;
+      for (const [dr, dc] of [
+        [0, 0],
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const rr = r + dr,
+          cc = c + dc;
         if (rr >= 0 && rr < n && cc >= 0 && cc < n) on[rr * n + cc] = !on[rr * n + cc];
       }
     };

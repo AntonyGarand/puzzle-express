@@ -8,9 +8,13 @@ const R = 0.42; // island radius in cell units
 
 export const bridges: PuzzleDef = {
   id: 'bridges',
-  get name() { return L('Bridges', 'Ponts'); },
+  get name() {
+    return L('Bridges', 'Ponts');
+  },
   category: 'logic',
-  get rules() { return L('Link islands with up to 2 straight bridges; join them all.', 'Reliez toutes les îles avec 1 ou 2 ponts droits.'); },
+  get rules() {
+    return L('Link islands with up to 2 straight bridges; join them all.', 'Reliez toutes les îles avec 1 ou 2 ponts droits.');
+  },
   help: () => ({
     goal: L(
       'Connect all the islands into one network. Each island’s number is how many bridges end at it.',
@@ -65,11 +69,14 @@ export const bridges: PuzzleDef = {
     const gIsl = s('g', { class: 'isls' });
     svg.append(gHit, gBr, gIsl);
     edges.forEach((e, k) => {
-      const A = islands[e.a], B = islands[e.b];
+      const A = islands[e.a],
+        B = islands[e.b];
       gHit.append(s('line', { x1: A.c, y1: A.r, x2: B.c, y2: B.r, class: 'hit', 'data-e': k }));
     });
     const islEls = islands.map((isl, i) => {
-      const g = s('g', { class: 'isl', 'data-i': i },
+      const g = s(
+        'g',
+        { class: 'isl', 'data-i': i },
         s('circle', { cx: isl.c, cy: isl.r, r: R }),
         s('text', { x: isl.c, y: isl.r, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, isl.need),
       );
@@ -82,7 +89,8 @@ export const bridges: PuzzleDef = {
       gBr.replaceChildren();
       edges.forEach((e, k) => {
         if (!b[k]) return;
-        const A = islands[e.a], B = islands[e.b];
+        const A = islands[e.a],
+          B = islands[e.b];
         const offs = b[k] === 2 ? [-0.11, 0.11] : [0];
         for (const o of offs) {
           const [x1, y1, x2, y2] = e.horiz ? [A.c + R, A.r + o, B.c - R, B.r + o] : [A.c + o, A.r + R, B.c + o, B.r - R];
@@ -102,18 +110,29 @@ export const bridges: PuzzleDef = {
 
     const cycle = (k: number) => {
       const nv = (b[k] + 1) % 3;
-      if (nv > 0 && cross[k].some((f) => b[f] > 0)) { shake(wrap); return; }
+      if (nv > 0 && cross[k].some((f) => b[f] > 0)) {
+        shake(wrap);
+        return;
+      }
       b[k] = nv;
     };
     const after = () => {
-      if (render() && !done) { done = true; sel = -1; render(); ctx.solved(); }
+      if (render() && !done) {
+        done = true;
+        sel = -1;
+        render();
+        ctx.solved();
+      }
     };
     const tapIsland = (i: number) => {
       if (sel < 0 || sel === i) sel = sel === i ? -1 : i;
       else {
         const k = edgeOf.get(pairKey(sel, i));
         if (k == null) sel = i;
-        else { cycle(k); sel = -1; }
+        else {
+          cycle(k);
+          sel = -1;
+        }
       }
       after();
     };
@@ -124,7 +143,8 @@ export const bridges: PuzzleDef = {
       return inc[i].find((k) => {
         const e = edges[k];
         if (e.horiz !== horiz) return false;
-        const o = islands[e.a === i ? e.b : e.a], me = islands[i];
+        const o = islands[e.a === i ? e.b : e.a],
+          me = islands[i];
         return Math.sign(horiz ? o.c - me.c : o.r - me.r) === sign;
       });
     };
@@ -141,14 +161,20 @@ export const bridges: PuzzleDef = {
         const t = (e.target as Element | null)?.closest?.('[data-i]');
         return t ? Number(t.getAttribute('data-i')) : -1;
       }
-      let best = -1, bd = 0.62;
+      let best = -1,
+        bd = 0.62;
       islands.forEach((isl, i) => {
         const dd = Math.hypot(isl.c - pt.x, isl.r - pt.y);
-        if (dd < bd) { bd = dd; best = i; }
+        if (dd < bd) {
+          bd = dd;
+          best = i;
+        }
       });
       return best;
     };
-    let down = -1, downEdge = -1, start: { x: number; y: number } | null = null;
+    let down = -1,
+      downEdge = -1,
+      start: { x: number; y: number } | null = null;
     svg.addEventListener('pointerdown', (e) => {
       if (done || (e.pointerType === 'mouse' && e.button !== 0)) return;
       ctx.touch();
@@ -158,15 +184,24 @@ export const bridges: PuzzleDef = {
       start = toUnits(e);
       if (down >= 0 || downEdge >= 0) {
         e.preventDefault();
-        try { svg.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
+        try {
+          svg.setPointerCapture(e.pointerId);
+        } catch {
+          /* not capturable */
+        }
       }
     });
     svg.addEventListener('pointerup', (e) => {
       if (done) return;
-      const a = down, k0 = downEdge;
+      const a = down,
+        k0 = downEdge;
       down = downEdge = -1;
       if (a < 0) {
-        if (k0 >= 0) { sel = -1; cycle(k0); after(); }
+        if (k0 >= 0) {
+          sel = -1;
+          cycle(k0);
+          after();
+        }
         return;
       }
       const up = islandAt(e);
@@ -175,19 +210,32 @@ export const bridges: PuzzleDef = {
       if (up === a || (up < 0 && moved < 0.45)) return tapIsland(a);
       if (up >= 0) {
         const k = edgeOf.get(pairKey(a, up));
-        if (k != null) { cycle(k); sel = -1; after(); return; }
+        if (k != null) {
+          cycle(k);
+          sel = -1;
+          after();
+          return;
+        }
         return tapIsland(up);
       }
       const k = start && pt ? edgeToward(a, pt.x - start.x, pt.y - start.y) : undefined;
-      if (k != null) { cycle(k); sel = -1; after(); }
+      if (k != null) {
+        cycle(k);
+        sel = -1;
+        after();
+      }
     });
-    svg.addEventListener('pointercancel', () => { down = downEdge = -1; });
+    svg.addEventListener('pointercancel', () => {
+      down = downEdge = -1;
+    });
 
     const sv = ctx.saved as { b?: unknown; sel?: unknown } | undefined;
     if (Array.isArray(sv?.b) && sv.b.length === b.length) {
       sv.b.forEach((v, k) => (b[k] = v === 1 || v === 2 ? v : 0));
       // Drop any crossing pairs from a corrupt save.
-      b.forEach((v, k) => { if (v && cross[k].some((f) => f < k && b[f])) b[k] = 0; });
+      b.forEach((v, k) => {
+        if (v && cross[k].some((f) => f < k && b[f])) b[k] = 0;
+      });
     }
     if (Number.isInteger(sv?.sel) && (sv!.sel as number) >= -1 && (sv!.sel as number) < islands.length) sel = sv!.sel as number;
     root.append(wrap);

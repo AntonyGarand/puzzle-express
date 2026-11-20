@@ -8,7 +8,9 @@ const GLYPH = ['', '♟', '♞', '♝', '♜', '♛', '♚'].map((g) => (g ? g +
 
 export const chess: PuzzleDef = {
   id: 'chess',
-  get name() { return L('Chess', 'Échecs'); },
+  get name() {
+    return L('Chess', 'Échecs');
+  },
   category: 'cards',
   get rules() {
     return L('White to move. Find the only mating line.', 'Aux blancs de jouer. Trouvez l’unique suite qui mate.');
@@ -87,7 +89,13 @@ export const chess: PuzzleDef = {
     const status = (t?: string) => ctx.status(t ?? L(`Mate in ${left()} · White to move`, `Mat en ${left()} · Aux blancs de jouer`));
 
     const render = () => {
-      const targets = new Set(sel >= 0 ? legal(cur, true).filter((m) => from(m) === sel).map(to) : []);
+      const targets = new Set(
+        sel >= 0
+          ? legal(cur, true)
+              .filter((m) => from(m) === sel)
+              .map(to)
+          : [],
+      );
       const last = moves.length ? moves[moves.length - 1] : -1;
       cells.forEach((el, sq) => {
         const dark = ((sq >> 3) + (sq & 7)) % 2 === 1;
@@ -113,22 +121,41 @@ export const chess: PuzzleDef = {
     const tap = (sq: number) => {
       if (over) return;
       ctx.touch();
-      if (cur[sq] > 0 && sq !== sel) { sel = sq; render(); return; }
+      if (cur[sq] > 0 && sq !== sel) {
+        sel = sq;
+        render();
+        return;
+      }
       if (sel < 0) return;
       const m = legal(cur, true).find((mv) => from(mv) === sel && to(mv) === sq);
-      if (m == null) { sel = -1; render(); return; }
+      if (m == null) {
+        sel = -1;
+        render();
+        return;
+      }
       const nb = apply(cur, m);
       if (left() === 2) {
-        if (!forcesMate2(cur, m)) { wrong(L('Black escapes · Try again', 'Les noirs s’échappent · Réessayez')); return; }
+        if (!forcesMate2(cur, m)) {
+          wrong(L('Black escapes · Try again', 'Les noirs s’échappent · Réessayez'));
+          return;
+        }
         const reply = bestDefence(nb);
         moves.push(m, reply);
         cur = apply(nb, reply);
         sel = -1;
         render();
-        status(L(`Black ${sqName(from(reply))}→${sqName(to(reply))} · Mate in 1`, `Noirs ${sqName(from(reply))}→${sqName(to(reply))} · Mat en 1`));
+        status(
+          L(
+            `Black ${sqName(from(reply))}→${sqName(to(reply))} · Mate in 1`,
+            `Noirs ${sqName(from(reply))}→${sqName(to(reply))} · Mat en 1`,
+          ),
+        );
         return;
       }
-      if (!isMate(nb, false)) { wrong(L('Not mate · Try again', 'Pas mat · Réessayez')); return; }
+      if (!isMate(nb, false)) {
+        wrong(L('Not mate · Try again', 'Pas mat · Réessayez'));
+        return;
+      }
       moves.push(m);
       cur = nb;
       sel = -1;
@@ -148,7 +175,11 @@ export const chess: PuzzleDef = {
     return {
       snapshot: () => ({ moves, sel }),
       onKey(e) {
-        if (e.key === 'Escape' && sel >= 0) { sel = -1; render(); return true; }
+        if (e.key === 'Escape' && sel >= 0) {
+          sel = -1;
+          render();
+          return true;
+        }
         return false;
       },
     };

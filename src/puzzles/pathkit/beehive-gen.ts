@@ -1,7 +1,7 @@
 import type { Rng } from '../../core/rng';
 import { byLevel, type Difficulty } from '../../core/types';
 
-export const HEX_DIRS = [
+const HEX_DIRS = [
   [1, 0],
   [1, -1],
   [0, -1],
@@ -38,12 +38,19 @@ const connected = (adj: number[][]) => {
   const st = [0];
   seen[0] = 1;
   let k = 1;
-  while (st.length) for (const j of adj[st.pop()!]) if (!seen[j]) (seen[j] = 1), k++, st.push(j);
+  while (st.length) {
+    for (const j of adj[st.pop()!]) {
+      if (seen[j]) continue;
+      seen[j] = 1;
+      k++;
+      st.push(j);
+    }
+  }
   return k === adj.length;
 };
 
 /** Hamiltonian path by DFS with Warnsdorff ordering and a node budget. */
-export function hamilton(rng: Rng, adj: number[][], budget: number): number[] | null {
+function hamilton(rng: Rng, adj: number[][], budget: number): number[] | null {
   const N = adj.length;
   const deg1 = adj.map((a, i) => (a.length === 1 ? i : -1)).filter((i) => i >= 0);
   if (deg1.length > 2) return null;
@@ -52,8 +59,7 @@ export function hamilton(rng: Rng, adj: number[][], budget: number): number[] | 
   const path = [start];
   used[start] = 1;
   const free = (i: number) => adj[i].filter((j) => !used[j]).length;
-  const order = (i: number) =>
-    rng.shuffle(adj[i].filter((j) => !used[j])).sort((x, y) => free(x) - free(y));
+  const order = (i: number) => rng.shuffle(adj[i].filter((j) => !used[j])).sort((x, y) => free(x) - free(y));
   const stack: number[][] = [order(start)];
   let nodes = 0;
   while (stack.length) {
@@ -70,7 +76,8 @@ export function hamilton(rng: Rng, adj: number[][], budget: number): number[] | 
     path.push(j);
     // prune: an unvisited cell away from the end with no free neighbours can never be entered,
     // and at most one such cell with a single free neighbour can exist (it must be the last cell).
-    let dead = false, tails = 0;
+    let dead = false,
+      tails = 0;
     for (let i = 0; i < N && !dead; i++) {
       if (used[i] || adj[i].includes(j)) continue;
       const f = free(i);
@@ -123,7 +130,8 @@ export function genBeehive(rng: Rng, d: Difficulty): BeehivePuzzle {
   // spread the givens out: pick from evenly spaced buckets
   const inner = Array.from({ length: N - 2 }, (_, i) => i + 1);
   for (let g = 0; g < extra; g++) {
-    const lo = Math.floor((g * inner.length) / extra), hi = Math.floor(((g + 1) * inner.length) / extra) - 1;
+    const lo = Math.floor((g * inner.length) / extra),
+      hi = Math.floor(((g + 1) * inner.length) / extra) - 1;
     const k = inner[rng.int(lo, Math.max(lo, hi))];
     givens[path[k]] = k + 1;
   }

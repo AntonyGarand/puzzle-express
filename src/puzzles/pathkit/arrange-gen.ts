@@ -4,7 +4,7 @@ import { nbrs } from './grid';
 
 export type Shape = [number, number][];
 
-export interface ArrangePiece {
+interface ArrangePiece {
   /** Cells in solution orientation, normalised to (0,0). */
   shape: Shape;
   /** Solution origin on the board. */
@@ -20,8 +20,9 @@ export interface ArrangePuzzle {
   pieces: ArrangePiece[];
 }
 
-export const normalise = (sh: Shape): Shape => {
-  const r0 = Math.min(...sh.map((p) => p[0])), c0 = Math.min(...sh.map((p) => p[1]));
+const normalise = (sh: Shape): Shape => {
+  const r0 = Math.min(...sh.map((p) => p[0])),
+    c0 = Math.min(...sh.map((p) => p[1]));
   return sh.map(([r, c]) => [r - r0, c - c0] as [number, number]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 };
 /** Rotate a shape k quarter turns clockwise. */
@@ -32,8 +33,20 @@ export const rotated = (sh: Shape, k: number): Shape => {
 };
 
 export function genArrange(rng: Rng, d: Difficulty): ArrangePuzzle {
-  const [rows, cols] = byLevel<[number, number]>(d, [[4, 4], [5, 5], [5, 6], [6, 6], [7, 7]]);
-  const [lo, hi] = byLevel<[number, number]>(d, [[3, 5], [3, 5], [3, 5], [3, 6], [4, 6]]);
+  const [rows, cols] = byLevel<[number, number]>(d, [
+    [4, 4],
+    [5, 5],
+    [5, 6],
+    [6, 6],
+    [7, 7],
+  ]);
+  const [lo, hi] = byLevel<[number, number]>(d, [
+    [3, 5],
+    [3, 5],
+    [3, 5],
+    [3, 6],
+    [4, 6],
+  ]);
   const rotate = d >= 3;
   const N = rows * cols;
   for (let attempt = 0; attempt < 200; attempt++) {
@@ -55,7 +68,9 @@ export function genArrange(rng: Rng, d: Difficulty): ArrangePuzzle {
       }
       if (g.length < 2) {
         // merge a stranded cell into the smallest neighbour that has room
-        const opts = nbrs(u, cols, rows).map((j) => owner[j]).filter((o) => o >= 0 && o !== id && groups[o].length < 6);
+        const opts = nbrs(u, cols, rows)
+          .map((j) => owner[j])
+          .filter((o) => o >= 0 && o !== id && groups[o].length < 6);
         if (!opts.length) ok = false;
         else {
           const o = opts.sort((a, b) => groups[a].length - groups[b].length)[0];
@@ -79,7 +94,8 @@ export function genArrange(rng: Rng, d: Difficulty): ArrangePuzzle {
     });
     const pieces = groups.map((g, id) => {
       const raw: Shape = g.map((i) => [Math.floor(i / cols), i % cols]);
-      const r = Math.min(...raw.map((p) => p[0])), c = Math.min(...raw.map((p) => p[1]));
+      const r = Math.min(...raw.map((p) => p[0])),
+        c = Math.min(...raw.map((p) => p[1]));
       return { shape: normalise(raw), r, c, colour: colour[id] };
     });
     return { rows, cols, rotate, pieces };
@@ -87,7 +103,7 @@ export function genArrange(rng: Rng, d: Difficulty): ArrangePuzzle {
   // Fallback: straight bars of 2–3 cells along each row.
   const pieces: ArrangePiece[] = [];
   for (let r = 0; r < rows; r++)
-    for (let c = 0; c < cols; ) {
+    for (let c = 0; c < cols;) {
       const rem = cols - c;
       const w = rem === 4 || rem === 2 ? 2 : 3;
       pieces.push({ shape: Array.from({ length: w }, (_, k) => [0, k] as [number, number]), r, c, colour: pieces.length % 8 });

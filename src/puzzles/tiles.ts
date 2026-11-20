@@ -9,9 +9,13 @@ type Placed = Rect & { k: number };
 
 export const tiles: PuzzleDef = {
   id: 'tiles',
-  get name() { return L('Tiles', 'Rectangles'); },
+  get name() {
+    return L('Tiles', 'Rectangles');
+  },
   category: 'logic',
-  get rules() { return L('Split into rectangles, each holding one number = its area.', 'Découpez en rectangles contenant un nombre égal à leur aire.'); },
+  get rules() {
+    return L('Split into rectangles, each holding one number = its area.', 'Découpez en rectangles contenant un nombre égal à leur aire.');
+  },
   help: () => ({
     goal: L(
       'Cut the whole grid into rectangles. Each rectangle holds exactly one number, equal to the number of cells it covers.',
@@ -26,15 +30,24 @@ export const tiles: PuzzleDef = {
         'Drag from one corner to the opposite corner to draw a rectangle. It replaces any rectangle it overlaps.',
         'Glissez d’un coin au coin opposé pour tracer un rectangle. Il remplace ceux qu’il chevauche.',
       ),
-      L('Tap a rectangle to remove it. Tap a 1 to make a one-cell rectangle.', 'Touchez un rectangle pour l’enlever. Touchez un 1 pour faire un rectangle d’une case.'),
+      L(
+        'Tap a rectangle to remove it. Tap a 1 to make a one-cell rectangle.',
+        'Touchez un rectangle pour l’enlever. Touchez un 1 pour faire un rectangle d’une case.',
+      ),
       L(
         'Rectangles that break the rule are marked. The footer counts the correct ones.',
         'Les rectangles fautifs sont signalés. Le bas de la carte compte les bons.',
       ),
     ],
     tips: [
-      L('Start with numbers that fit only one way, like big numbers near a corner.', 'Commencez par les nombres qui n’entrent que d’une façon, comme les gros nombres près d’un coin.'),
-      L('A cell only one number can reach must belong to that number’s rectangle.', 'Une case qu’un seul nombre peut atteindre fait partie de son rectangle.'),
+      L(
+        'Start with numbers that fit only one way, like big numbers near a corner.',
+        'Commencez par les nombres qui n’entrent que d’une façon, comme les gros nombres près d’un coin.',
+      ),
+      L(
+        'A cell only one number can reach must belong to that number’s rectangle.',
+        'Une case qu’un seul nombre peut atteindre fait partie de son rectangle.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [30, 60, 100, 160, 260]),
@@ -46,7 +59,8 @@ export const tiles: PuzzleDef = {
     const clueCount = clue.filter((v) => v > 0).length;
 
     let rects: Placed[] = [];
-    let start = -1, cur = -1;
+    let start = -1,
+      cur = -1;
     let done = false;
 
     const grid = board(n, n, 'lk-plate');
@@ -63,7 +77,8 @@ export const tiles: PuzzleDef = {
       c1: Math.max(a % n, b % n),
     });
     const inRect = (q: Rect, i: number) => {
-      const r = Math.floor(i / n), c = i % n;
+      const r = Math.floor(i / n),
+        c = i % n;
       return r >= q.r0 && r <= q.r1 && c >= q.c0 && c <= q.c1;
     };
     const valid = (q: Rect) => {
@@ -107,7 +122,8 @@ export const tiles: PuzzleDef = {
 
     const finish = () => {
       if (start < 0) return;
-      const a = start, b = cur;
+      const a = start,
+        b = cur;
       start = cur = -1;
       if (b >= 0) {
         if (a === b) {
@@ -116,7 +132,10 @@ export const tiles: PuzzleDef = {
           else if (clue[a] === 1) place(span(a, a));
         } else place(span(a, b));
       }
-      if (render() && !done) { done = true; ctx.solved(); }
+      if (render() && !done) {
+        done = true;
+        ctx.solved();
+      }
     };
 
     grid.addEventListener('pointerdown', (e) => {
@@ -125,14 +144,21 @@ export const tiles: PuzzleDef = {
       if (i < 0) return;
       ctx.touch();
       e.preventDefault();
-      try { grid.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
+      try {
+        grid.setPointerCapture(e.pointerId);
+      } catch {
+        /* not capturable */
+      }
       start = cur = i;
       render();
     });
     grid.addEventListener('pointermove', (e) => {
       if (start < 0) return;
       const i = cellFromPointer(grid, e, n, n);
-      if (i >= 0 && i !== cur) { cur = i; render(); }
+      if (i >= 0 && i !== cur) {
+        cur = i;
+        render();
+      }
     });
     grid.addEventListener('pointerup', (e) => {
       if (start < 0) return;
@@ -140,14 +166,18 @@ export const tiles: PuzzleDef = {
       if (i >= 0) cur = i;
       finish();
     });
-    grid.addEventListener('pointercancel', () => { start = cur = -1; render(); });
+    grid.addEventListener('pointercancel', () => {
+      start = cur = -1;
+      render();
+    });
     grid.addEventListener('contextmenu', (e) => e.preventDefault());
 
     const sv = ctx.saved as { rects?: unknown } | undefined;
     if (Array.isArray(sv?.rects)) {
       for (const q of sv.rects as Placed[]) {
         const okNum = [q?.r0, q?.c0, q?.r1, q?.c1, q?.k].every((x) => Number.isInteger(x) && x >= 0);
-        if (okNum && q.r1 < n && q.c1 < n && q.r0 <= q.r1 && q.c0 <= q.c1) rects.push({ r0: q.r0, c0: q.c0, r1: q.r1, c1: q.c1, k: q.k % 8 });
+        if (okNum && q.r1 < n && q.c1 < n && q.r0 <= q.r1 && q.c0 <= q.c1)
+          rects.push({ r0: q.r0, c0: q.c0, r1: q.r1, c1: q.c1, k: q.k % 8 });
       }
     }
     root.append(grid);

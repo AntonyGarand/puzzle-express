@@ -1,15 +1,31 @@
-[data-puzzle='killer-sudoku'] { --accent: var(--p5); }
-[data-puzzle='killer-sudoku'] .killer { --in: calc(var(--board) / var(--cols) * 0.09); }
+[data-puzzle='killer-sudoku'] {
+  --accent: var(--p5);
+}
+[data-puzzle='killer-sudoku'] .killer {
+  --in: calc(var(--board) / var(--cols) * 0.09);
+}
 [data-puzzle='killer-sudoku'] .killer .cage {
   position: absolute;
   inset: 0;
   pointer-events: none;
   border: 0 dashed color-mix(in srgb, var(--ink) 75%, transparent);
 }
-[data-puzzle='killer-sudoku'] .killer .cage.ct { top: var(--in); border-top-width: 1.5px; }
-[data-puzzle='killer-sudoku'] .killer .cage.cb { bottom: var(--in); border-bottom-width: 1.5px; }
-[data-puzzle='killer-sudoku'] .killer .cage.cl { left: var(--in); border-left-width: 1.5px; }
-[data-puzzle='killer-sudoku'] .killer .cage.cr { right: var(--in); border-right-width: 1.5px; }
+[data-puzzle='killer-sudoku'] .killer .cage.ct {
+  top: var(--in);
+  border-top-width: 1.5px;
+}
+[data-puzzle='killer-sudoku'] .killer .cage.cb {
+  bottom: var(--in);
+  border-bottom-width: 1.5px;
+}
+[data-puzzle='killer-sudoku'] .killer .cage.cl {
+  left: var(--in);
+  border-left-width: 1.5px;
+}
+[data-puzzle='killer-sudoku'] .killer .cage.cr {
+  right: var(--in);
+  border-right-width: 1.5px;
+}
 [data-puzzle='killer-sudoku'] .killer .sum {
   position: absolute;
   top: 1px;
@@ -23,5 +39,10 @@
   font-weight: 700;
 }
 [data-puzzle='killer-sudoku'] .killer .cell.sel .sum,
-[data-puzzle='killer-sudoku'] .killer .cell.err .sum { color: var(--on-tone); }
-[data-puzzle='killer-sudoku'] .killer .cell .v { font-size: 0.92em; margin-top: 0.12em; }
+[data-puzzle='killer-sudoku'] .killer .cell.err .sum {
+  color: var(--on-tone);
+}
+[data-puzzle='killer-sudoku'] .killer .cell .v {
+  font-size: 0.92em;
+  margin-top: 0.12em;
+}

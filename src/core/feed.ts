@@ -34,7 +34,11 @@ export class Feed {
         for (const e of entries) ratios.set(cardOf(e.target), e.intersectionRatio);
         let best: Card | null = null;
         let bestR = 0.55;
-        for (const [c, r] of ratios) if (r > bestR) (best = c), (bestR = r);
+        for (const [c, r] of ratios)
+          if (r > bestR) {
+            best = c;
+            bestR = r;
+          }
         if (best && best !== this.active) this.setActive(best);
       },
       { root: this.el, threshold: [0, 0.25, 0.55, 0.75, 1] },
@@ -109,7 +113,7 @@ export class Feed {
       const age = this.recentTypes.length - idx; // 1 = previous card
       x.w *= age === 1 ? 0 : age === 2 ? 0.3 : age === 3 ? 0.6 : 1;
     }
-    let total = pool.reduce((a, x) => a + x.w, 0);
+    const total = pool.reduce((a, x) => a + x.w, 0);
     if (total <= 0) return pool[Math.floor(Math.random() * pool.length)].d;
     let r = Math.random() * total;
     for (const x of pool) if ((r -= x.w) <= 0) return x.d;

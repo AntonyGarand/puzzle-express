@@ -1,1 +1,3 @@
-[data-puzzle='pyramid'] { --accent: var(--p1); }
+[data-puzzle='pyramid'] {
+  --accent: var(--p1);
+}

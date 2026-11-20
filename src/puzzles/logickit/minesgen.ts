@@ -21,7 +21,7 @@ export function flood(i: number, open: boolean[], mine: boolean[], count: number
 }
 
 /** Can the board be cleared from `first` by pure deduction (single-cell + subset rules + mine total)? */
-export function solvableByLogic(mine: boolean[], cols: number, rows: number, first: number): boolean {
+function solvableByLogic(mine: boolean[], cols: number, rows: number, first: number): boolean {
   const N = cols * rows;
   const count = mineCounts(mine, cols, rows);
   const open = new Array<boolean>(N).fill(false);
@@ -35,7 +35,10 @@ export function solvableByLogic(mine: boolean[], cols: number, rows: number, fir
     if (opened === safeTotal) return true;
     let progress = false;
     const reveal = (k: number) => {
-      if (!open[k] && !mine[k]) { flood(k, open, mine, count, cols, rows); progress = true; }
+      if (!open[k] && !mine[k]) {
+        flood(k, open, mine, count, cols, rows);
+        progress = true;
+      }
     };
     // Constraints from open numbered cells.
     const cons: { cells: number[]; m: number }[] = [];
@@ -44,28 +47,44 @@ export function solvableByLogic(mine: boolean[], cols: number, rows: number, fir
       const unk = nbs[i].filter((j) => !open[j] && !flag[j]);
       if (!unk.length) continue;
       const m = count[i] - nbs[i].filter((j) => flag[j]).length;
-      if (m === 0) { unk.forEach(reveal); continue; }
-      if (m === unk.length) { unk.forEach((j) => (flag[j] = true)); progress = true; continue; }
+      if (m === 0) {
+        unk.forEach(reveal);
+        continue;
+      }
+      if (m === unk.length) {
+        unk.forEach((j) => (flag[j] = true));
+        progress = true;
+        continue;
+      }
       cons.push({ cells: unk, m });
     }
     if (progress) continue;
     // Subset rule.
-    outer: for (const a of cons) for (const b of cons) {
-      if (a === b || a.cells.length >= b.cells.length) continue;
-      if (!a.cells.every((x) => b.cells.includes(x))) continue;
-      const rest = b.cells.filter((x) => !a.cells.includes(x));
-      const m = b.m - a.m;
-      if (m === 0) { rest.forEach(reveal); }
-      else if (m === rest.length) { rest.forEach((j) => (flag[j] = true)); progress = true; }
-      if (progress) break outer;
-    }
+    outer: for (const a of cons)
+      for (const b of cons) {
+        if (a === b || a.cells.length >= b.cells.length) continue;
+        if (!a.cells.every((x) => b.cells.includes(x))) continue;
+        const rest = b.cells.filter((x) => !a.cells.includes(x));
+        const m = b.m - a.m;
+        if (m === 0) {
+          rest.forEach(reveal);
+        } else if (m === rest.length) {
+          rest.forEach((j) => (flag[j] = true));
+          progress = true;
+        }
+        if (progress) break outer;
+      }
     if (progress) continue;
     // Global count.
     const unknown = [] as number[];
     for (let i = 0; i < N; i++) if (!open[i] && !flag[i]) unknown.push(i);
     const left = total - flag.filter(Boolean).length;
-    if (left === 0) { unknown.forEach(reveal); }
-    else if (left === unknown.length) { unknown.forEach((j) => (flag[j] = true)); progress = true; }
+    if (left === 0) {
+      unknown.forEach(reveal);
+    } else if (left === unknown.length) {
+      unknown.forEach((j) => (flag[j] = true));
+      progress = true;
+    }
     opened = open.filter(Boolean).length;
     if (opened === safeTotal) return true;
     if (!progress) return false;

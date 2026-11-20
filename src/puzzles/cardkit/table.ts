@@ -53,7 +53,11 @@ export function bindTable(table: HTMLElement, hooks: TableHooks): () => void {
     if (!drag.on) {
       if (Math.hypot(dx, dy) < 7) return;
       drag.on = true;
-      try { table.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+      try {
+        table.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
       for (const el of drag.els) el.classList.add('lift');
     }
     for (const el of drag.els) el.style.transform = `translate(${dx}px, ${dy}px)`;
@@ -63,7 +67,10 @@ export function bindTable(table: HTMLElement, hooks: TableHooks): () => void {
   const onUp = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag;
-    if (!d.on) { drag = null; return; }
+    if (!d.on) {
+      drag = null;
+      return;
+    }
     suppress = performance.now() + 250;
     // Drop on the pile whose box overlaps the lead card most (pointer position breaks ties).
     const lead = d.els[0].getBoundingClientRect();
@@ -77,14 +84,20 @@ export function bindTable(table: HTMLElement, hooks: TableHooks): () => void {
       const hh = Math.min(lead.bottom, r.bottom) - Math.max(lead.top, r.top);
       let a = w > 0 && hh > 0 ? w * hh : 0;
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) a += lead.width * lead.height;
-      if (a > bestA) { bestA = a; best = pile.dataset.pile!; }
+      if (a > bestA) {
+        bestA = a;
+        best = pile.dataset.pile!;
+      }
     }
     const moved = best != null && hooks.drop(d.p, d.i, best);
     if (!moved) reset();
     drag = null;
   };
 
-  const onCancel = () => { reset(); drag = null; };
+  const onCancel = () => {
+    reset();
+    drag = null;
+  };
 
   table.addEventListener('click', onClick);
   table.addEventListener('pointerdown', onDown);
@@ -113,7 +126,9 @@ export class History<T> {
     const s = this.stack.pop();
     return s ? (JSON.parse(s) as T) : null;
   }
-  get size() { return this.stack.length; }
+  get size() {
+    return this.stack.length;
+  }
   restore(v: unknown) {
     if (Array.isArray(v) && v.every((x) => typeof x === 'string')) this.stack = v.slice(-this.cap);
   }

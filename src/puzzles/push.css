@@ -1,5 +1,9 @@
-[data-puzzle='push'] { --accent: var(--p8); }
-[data-puzzle='push'] .push-grid { touch-action: none; }
+[data-puzzle='push'] {
+  --accent: var(--p8);
+}
+[data-puzzle='push'] .push-grid {
+  touch-action: none;
+}
 [data-puzzle='push'] .cell.wall {
   background: repeating-linear-gradient(135deg, var(--ink) 0 3px, var(--cell-alt) 3px 8px);
   box-shadow: none;
@@ -14,7 +18,9 @@
   border-radius: 50%;
 }
 /* crate */
-[data-puzzle='push'] .cell.bx { background: var(--accent); }
+[data-puzzle='push'] .cell.bx {
+  background: var(--accent);
+}
 [data-puzzle='push'] .cell.bx::after {
   content: '';
   width: 58%;
@@ -24,8 +30,13 @@
   background: linear-gradient(45deg, transparent 45%, var(--on-tone) 45% 55%, transparent 55%);
   opacity: 0.55;
 }
-[data-puzzle='push'] .cell.bx.tg::before { display: none; }
-[data-puzzle='push'] .cell.bx.on { background: var(--good); color: var(--on-tone); }
+[data-puzzle='push'] .cell.bx.tg::before {
+  display: none;
+}
+[data-puzzle='push'] .cell.bx.on {
+  background: var(--good);
+  color: var(--on-tone);
+}
 /* player */
 [data-puzzle='push'] .cell.me::after {
   content: '';
@@ -34,4 +45,6 @@
   border-radius: 50%;
   background: var(--fg);
 }
-[data-puzzle='push'] .push-pad { width: min(var(--board), 300px); }
+[data-puzzle='push'] .push-pad {
+  width: min(var(--board), 300px);
+}

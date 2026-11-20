@@ -4,8 +4,20 @@ import { byLevel, type PuzzleDef } from '../core/types';
 import { btn, h, shake } from '../core/ui';
 import { cardEl, deck, fan, pileEl, slotEl, SUITS, tableEl } from './cardkit/cards';
 import {
-  bestDest, canDraw, canRedeal, dealK, draw, finishK, greedyK, hasProgress, moveK, picked, trivialK, wonK,
-  type KRules, type KState,
+  bestDest,
+  canDraw,
+  canRedeal,
+  dealK,
+  draw,
+  finishK,
+  greedyK,
+  hasProgress,
+  moveK,
+  picked,
+  trivialK,
+  wonK,
+  type KRules,
+  type KState,
 } from './cardkit/klondike';
 import { bindTable, History } from './cardkit/table';
 
@@ -22,7 +34,9 @@ function validState(v: unknown): v is KState {
 
 export const solitaire: PuzzleDef = {
   id: 'solitaire',
-  get name() { return L('Solitaire', 'Solitaire'); },
+  get name() {
+    return L('Solitaire', 'Solitaire');
+  },
   category: 'cards',
   get rules() {
     return L('Build suits A→K. Stack down in alternating colours.', 'Montez les sortes de A à R; alternez les couleurs.');
@@ -167,7 +181,10 @@ export const solitaire: PuzzleDef = {
     };
 
     const doDraw = () => {
-      if (!canDraw(s, rules)) { bump('s', -1); return; }
+      if (!canDraw(s, rules)) {
+        bump('s', -1);
+        return;
+      }
       hist.push(s);
       draw(s, rules);
       after();
@@ -179,10 +196,16 @@ export const solitaire: PuzzleDef = {
       tap(p, i) {
         if (over) return;
         ctx.touch();
-        if (p === 's') { doDraw(); return; }
+        if (p === 's') {
+          doDraw();
+          return;
+        }
         if (i < 0) return;
         const to = bestDest(s, p, i);
-        if (!to) { bump(p, i); return; }
+        if (!to) {
+          bump(p, i);
+          return;
+        }
         hist.push(s);
         moveK(s, p, i, to);
         after();
@@ -216,8 +239,17 @@ export const solitaire: PuzzleDef = {
     return {
       snapshot: () => ({ s, hist: hist.stack }),
       onKey(e) {
-        if (e.key === 'z' || e.key === 'Backspace') { undo(); return true; }
-        if (e.key === ' ' || e.key === 'd') { if (!over) { ctx.touch(); doDraw(); } return true; }
+        if (e.key === 'z' || e.key === 'Backspace') {
+          undo();
+          return true;
+        }
+        if (e.key === ' ' || e.key === 'd') {
+          if (!over) {
+            ctx.touch();
+            doDraw();
+          }
+          return true;
+        }
         return false;
       },
     };

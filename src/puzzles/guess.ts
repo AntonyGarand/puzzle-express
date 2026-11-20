@@ -5,7 +5,8 @@ import './guess.css';
 
 /** Bulls & cows score of a guess against the secret (both distinct digits). */
 export function scoreGuess(secret: number[], g: number[]) {
-  let exact = 0, near = 0;
+  let exact = 0,
+    near = 0;
   g.forEach((v, k) => {
     if (secret[k] === v) exact++;
     else if (secret.includes(v)) near++;
@@ -15,24 +16,40 @@ export function scoreGuess(secret: number[], g: number[]) {
 
 export const guess: PuzzleDef = {
   id: 'guess',
-  get name() { return L('Guess', 'Code secret'); },
+  get name() {
+    return L('Guess', 'Code secret');
+  },
   category: 'numbers',
-  get rules() { return L('Crack the digit code. ● right spot · ○ wrong spot.', 'Trouvez le code. ● bonne place · ○ mauvaise place.'); },
+  get rules() {
+    return L('Crack the digit code. ● right spot · ○ wrong spot.', 'Trouvez le code. ● bonne place · ○ mauvaise place.');
+  },
   help: () => ({
     goal: L(
       'Find the secret code: a row of different digits in a set order. After each guess, dots tell you how close you are.',
       'Trouvez le code secret : une suite de chiffres tous différents, dans un ordre précis. Après chaque essai, des pastilles indiquent si vous chauffez.',
     ),
     steps: [
-      L('Tap digits (or type them) to fill the row. Tap a digit again to remove it; ⌫ or Backspace erases the last one.', 'Touchez des chiffres (ou tapez-les) pour remplir la rangée. Touchez un chiffre de nouveau pour le retirer; ⌫ ou Retour arrière efface le dernier.'),
+      L(
+        'Tap digits (or type them) to fill the row. Tap a digit again to remove it; ⌫ or Backspace erases the last one.',
+        'Touchez des chiffres (ou tapez-les) pour remplir la rangée. Touchez un chiffre de nouveau pour le retirer; ⌫ ou Retour arrière efface le dernier.',
+      ),
       L('Press Guess (or Enter) to submit the row.', 'Appuyez sur Essayer (ou Entrée) pour soumettre la rangée.'),
-      L('● means a digit is in the right spot; ○ means it’s in the code but elsewhere. The dots don’t say which digit.', '● : un chiffre est à la bonne place; ○ : il est dans le code, mais ailleurs. Les pastilles ne disent pas lequel.'),
+      L(
+        '● means a digit is in the right spot; ○ means it’s in the code but elsewhere. The dots don’t say which digit.',
+        '● : un chiffre est à la bonne place; ○ : il est dans le code, mais ailleurs. Les pastilles ne disent pas lequel.',
+      ),
       L('A digit never appears twice in the code.', 'Un chiffre n’apparaît jamais deux fois dans le code.'),
       L('Guesses are limited; run out and the code is revealed.', 'Les essais sont limités; une fois épuisés, le code est dévoilé.'),
     ],
     tips: [
-      L('Start with guesses that share no digits to find out which ones are in the code.', 'Commencez par des essais sans chiffre commun pour savoir lesquels font partie du code.'),
-      L('Then shuffle the right digits around to pin down their positions.', 'Ensuite, déplacez les bons chiffres pour trouver leur position.'),
+      L(
+        'Start with guesses that share no digits to find out which ones are in the code.',
+        'Commencez par des essais sans chiffre commun pour savoir lesquels font partie du code.',
+      ),
+      L(
+        'Then shuffle the right digits around to pin down their positions.',
+        'Ensuite, déplacez les bons chiffres pour trouver leur position.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [40, 60, 100, 140, 200]),
@@ -61,7 +78,8 @@ export const guess: PuzzleDef = {
       return p;
     });
 
-    const digit = (v: number | undefined, cls = '') => h('span', { class: `gd ${v == null ? 'empty' : ''} ${cls}`.trim() }, v == null ? '' : String(v));
+    const digit = (v: number | undefined, cls = '') =>
+      h('span', { class: `gd ${v == null ? 'empty' : ''} ${cls}`.trim() }, v == null ? '' : String(v));
     const render = () => {
       const out: HTMLElement[] = [];
       for (let r = 0; r < maxGuesses; r++) {
@@ -73,10 +91,19 @@ export const guess: PuzzleDef = {
           for (let k = 0; k < past.exact; k++) fb.append(h('i', { class: 'exact' }));
           for (let k = 0; k < past.near; k++) fb.append(h('i', { class: 'near' }));
         }
-        out.push(h('div', { class: `code-row ${isCur ? 'cur' : ''} ${past || isCur ? '' : 'future'}` }, h('span', { class: 'digits' }, ...ds), fb));
+        out.push(
+          h('div', { class: `code-row ${isCur ? 'cur' : ''} ${past || isCur ? '' : 'future'}` }, h('span', { class: 'digits' }, ...ds), fb),
+        );
       }
       if (over && guesses[guesses.length - 1]?.exact !== len) {
-        out.push(h('div', { class: 'code-row reveal' }, h('span', { class: 'digits' }, ...secret.map((v) => digit(v, 'secret'))), h('span', { class: 'fb' }, L('code', 'code'))));
+        out.push(
+          h(
+            'div',
+            { class: 'code-row reveal' },
+            h('span', { class: 'digits' }, ...secret.map((v) => digit(v, 'secret'))),
+            h('span', { class: 'fb' }, L('code', 'code')),
+          ),
+        );
       }
       boardEl.replaceChildren(...out);
       keyEls.forEach((k, v) => k.classList.toggle('sel', cur.includes(v)));
@@ -87,20 +114,39 @@ export const guess: PuzzleDef = {
       if (over) return;
       ctx.touch();
       if (cur.includes(v)) cur = cur.filter((x) => x !== v); // tap again to take it back
-      else if (cur.length >= len) { shake(curRow()); return; }
-      else cur.push(v);
+      else if (cur.length >= len) {
+        shake(curRow());
+        return;
+      } else cur.push(v);
       render();
     };
-    const back = () => { if (over || !cur.length) return; cur.pop(); render(); };
+    const back = () => {
+      if (over || !cur.length) return;
+      cur.pop();
+      render();
+    };
     const submit = () => {
       if (over) return;
-      if (cur.length < len) { shake(curRow()); return; }
+      if (cur.length < len) {
+        shake(curRow());
+        return;
+      }
       ctx.touch();
       const res = scoreGuess(secret, cur);
       guesses.push({ g: cur, ...res });
       cur = [];
-      if (res.exact === len) { over = true; render(); ctx.solved(); return; }
-      if (guesses.length >= maxGuesses) { over = true; render(); ctx.failed(); return; }
+      if (res.exact === len) {
+        over = true;
+        render();
+        ctx.solved();
+        return;
+      }
+      if (guesses.length >= maxGuesses) {
+        over = true;
+        render();
+        ctx.failed();
+        return;
+      }
       render();
     };
 
@@ -132,8 +178,14 @@ export const guess: PuzzleDef = {
           if (pool.includes(v)) add(v);
           return true;
         }
-        if (e.key === 'Backspace') { back(); return true; }
-        if (e.key === 'Enter') { submit(); return true; }
+        if (e.key === 'Backspace') {
+          back();
+          return true;
+        }
+        if (e.key === 'Enter') {
+          submit();
+          return true;
+        }
         return false;
       },
     };

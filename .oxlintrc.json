@@ -1,0 +1,77 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
+  "rules": {
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrors": "none"
+      }
+    ],
+    "eqeqeq": ["error", "smart"],
+    "prefer-const": "error",
+    "no-var": "error",
+    "import/no-cycle": "error",
+    "import/no-duplicates": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/no-explicit-any": "warn",
+    "unicorn/prefer-node-protocol": "error",
+    "unicorn/no-array-for-each": "off",
+    "unicorn/no-array-reduce": "off",
+    "unicorn/no-new-array": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "no-underscore-dangle": "off",
+    "import/no-unassigned-import": [
+      "warn",
+      {
+        "allow": ["**/*.css", "@fontsource-variable/*"]
+      }
+    ],
+    "no-unused-expressions": [
+      "error",
+      {
+        "allowShortCircuit": true,
+        "allowTernary": true
+      }
+    ],
+    "oxc/no-map-spread": "off"
+  },
+  "overrides": [
+    {
+      "files": ["scripts/**", "src/puzzles/wordkit/*.mjs"],
+      "env": {
+        "node": true,
+        "browser": false
+      },
+      "rules": {
+        "no-await-in-loop": "off"
+      }
+    },
+    {
+      "files": ["test/**"],
+      "rules": {
+        "typescript/no-explicit-any": "off",
+        "vitest/valid-expect": [
+          "error",
+          {
+            "maxArgs": 2
+          }
+        ]
+      }
+    }
+  ],
+  "ignorePatterns": ["dist/**", "shots*/**", "src/puzzles/wordkit/dict*.txt"]
+}

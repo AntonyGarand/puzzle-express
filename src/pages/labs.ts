@@ -27,7 +27,11 @@ export function renderLabs(el: HTMLElement, defs: PuzzleDef[]) {
   const tile = (d: PuzzleDef, save: Save | undefined) => {
     const st = stats(d.id);
     const pr = prefs(d.id);
-    const levelSel = h('select', { class: 'select', 'aria-label': `${d.name} — ${L('level', 'niveau')}` }, ...LEVELS.map((l) => h('option', { value: String(l) }, LEVEL_NAMES[l])));
+    const levelSel = h(
+      'select',
+      { class: 'select', 'aria-label': `${d.name} — ${L('level', 'niveau')}` },
+      ...LEVELS.map((l) => h('option', { value: String(l) }, LEVEL_NAMES[l])),
+    );
     levelSel.value = String(save?.level ?? pr.level);
     const best = st.best[pr.level];
     const startNew = () => (location.hash = `#/game/${d.id}/new/${levelSel.value}`);
@@ -35,23 +39,58 @@ export function renderLabs(el: HTMLElement, defs: PuzzleDef[]) {
     return h(
       'article',
       { class: `lab-tile ${save ? 'has-save' : ''}`, 'data-puzzle': d.id },
-      h('header', null, h('div', { class: 'title-row' }, h('h2', null, d.name), helpButton(d)), save ? h('span', { class: 'badge' }, L('In progress', 'En cours')) : null),
+      h(
+        'header',
+        null,
+        h('div', { class: 'title-row' }, h('h2', null, d.name), helpButton(d)),
+        save ? h('span', { class: 'badge' }, L('In progress', 'En cours')) : null,
+      ),
       h('p', { class: 'rules' }, d.rules),
       save
         ? h(
             'p',
             { class: 'lab-meta' },
             `${LEVEL_NAMES[save.level]} · ${fmtTime(save.elapsed)} · ${ago(save.at)} · `,
-            h('button', { type: 'button', class: 'linkish', onclick: () => { clearSave(d.id); rerender(); } }, L('discard', 'abandonner')),
+            h(
+              'button',
+              {
+                type: 'button',
+                class: 'linkish',
+                onclick: () => {
+                  clearSave(d.id);
+                  rerender();
+                },
+              },
+              L('discard', 'abandonner'),
+            ),
           )
-        : h('p', { class: 'lab-meta' }, P(st.solved, ['solved', 'solved'], ['réussi', 'réussis']), best != null ? ` · ${L('best', 'record')} ${fmtTime(best)}` : '', ` · ${pr.manual ? '' : 'auto '}${LEVEL_NAMES[pr.level]}`),
+        : h(
+            'p',
+            { class: 'lab-meta' },
+            P(st.solved, ['solved', 'solved'], ['réussi', 'réussis']),
+            best != null ? ` · ${L('best', 'record')} ${fmtTime(best)}` : '',
+            ` · ${pr.manual ? '' : 'auto '}${LEVEL_NAMES[pr.level]}`,
+          ),
       h(
         'div',
         { class: 'lab-new' },
         save ? h('a', { class: 'btn primary', href: `#/game/${d.id}` }, L('Resume', 'Reprendre')) : null,
         levelSel,
-        h('button', { type: 'button', class: `btn ${save ? '' : 'primary'}`, onclick: startNew }, save ? L('New', 'Nouvelle') : L('Play', 'Jouer')),
-        h('a', { class: 'btn ghost endless', href: `#/play/${d.id}`, title: L(`Endless feed of ${d.name}`, `Fil sans fin : ${d.name}`), 'aria-label': L(`Endless feed of ${d.name}`, `Fil sans fin : ${d.name}`) }, '∞'),
+        h(
+          'button',
+          { type: 'button', class: `btn ${save ? '' : 'primary'}`, onclick: startNew },
+          save ? L('New', 'Nouvelle') : L('Play', 'Jouer'),
+        ),
+        h(
+          'a',
+          {
+            class: 'btn ghost endless',
+            href: `#/play/${d.id}`,
+            title: L(`Endless feed of ${d.name}`, `Fil sans fin : ${d.name}`),
+            'aria-label': L(`Endless feed of ${d.name}`, `Fil sans fin : ${d.name}`),
+          },
+          '∞',
+        ),
       ),
     );
   };
@@ -61,17 +100,46 @@ export function renderLabs(el: HTMLElement, defs: PuzzleDef[]) {
   const shown = filter === 'all' ? cats : cats.filter((c) => c.id === filter);
 
   const chip = (id: CategoryId | 'all', label: string, n: number) =>
-    h('button', { type: 'button', class: `chip-filter ${filter === id ? 'on' : ''}`, onclick: () => { filter = id; rerender(); } }, label, h('span', null, n));
+    h(
+      'button',
+      {
+        type: 'button',
+        class: `chip-filter ${filter === id ? 'on' : ''}`,
+        onclick: () => {
+          filter = id;
+          rerender();
+        },
+      },
+      label,
+      h('span', null, n),
+    );
 
   el.replaceChildren(
     h(
       'div',
       { class: 'page wide' },
       h('h1', null, L('Games', 'Jeux')),
-      h('p', { class: 'muted' }, L(`${defs.length} games. Pick any game and level — unfinished ones are saved automatically.`, `${defs.length} jeux. Choisissez un jeu et un niveau — les parties en cours sont sauvegardées automatiquement.`)),
-      h('div', { class: 'filters', role: 'toolbar', 'aria-label': L('Categories', 'Catégories') }, chip('all', L('All', 'Tous'), defs.length), ...cats.map((c) => chip(c.id, c.name, c.games.length))),
+      h(
+        'p',
+        { class: 'muted' },
+        L(
+          `${defs.length} games. Pick any game and level — unfinished ones are saved automatically.`,
+          `${defs.length} jeux. Choisissez un jeu et un niveau — les parties en cours sont sauvegardées automatiquement.`,
+        ),
+      ),
+      h(
+        'div',
+        { class: 'filters', role: 'toolbar', 'aria-label': L('Categories', 'Catégories') },
+        chip('all', L('All', 'Tous'), defs.length),
+        ...cats.map((c) => chip(c.id, c.name, c.games.length)),
+      ),
       inProgress.length && filter === 'all'
-        ? h('section', { class: 'cat' }, h('h3', null, L('Continue', 'Reprendre')), h('div', { class: 'lab-grid' }, ...inProgress.map((d) => tile(d, saves[d.id]))))
+        ? h(
+            'section',
+            { class: 'cat' },
+            h('h3', null, L('Continue', 'Reprendre')),
+            h('div', { class: 'lab-grid' }, ...inProgress.map((d) => tile(d, saves[d.id]))),
+          )
         : null,
       ...shown.map((c) =>
         h(

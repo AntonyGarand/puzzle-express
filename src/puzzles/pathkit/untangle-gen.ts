@@ -6,12 +6,18 @@ export type Edge = [number, number];
 
 const orient = (a: Pt, b: Pt, c: Pt) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 const onSeg = (a: Pt, b: Pt, p: Pt) =>
-  Math.min(a.x, b.x) - 1e-9 <= p.x && p.x <= Math.max(a.x, b.x) + 1e-9 && Math.min(a.y, b.y) - 1e-9 <= p.y && p.y <= Math.max(a.y, b.y) + 1e-9;
+  Math.min(a.x, b.x) - 1e-9 <= p.x &&
+  p.x <= Math.max(a.x, b.x) + 1e-9 &&
+  Math.min(a.y, b.y) - 1e-9 <= p.y &&
+  p.y <= Math.max(a.y, b.y) + 1e-9;
 
 /** Do segments ab and cd intersect (touching counts)? Callers skip edges sharing a vertex. */
-export function crosses(a: Pt, b: Pt, c: Pt, d: Pt): boolean {
+function crosses(a: Pt, b: Pt, c: Pt, d: Pt): boolean {
   const eps = 1e-9;
-  const o1 = orient(a, b, c), o2 = orient(a, b, d), o3 = orient(c, d, a), o4 = orient(c, d, b);
+  const o1 = orient(a, b, c),
+    o2 = orient(a, b, d),
+    o3 = orient(c, d, a),
+    o4 = orient(c, d, b);
   if (((o1 > eps && o2 < -eps) || (o1 < -eps && o2 > eps)) && ((o3 > eps && o4 < -eps) || (o3 < -eps && o4 > eps))) return true;
   if (Math.abs(o1) <= eps && onSeg(a, b, c)) return true;
   if (Math.abs(o2) <= eps && onSeg(a, b, d)) return true;
@@ -25,7 +31,8 @@ export function crossingEdges(p: Pt[], edges: Edge[]): Set<number> {
   const bad = new Set<number>();
   for (let i = 0; i < edges.length; i++)
     for (let j = i + 1; j < edges.length; j++) {
-      const [a, b] = edges[i], [c, d] = edges[j];
+      const [a, b] = edges[i],
+        [c, d] = edges[j];
       if (a === c || a === d || b === c || b === d) continue;
       if (crosses(p[a], p[b], p[c], p[d])) bad.add(i).add(j);
     }
@@ -33,7 +40,8 @@ export function crossingEdges(p: Pt[], edges: Edge[]): Set<number> {
 }
 
 const segPointDist = (a: Pt, b: Pt, p: Pt) => {
-  const dx = b.x - a.x, dy = b.y - a.y;
+  const dx = b.x - a.x,
+    dy = b.y - a.y;
   const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)));
   return Math.hypot(a.x + t * dx - p.x, a.y + t * dy - p.y);
 };
@@ -65,7 +73,12 @@ export function genUntangle(rng: Rng, d: Difficulty): UntanglePuzzle {
   let edges: Edge[] = [];
   for (const e of cand) {
     if (pts.some((p, k) => k !== e[0] && k !== e[1] && segPointDist(pts[e[0]], pts[e[1]], p) < 4)) continue;
-    if (edges.some((f) => f[0] !== e[0] && f[0] !== e[1] && f[1] !== e[0] && f[1] !== e[1] && crosses(pts[e[0]], pts[e[1]], pts[f[0]], pts[f[1]]))) continue;
+    if (
+      edges.some(
+        (f) => f[0] !== e[0] && f[0] !== e[1] && f[1] !== e[0] && f[1] !== e[1] && crosses(pts[e[0]], pts[e[1]], pts[f[0]], pts[f[1]]),
+      )
+    )
+      continue;
     edges.push(e);
   }
   // 3. thin out to the target edge count, keeping degree >= 2 and connectivity
@@ -77,7 +90,13 @@ export function genUntangle(rng: Rng, d: Difficulty): UntanglePuzzle {
     es.forEach(([a, b]) => (adj[a].push(b), adj[b].push(a)));
     const seen = new Set([0]);
     const st = [0];
-    while (st.length) for (const j of adj[st.pop()!]) if (!seen.has(j)) seen.add(j), st.push(j);
+    while (st.length) {
+      for (const j of adj[st.pop()!]) {
+        if (seen.has(j)) continue;
+        seen.add(j);
+        st.push(j);
+      }
+    }
     return seen.size === V;
   };
   for (const e of rng.shuffle([...edges])) {
@@ -86,7 +105,8 @@ export function genUntangle(rng: Rng, d: Difficulty): UntanglePuzzle {
     const rest = edges.filter((f) => f !== e);
     if (!isConnected(rest)) continue;
     edges = rest;
-    deg[e[0]]--, deg[e[1]]--;
+    deg[e[0]]--;
+    deg[e[1]]--;
   }
   // 4. scramble onto a circle, making sure it starts tangled
   let start: Pt[] = [];
@@ -100,7 +120,10 @@ export function genUntangle(rng: Rng, d: Difficulty): UntanglePuzzle {
       cand2[v] = { x: Math.round((50 + 40 * Math.cos(a)) * 10) / 10, y: Math.round((50 + 40 * Math.sin(a)) * 10) / 10 };
     });
     const bad = crossingEdges(cand2, edges).size;
-    if (bad > bestBad) (bestBad = bad), (start = cand2);
+    if (bad > bestBad) {
+      bestBad = bad;
+      start = cand2;
+    }
     if (bad >= Math.min(edges.length, V)) break;
   }
   return { solution: pts, edges, start };

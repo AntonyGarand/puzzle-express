@@ -1,1 +1,3 @@
-[data-puzzle='solitaire'] { --accent: var(--p3); }
+[data-puzzle='solitaire'] {
+  --accent: var(--p3);
+}

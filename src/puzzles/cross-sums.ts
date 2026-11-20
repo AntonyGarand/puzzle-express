@@ -6,7 +6,11 @@ import { h } from '../core/ui';
 import { entryGame, entryHelpSteps } from './sudokukit/entry';
 import { revealUntilUnique, solve, type Problem, type Unit } from './sudokukit/solver';
 
-interface Run { cells: number[]; clue: number; across: boolean }
+interface Run {
+  cells: number[];
+  clue: number;
+  across: boolean;
+}
 
 /** All runs (≥1 cell) of white cells; `clue` is the black cell just before the run. */
 function runsOf(n: number, white: boolean[]): Run[] {
@@ -16,7 +20,10 @@ function runsOf(n: number, white: boolean[]): Run[] {
       let cur: number[] = [];
       for (let b = 0; b <= n; b++) {
         const i = across ? a * n + b : b * n + a;
-        if (b < n && white[i]) { cur.push(i); continue; }
+        if (b < n && white[i]) {
+          cur.push(i);
+          continue;
+        }
         if (cur.length) out.push({ cells: cur, clue: cur[0] - (across ? 1 : n), across });
         cur = [];
       }
@@ -34,10 +41,19 @@ function valid(n: number, white: boolean[]): boolean {
   const stack = [start];
   while (stack.length) {
     const i = stack.pop()!;
-    const r = Math.floor(i / n), c = i % n;
-    for (const [rr, cc] of [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]) {
+    const r = Math.floor(i / n),
+      c = i % n;
+    for (const [rr, cc] of [
+      [r - 1, c],
+      [r + 1, c],
+      [r, c - 1],
+      [r, c + 1],
+    ]) {
       const j = rr * n + cc;
-      if (rr >= 0 && cc >= 0 && rr < n && cc < n && white[j] && !seen.has(j)) { seen.add(j); stack.push(j); }
+      if (rr >= 0 && cc >= 0 && rr < n && cc < n && white[j] && !seen.has(j)) {
+        seen.add(j);
+        stack.push(j);
+      }
     }
   }
   return seen.size === white.filter(Boolean).length;
@@ -71,9 +87,13 @@ function layout(n: number, maxRun: number, blackFrac: number, rng: Rng): boolean
 
 export const crossSums: PuzzleDef = {
   id: 'cross-sums',
-  get name() { return L('Cross Sums', 'Sommes croisées'); },
+  get name() {
+    return L('Cross Sums', 'Sommes croisées');
+  },
   category: 'logic',
-  get rules() { return L('Digits 1–9 add up to each clue; no repeats in a run.', 'Chiffres 1 à 9 : chaque segment fait sa somme, sans doublon.'); },
+  get rules() {
+    return L('Digits 1–9 add up to each clue; no repeats in a run.', 'Chiffres 1 à 9 : chaque segment fait sa somme, sans doublon.');
+  },
   help: () => ({
     goal: L(
       'Fill every white cell with a digit from 1 to 9 so each run of cells adds up to its clue.',
@@ -135,7 +155,8 @@ export const crossSums: PuzzleDef = {
     const { units, puzzle, runs } = best;
     const problem: Problem = { size: n * n, maxDigit: 9, units };
 
-    const across = new Map<number, number>(), down = new Map<number, number>();
+    const across = new Map<number, number>(),
+      down = new Map<number, number>();
     runs.forEach((run, k) => (run.across ? across : down).set(run.clue, units[k].sum!));
     return entryGame({
       ctx,
