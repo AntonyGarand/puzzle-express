@@ -39,8 +39,8 @@ export const pyramid: PuzzleDef = {
         'Seules les cartes libres comptent : une carte de la pyramide se libère quand les deux cartes qui la couvrent sont parties. La carte du dessus du talon est libre aussi.',
       ),
       L(
-        'Tap one card, then its partner; or drag one card onto the other. Tap a king to remove it.',
-        'Touchez une carte, puis sa partenaire; ou glissez une carte sur l’autre. Touchez un roi pour le retirer.',
+        'Tap one card, then its partner; or drag one card onto the other (on a touch screen, hold it a moment first). Tap a king to remove it.',
+        'Touchez une carte, puis sa partenaire; ou glissez une carte sur l’autre (sur écran tactile, maintenez-la un instant d’abord). Touchez un roi pour le retirer.',
       ),
       L(
         'Tap the stock to turn one card onto the waste. When it runs out, ↻ starts a new pass: unlimited on Easy, 3 on Medium, 2 on Hard and Expert, 1 on Master.',

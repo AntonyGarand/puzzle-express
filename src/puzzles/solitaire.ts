@@ -52,8 +52,8 @@ export const solitaire: PuzzleDef = {
         'Dans les sept colonnes, empilez les cartes en ordre décroissant en alternant les couleurs (un 9 rouge sur un 10 noir). Seul un roi peut occuper une colonne vide.',
       ),
       L(
-        'Tap a card to play it automatically: to a foundation if it fits, otherwise onto a matching column. You can also drag it, along with the cards on top of it.',
-        'Touchez une carte pour la jouer automatiquement : sur une fondation si elle convient, sinon sur une colonne compatible. Vous pouvez aussi la glisser, avec les cartes posées dessus.',
+        'Tap a card to play it automatically: to a foundation if it fits, otherwise onto a matching column. You can also drag it with the cards on top (on a touch screen, hold it a moment first).',
+        'Touchez une carte pour la jouer automatiquement : sur une fondation si elle convient, sinon sur une colonne compatible. Vous pouvez aussi la glisser avec les cartes posées dessus (sur écran tactile, maintenez-la un instant d’abord).',
       ),
       L(
         'Tap the stock (top left) to turn cards onto the waste. When it is empty, tap ↻ to turn the waste over again, if redeals remain.',

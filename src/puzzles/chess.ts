@@ -80,7 +80,14 @@ export const chess: PuzzleDef = {
     const grid = board(8, 8, 'chess');
     const cells: HTMLButtonElement[] = [];
     for (let sq = 0; sq < 64; sq++) {
-      const el = h('button', { type: 'button', class: 'cell', 'aria-label': sqName(sq), onclick: () => tap(sq) });
+      const el = h('button', {
+        type: 'button',
+        class: 'cell',
+        'aria-label': sqName(sq),
+        'data-rank': (sq & 7) === 0 ? sqName(sq)[1] : null,
+        'data-file': sq >> 3 === 7 ? sqName(sq)[0] : null,
+        onclick: () => tap(sq),
+      });
       cells.push(el);
       grid.append(el);
     }
@@ -106,7 +113,10 @@ export const chess: PuzzleDef = {
         if (targets.has(sq)) cls += p ? ' tgt cap' : ' tgt';
         if (last >= 0 && (sq === from(last) || sq === to(last))) cls += ' last';
         el.className = cls;
-        el.replaceChildren(p ? h('span', { class: p > 0 ? 'pw' : 'pb' }, GLYPH[Math.abs(p)]) : '');
+        const kids: HTMLElement[] = [];
+        if (p) kids.push(h('span', { class: p > 0 ? 'pw' : 'pb' }, GLYPH[Math.abs(p)]));
+        if (sq >> 3 === 7) kids.push(h('span', { class: 'co', 'aria-hidden': 'true' }, sqName(sq)[0]));
+        el.replaceChildren(...kids);
       });
     };
 

@@ -3,7 +3,7 @@
 }
 
 [data-puzzle='tracks'] .tracks-wrap {
-  --board: min(78vw, calc(100dvh - var(--head) - var(--tabs) - 290px), 400px);
+  --board: var(--fit, min(78vw, calc(100dvh - var(--head) - var(--tabs) - 290px), 400px));
   display: grid;
   grid-template-columns: auto var(--board);
   grid-template-rows: auto auto;

@@ -1,7 +1,7 @@
 import { L } from '../core/i18n';
 import { byLevel, type PuzzleDef } from '../core/types';
 import { btn, h, PALETTE } from '../core/ui';
-import { anim, int, isIntArr, keyDir } from './movekit/kit';
+import { int, isIntArr, keyDir } from './movekit/kit';
 import { EXIT_ROW, generateUnblock, N, range } from './movekit/unblockgen';
 import './unblock.css';
 
@@ -139,7 +139,13 @@ export const unblock: PuzzleDef = {
         done = true;
         sel = -1;
         render();
-        anim(els[0], [{ transform: 'translateX(0)' }, { transform: 'translateX(120%)', opacity: 0 }], 380);
+        // `transform` composes with the `translate` that positions the block; hold the end frame so it stays gone.
+        els[0].animate?.([{ transform: 'translateX(0)' }, { transform: 'translateX(120%)', opacity: 0 }], {
+          duration: 380,
+          delay: 120,
+          easing: 'ease-in',
+          fill: 'forwards',
+        });
         ctx.solved();
         return;
       }
@@ -183,16 +189,21 @@ export const unblock: PuzzleDef = {
       if (!drag || e.pointerId !== drag.id) return;
       const off = offset(e);
       if (Math.abs(off) > 0.08) drag.moved = true;
-      const b = blocks[drag.i];
-      els[drag.i].style.transform = b.hz ? `translateX(${off * drag.unit}px)` : `translateY(${off * drag.unit}px)`;
+      // One custom property per frame: no layout, no re-render; the compositor moves the block.
+      els[drag.i].style.setProperty(blocks[drag.i].hz ? '--dx' : '--dy', `${(off * drag.unit).toFixed(1)}px`);
     });
+    /** Drop the live drag offset; with `.drag` removed in the same frame the block glides from where the finger left it. */
+    const release = (i: number) => {
+      els[i].classList.remove('drag');
+      els[i].style.removeProperty('--dx');
+      els[i].style.removeProperty('--dy');
+    };
     const end = (e: PointerEvent) => {
       if (!drag || e.pointerId !== drag.id) return;
       const g = drag;
       const off = offset(e);
       drag = null;
-      els[g.i].classList.remove('drag');
-      els[g.i].style.removeProperty('transform');
+      release(g.i);
       if (!g.moved) {
         sel = sel === g.i ? -1 : g.i;
         render();
@@ -205,8 +216,7 @@ export const unblock: PuzzleDef = {
     field.addEventListener('pointerup', end);
     field.addEventListener('pointercancel', (e) => {
       if (!drag || e.pointerId !== drag.id) return;
-      els[drag.i].classList.remove('drag');
-      els[drag.i].style.removeProperty('transform');
+      release(drag.i);
       drag = null;
     });
 

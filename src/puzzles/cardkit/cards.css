@@ -10,7 +10,9 @@
   height: calc(var(--hcw) * var(--cw) + 2px);
   user-select: none;
   -webkit-user-select: none;
-  touch-action: none;
+  /* Vertical swipes scroll the feed; cards lift on a sideways move or a short hold (see table.ts). */
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
 .ctable .pile {

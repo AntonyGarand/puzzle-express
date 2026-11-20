@@ -36,15 +36,16 @@
 [data-puzzle='unblock'] .ub-blk {
   --u: calc(100% / var(--n));
   position: absolute;
-  left: calc(100% / var(--n) * var(--x));
-  top: calc(100% / var(--n) * var(--y));
+  left: 0;
+  top: 0;
   width: calc(100% / var(--n) * var(--w));
   height: calc(100% / var(--n) * var(--h));
   padding: 4px;
   cursor: grab;
-  transition:
-    left 0.12s ease,
-    top 0.12s ease;
+  /* Positioned with `translate` (a % of the block's own size = whole cells), plus the live drag offset.
+     Only the compositor moves it; `transform` stays free for the exit animation. */
+  translate: calc(100% * var(--x) / var(--w) + var(--dx, 0px)) calc(100% * var(--y) / var(--h) + var(--dy, 0px));
+  transition: translate 0.14s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 [data-puzzle='unblock'] .ub-blk::before {
   content: '';
@@ -75,6 +76,7 @@
 }
 [data-puzzle='unblock'] .ub-blk.drag {
   transition: none;
+  will-change: translate;
   z-index: 2;
   cursor: grabbing;
 }

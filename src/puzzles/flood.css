@@ -1,0 +1,58 @@
+[data-puzzle='flood'] .fl-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: var(--board);
+  margin-bottom: -6px;
+}
+[data-puzzle='flood'] .fl-left {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 12px;
+  background: var(--accent);
+  color: var(--on-tone);
+  border: var(--bw) solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 3px 3px 0 var(--ink);
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+[data-puzzle='flood'] .fl-num {
+  display: inline-block;
+  font-size: 26px;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+[data-puzzle='flood'] .fl-lbl {
+  font-size: 13px;
+  font-weight: 700;
+}
+[data-puzzle='flood'] .fl-bar {
+  flex: 1;
+  height: 12px;
+  background: var(--cell);
+  border: var(--bw) solid var(--ink);
+  border-radius: 999px;
+  overflow: hidden;
+}
+[data-puzzle='flood'] .fl-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition:
+    width 0.25s ease,
+    background 0.2s;
+}
+[data-puzzle='flood'] .fl-head.low .fl-left,
+[data-puzzle='flood'] .fl-head.low .fl-fill {
+  background: var(--bad);
+}
+[data-puzzle='flood'] .fl-head.low .fl-num {
+  animation: fl-beat 0.35s ease-out;
+}
+@keyframes fl-beat {
+  50% {
+    transform: scale(1.25);
+  }
+}

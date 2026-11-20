@@ -1,6 +1,7 @@
 import { L } from '../core/i18n';
 import { byLevel, type PuzzleDef } from '../core/types';
-import { board, btn, h } from '../core/ui';
+import { board, h } from '../core/ui';
+import './nonogram.css';
 
 const runs = (line: boolean[]) => {
   const out: number[] = [];
@@ -37,12 +38,16 @@ export const nonogram: PuzzleDef = {
         'Chaque indice donne, dans l’ordre, la longueur des blocs pleins de la ligne, séparés par au moins une case vide. Un 0 veut dire que la ligne est vide.',
       ),
       L(
-        'Tap a cell to fill it, and tap it again to clear it. Drag to paint several cells at once.',
-        'Touchez une case pour la remplir, et retouchez-la pour l’effacer. Glissez pour peindre plusieurs cases d’un coup.',
+        'Tap a cell to fill it. Tap it again to mark it ✕ (surely empty), and once more to clear it.',
+        'Touchez une case pour la remplir. Retouchez-la pour la marquer d’un ✕ (vide à coup sûr), puis encore une fois pour l’effacer.',
       ),
       L(
-        'Switch the footer button to Mark ✕ to note cells you know are empty. Right-click also marks; X or Space switches mode.',
-        'Passez le bouton du bas à Marquer ✕ pour noter les cases que vous savez vides. Le clic droit marque aussi; X ou Espace change de mode.',
+        'Long-press (or right-click) a cell to mark it ✕ right away. Drag to repeat your first change over several cells.',
+        'Appuyez longuement (ou cliquez droit) sur une case pour la marquer d’un ✕ directement. Glissez pour répéter votre premier changement sur plusieurs cases.',
+      ),
+      L(
+        'Keyboard: arrow keys move, Space cycles a cell, X marks it, Delete clears it.',
+        'Au clavier : les flèches déplacent, Espace change l’état de la case, X la marque, Suppr l’efface.',
       ),
       L(
         'A clue fades once its line matches. The puzzle is solved when every line matches.',
@@ -72,7 +77,9 @@ export const nonogram: PuzzleDef = {
 
     // 0 empty, 1 filled, 2 marked
     const st = new Array<number>(n * n).fill(0);
-    let mode: 1 | 2 = 1;
+    /** Keyboard cursor (-1 until the keyboard is used). */
+    let cur = -1;
+    let done = false;
 
     const wrap = h('div', { class: 'nono', style: `--cols:${n}` });
     const colEls = colClues.map((cl) => h('div', { class: 'clue col' }, ...(cl.length ? cl : [0]).map((x) => h('span', null, x))));
@@ -90,6 +97,7 @@ export const nonogram: PuzzleDef = {
       cells.forEach((el, i) => {
         el.classList.toggle('on', st[i] === 1);
         el.classList.toggle('x', st[i] === 2);
+        el.classList.toggle('cur', i === cur);
       });
       let ok = true;
       rowEls.forEach((el, r) => {
@@ -105,63 +113,118 @@ export const nonogram: PuzzleDef = {
       return ok;
     };
 
-    // Drag painting: first cell decides whether we're setting or clearing.
-    let paint: number | null = null;
+    // Long-press (350 ms on the first cell, before the stroke spreads) marks ✕ directly.
+    let pressTimer = 0;
+    const cancelPress = () => {
+      clearTimeout(pressTimer);
+      pressTimer = 0;
+      for (const el of cells) el.classList.remove('lp');
+    };
+
+    // Tap cycles empty → filled → ✕ → empty. Dragging repeats the first cell's change (from → to) on every
+    // cell in the same starting state, so a stroke never overwrites cells of another kind.
+    let stroke: { from: number; to: number; first: number; id: number; x: number; y: number; spread: boolean } | null = null;
+    const set = (i: number, v: number) => {
+      st[i] = v;
+      if (render()) {
+        done = true;
+        stroke = null;
+        cancelPress();
+        ctx.solved();
+      }
+    };
     const cellAt = (x: number, y: number) => {
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
       const i = el?.dataset.i;
       return el && grid.contains(el) && i != null ? Number(i) : -1;
     };
-    const applyAt = (i: number) => {
-      if (i < 0 || paint == null) return;
-      if (st[i] === paint) return;
-      if (paint !== 0 && st[i] !== 0) return; // don't overwrite the other kind while dragging
-      st[i] = paint;
-      if (render()) {
-        paint = null;
-        ctx.solved();
-      }
-    };
     grid.addEventListener('contextmenu', (e) => e.preventDefault());
     grid.addEventListener('pointerdown', (e) => {
+      if (done || stroke) return;
       const i = cellAt(e.clientX, e.clientY);
       if (i < 0) return;
-      ctx.touch();
-      const m = e.button === 2 ? 2 : mode;
-      paint = st[i] === m ? 0 : m;
-      applyAt(i);
       e.preventDefault();
+      ctx.touch();
+      cur = -1;
+      const from = st[i];
+      const to = e.button === 2 ? (from === 2 ? 0 : 2) : (from + 1) % 3;
+      stroke = { from, to, first: i, id: e.pointerId, x: e.clientX, y: e.clientY, spread: false };
+      set(i, to);
+      // Only an empty cell turned filled can still become ✕ by holding.
+      if (done || to !== 1) return;
+      cells[i].classList.add('lp');
+      pressTimer = window.setTimeout(() => {
+        pressTimer = 0;
+        cells[i].classList.remove('lp');
+        if (!stroke || stroke.spread || done) return;
+        stroke.to = 2;
+        set(i, 2);
+        try {
+          navigator.vibrate?.(15);
+        } catch {
+          /* not allowed */
+        }
+      }, 350);
     });
     grid.addEventListener('pointermove', (e) => {
-      if (paint != null) applyAt(cellAt(e.clientX, e.clientY));
+      const g = stroke;
+      if (!g || e.pointerId !== g.id) return;
+      if (pressTimer && Math.hypot(e.clientX - g.x, e.clientY - g.y) > 10) cancelPress();
+      const i = cellAt(e.clientX, e.clientY);
+      if (i < 0 || i === g.first || st[i] !== g.from) return;
+      g.spread = true;
+      cancelPress();
+      set(i, g.to);
     });
-    const end = () => (paint = null);
+    const end = (e: PointerEvent) => {
+      if (stroke && e.pointerId !== stroke.id) return;
+      cancelPress();
+      stroke = null;
+    };
     window.addEventListener('pointerup', end);
     window.addEventListener('pointercancel', end);
 
-    const modeBtn = btn(
-      L('Fill ■', 'Remplir ■'),
-      () => {
-        mode = mode === 1 ? 2 : 1;
-        modeBtn.textContent = mode === 1 ? L('Fill ■', 'Remplir ■') : L('Mark ✕', 'Marquer ✕');
-      },
-      'ghost',
-    );
-    ctx.controls(modeBtn);
-    const sv = ctx.saved as { st?: number[] } | undefined;
-    if (sv?.st?.length === st.length) sv.st.forEach((v, i) => (st[i] = v));
+    const sv = ctx.saved as { st?: unknown; cur?: unknown } | undefined;
+    if (Array.isArray(sv?.st) && sv.st.length === st.length) sv.st.forEach((v, i) => (st[i] = v === 1 || v === 2 ? v : 0));
+    const c0 = sv?.cur;
+    if (typeof c0 === 'number' && Number.isInteger(c0) && c0 >= -1 && c0 < st.length) cur = c0;
     root.append(wrap);
     render();
+
+    const DIRS: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
     return {
-      snapshot: () => ({ st }),
+      snapshot: () => ({ st, cur }),
       onKey(e) {
-        if (e.key === 'x' || e.key === ' ') {
-          modeBtn.click();
+        if (done) return false;
+        const dir = DIRS[e.key];
+        if (dir) {
+          if (cur < 0) cur = 0;
+          else {
+            const r = Math.min(n - 1, Math.max(0, Math.floor(cur / n) + dir[1]));
+            const c = Math.min(n - 1, Math.max(0, (cur % n) + dir[0]));
+            cur = r * n + c;
+          }
+          render();
           return true;
         }
-        return false;
+        if (cur < 0) return false;
+        const next =
+          e.key === ' ' || e.key === 'Enter'
+            ? (st[cur] + 1) % 3
+            : e.key === 'x' || e.key === 'X'
+              ? st[cur] === 2
+                ? 0
+                : 2
+              : e.key === 'Backspace' || e.key === 'Delete'
+                ? 0
+                : -1;
+        if (next < 0) return false;
+        ctx.touch();
+        set(cur, next);
+        return true;
       },
       destroy() {
+        cancelPress();
         window.removeEventListener('pointerup', end);
         window.removeEventListener('pointercancel', end);
       },

@@ -1,3 +1,4 @@
+import { sheetOpen } from './sheet';
 import { L } from './i18n';
 import { Card } from './card';
 import { onChange, prefs } from './store';
@@ -206,7 +207,7 @@ export class Feed {
   }
 
   private onKey(e: KeyboardEvent) {
-    if (!this.active || !this.visible()) return;
+    if (!this.active || !this.visible() || sheetOpen()) return;
     const t = e.target as HTMLElement | null;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;

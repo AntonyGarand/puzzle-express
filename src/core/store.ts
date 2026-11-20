@@ -125,11 +125,16 @@ export function resetAllToAuto() {
   emit('level');
 }
 
-export const dayKey = (t = Date.now()) => new Date(t).toLocaleDateString('en-CA');
+/** A "day" for streaks and the activity chart starts at 4 am, so a late-night session counts as one day. */
+const DAY_START_HOURS = 4;
+export const dayKey = (t = Date.now()) => new Date(t - DAY_START_HOURS * 3_600_000).toLocaleDateString('en-CA');
 
 export interface RecordOutcome {
   levelChange?: { from: Difficulty; to: Difficulty };
+  /** Beat the previous best at this level (by at least a second). */
   best?: boolean;
+  /** Best time at this level before this result, if any. */
+  prevBest?: number;
 }
 
 /**
@@ -148,6 +153,7 @@ export function record(id: string, r: Omit<Result, 'at'>, parMs: number): Record
     s.solved++;
     s.time += r.ms;
     const prev = s.best[r.d];
+    out.prevBest = prev;
     if (prev == null || r.ms < prev) {
       s.best[r.d] = r.ms;
       out.best = prev != null && prev - r.ms >= 1000; // only celebrate a real improvement

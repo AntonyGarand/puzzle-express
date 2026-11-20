@@ -1,10 +1,12 @@
+import { confetti } from './confetti';
 import { helpButton } from './help';
 import { L, locale, P } from './i18n';
 import { Rng } from './rng';
 import { clearSave, putSave, type Save } from './saves';
-import { prefs, record, setLevel, getProfile } from './store';
+import { openSheet } from './sheet';
+import { prefs, record, setLevel, setWeight, getProfile, type Weight } from './store';
 import { LEVELS, LEVEL_NAMES, type Difficulty, type PuzzleDef, type PuzzleInstance } from './types';
-import { btn, fmtTime, h } from './ui';
+import { btn, cogIcon, fmtTime, h } from './ui';
 
 export interface CardOptions {
   /** Labs mode: fixed levels (doesn't touch feed prefs), no auto-advance, "New puzzle" instead of "Next". */
@@ -27,8 +29,10 @@ export class Card {
   private statusEl!: HTMLElement;
   private controlsEl!: HTMLElement;
   private timerEl!: HTMLElement;
-  private levelSel!: HTMLSelectElement;
+  private levelEl!: HTMLElement;
+  private mistakesEl!: HTMLElement;
   private inst: PuzzleInstance = {};
+  private resize = new ResizeObserver(() => this.fit());
 
   level: Difficulty = 1;
   mounted = false;
@@ -60,68 +64,188 @@ export class Card {
   }
 
   private build() {
-    this.levelSel = h(
-      'select',
-      { class: 'level', title: L('Difficulty', 'Difficulté'), onchange: () => this.onLevelPick() },
-      this.opts.lab ? null : h('option', { value: 'auto' }, L('Auto', 'Auto')),
-      ...LEVELS.map((l) => h('option', { value: String(l) }, LEVEL_NAMES[l])),
-    );
-    this.timerEl = h('span', { class: 'timer' }, '0:00');
+    this.timerEl = h('span', { class: 'timer', title: L('Time', 'Temps') }, '0:00');
+    this.mistakesEl = h('span', { class: 'mistakes', title: L('Mistakes', 'Erreurs'), hidden: true });
+    this.levelEl = h('span', { class: 'level-label' });
     this.stage = h('div', { class: 'stage' });
     this.statusEl = h('span', { class: 'status' });
     this.controlsEl = h('div', { class: 'controls' });
     this.foot = h('footer', { class: 'card-foot' });
+    const settings = h(
+      'button',
+      {
+        type: 'button',
+        class: 'icon-btn',
+        'data-action': 'settings',
+        title: L('Game settings', 'Réglages du jeu'),
+        'aria-label': L('Game settings', 'Réglages du jeu'),
+      },
+      cogIcon(),
+    );
+    settings.addEventListener('click', () => this.openSettings());
     this.el.replaceChildren(
       h(
         'header',
         { class: 'card-head' },
-        h(
-          'div',
-          { class: 'title' },
-          h('div', { class: 'title-row' }, h('h2', null, this.def.name), this.makeHelpButton()),
-          h('p', { class: 'rules' }, this.def.rules),
-        ),
-        h('div', { class: 'meta' }, this.levelSel, this.timerEl),
+        h('div', { class: 'title' }, h('h2', null, this.def.name), this.levelEl),
+        h('div', { class: 'meta' }, this.mistakesEl, this.timerEl, this.makeHelpButton(), settings),
       ),
       this.stage,
       this.foot,
     );
+    this.resize.observe(this.stage);
+  }
+
+  /** Pause the clock while a sheet (guide/settings) is open. Returns the resume function. */
+  private pauseWhile(): () => void {
+    const wasActive = this.active && !this.done;
+    if (wasActive) this.setActive(false);
+    return () => {
+      if (wasActive) this.setActive(true);
+    };
+  }
+
+  /** The cog sheet: difficulty, how often this game shows up in the feed, new puzzle, skip/give up. */
+  private openSettings() {
+    const resume = this.pauseWhile();
+    const p = prefs(this.def.id);
+    const options: { label: string; value: Difficulty | 'auto' }[] = [
+      ...(this.opts.lab ? [] : [{ label: L('Auto', 'Auto'), value: 'auto' as const }]),
+      ...LEVELS.map((l) => ({ label: LEVEL_NAMES[l], value: l })),
+    ];
+    const current: Difficulty | 'auto' = this.opts.lab || p.manual ? this.level : 'auto';
+    let close = () => {};
+    const pickLevel = (v: Difficulty | 'auto') => {
+      close();
+      if (this.opts.lab) {
+        this.mount({ level: v === 'auto' ? this.level : v });
+        return;
+      }
+      setLevel(this.def.id, v);
+      this.mount(); // the feed also regenerates untouched upcoming cards
+    };
+    const seg = <T>(name: string, items: { label: string; value: T }[], cur: T, onpick: (v: T) => void) =>
+      h(
+        'div',
+        { class: 'seg wrap', role: 'radiogroup', 'data-setting': name },
+        ...items.map((o) =>
+          h(
+            'button',
+            {
+              type: 'button',
+              role: 'radio',
+              'data-value': String(o.value),
+              'aria-checked': String(o.value === cur),
+              class: o.value === cur ? 'on' : '',
+              onclick: () => onpick(o.value),
+            },
+            o.label,
+          ),
+        ),
+      );
+    const weights: { label: string; value: Weight }[] = [
+      { label: L('Off', 'Jamais'), value: 0 },
+      { label: L('Less', 'Moins'), value: 1 },
+      { label: L('Normal', 'Normal'), value: 2 },
+      { label: L('More', 'Plus'), value: 3 },
+    ];
+    const freq = seg('weight', weights, p.weight, (v) => {
+      setWeight(this.def.id, v);
+      freq.querySelectorAll('button').forEach((b, i) => {
+        b.classList.toggle('on', weights[i].value === v);
+        b.setAttribute('aria-checked', String(weights[i].value === v));
+      });
+    });
+    close = openSheet({
+      title: this.def.name,
+      puzzle: this.def.id,
+      className: 'game-settings',
+      body: [
+        h('h3', null, L('Difficulty', 'Difficulté')),
+        seg('level', options, current, pickLevel),
+        this.opts.lab
+          ? null
+          : h(
+              'p',
+              { class: 'muted small' },
+              L(
+                'Auto raises the level when you solve quickly and cleanly.',
+                'Auto monte le niveau quand vous résolvez vite et sans faute.',
+              ),
+            ),
+        this.opts.lab ? null : h('h3', null, L('In the feed', 'Dans le fil')),
+        this.opts.lab ? null : freq,
+      ],
+      footer: [
+        h('a', { class: 'btn ghost', href: '#/settings', onclick: () => close() }, L('All settings', 'Tous les réglages')),
+        this.done
+          ? null
+          : btn(this.opts.lab ? L('Give up', 'Abandonner') : L('Skip', 'Passer'), () => {
+              close();
+              this.finish(this.opts.lab ? 'failed' : 'skipped');
+            }),
+        btn(
+          L('New puzzle', 'Nouvelle partie'),
+          () => {
+            close();
+            this.mount({ level: this.level });
+          },
+          'primary',
+        ),
+      ],
+      onClose: resume,
+    });
   }
 
   private makeHelpButton() {
-    let wasActive = false;
+    let resume = () => {};
     return helpButton(this.def, {
-      onOpen: () => {
-        // Pause the clock while reading the tutorial.
-        wasActive = this.active && !this.done;
-        if (wasActive) this.setActive(false);
-      },
-      onClose: () => {
-        if (wasActive) this.setActive(true);
-      },
+      onOpen: () => (resume = this.pauseWhile()),
+      onClose: () => resume(),
     });
   }
 
   private syncLevelSel() {
-    if (this.opts.lab) {
-      this.levelSel.value = String(this.level);
-      return;
-    }
-    const p = prefs(this.def.id);
-    const auto = this.levelSel.options[0];
-    auto.textContent = p.manual ? L('Auto', 'Auto') : `${LEVEL_NAMES[this.level]} · auto`;
-    this.levelSel.value = p.manual ? String(this.level) : 'auto';
+    const auto = !this.opts.lab && !prefs(this.def.id).manual;
+    this.levelEl.textContent = auto ? `${LEVEL_NAMES[this.level]} · auto` : LEVEL_NAMES[this.level];
   }
 
-  private onLevelPick() {
-    const v = this.levelSel.value;
-    if (this.opts.lab) {
-      this.mount({ level: Number(v) as Difficulty });
-      return;
+  private syncMistakes() {
+    this.mistakesEl.hidden = this.mistakes === 0;
+    this.mistakesEl.textContent = `✕ ${this.mistakes}`;
+  }
+
+  /**
+   * Size the board to the space actually left between header and footer. Every game scales from
+   * `--board`, so shrink it until the whole game (board + pads/palettes) fits without overflowing.
+   */
+  fit() {
+    const stage = this.stage;
+    const root = stage.firstElementChild as HTMLElement | null;
+    const W = stage.clientWidth;
+    const H = stage.clientHeight;
+    if (!root || !W || !H) return;
+    const set = (f: number) => stage.style.setProperty('--fit', `${Math.max(120, Math.floor(f))}px`);
+    let f = Math.min(W - 8, 600);
+    set(f);
+    let prevF = 0;
+    let prevOver = 0;
+    for (let i = 0; i < 5; i++) {
+      const overH = root.getBoundingClientRect().height - H;
+      const overW = root.scrollWidth - W;
+      const over = Math.max(overH, overW);
+      if (over <= 0.5) break;
+      // Secant step once there are two samples: content height isn't always 1:1 with the board size.
+      const slope = prevF ? Math.max(0.3, (prevOver - over) / (prevF - f || 1)) : 1;
+      prevF = f;
+      prevOver = over;
+      f -= over / slope + 1;
+      if (f <= 120) {
+        set(120);
+        break;
+      }
+      set(f);
     }
-    setLevel(this.def.id, v === 'auto' ? 'auto' : (Number(v) as Difficulty));
-    // The feed regenerates pristine cards on level change; force it for this one too.
-    this.mount();
   }
 
   mount(launch: Launch | null = this.launch) {
@@ -145,20 +269,9 @@ export class Card {
     this.stage.inert = false;
     this.statusEl.textContent = '';
     this.controlsEl.replaceChildren();
-    this.foot.replaceChildren(
-      this.statusEl,
-      h(
-        'div',
-        { class: 'actions' },
-        this.controlsEl,
-        btn(
-          this.opts.lab ? L('Give up', 'Abandonner') : L('Skip', 'Passer'),
-          () => this.finish(this.opts.lab ? 'failed' : 'skipped'),
-          'ghost',
-        ),
-      ),
-    );
+    this.foot.replaceChildren(this.statusEl, h('div', { class: 'actions' }, this.controlsEl));
     this.syncLevelSel();
+    this.syncMistakes();
     this.tick();
 
     const live = () => gen === this.gen && !this.done;
@@ -173,7 +286,12 @@ export class Card {
         solved: () => live() && this.finish('solved'),
         failed: () => live() && this.finish('failed'),
         mistake: () => {
-          if (live()) this.mistakes++;
+          if (!live()) return;
+          this.mistakes++;
+          this.syncMistakes();
+          this.mistakesEl.classList.remove('bump');
+          void this.mistakesEl.offsetWidth;
+          this.mistakesEl.classList.add('bump');
         },
         touch: () => {
           if (live()) this.interacted = true;
@@ -189,6 +307,8 @@ export class Card {
     root.addEventListener('pointerdown', () => (this.interacted = true), { capture: true });
     root.addEventListener('pointerup', () => this.queueSave());
     root.addEventListener('keyup', () => this.queueSave());
+    this.resize.observe(root);
+    this.fit();
     if (this.active) this.inst.activate?.();
   }
 
@@ -233,6 +353,7 @@ export class Card {
     if (!this.mounted) this.mount();
     if (on && !this.done) {
       this.runningSince = performance.now();
+      this.fit();
       this.inst.activate?.();
     } else if (!on) {
       this.persist();
@@ -276,7 +397,19 @@ export class Card {
     else if (o === 'failed') parts.push(h('strong', { class: 'bad' }, L('Not this time', 'Pas cette fois')));
     else parts.push(h('strong', null, L('Skipped', 'Passé')));
     if (this.mistakes && o !== 'skipped') parts.push(` · ${P(this.mistakes, ['mistake', 'mistakes'], ['erreur', 'erreurs'])}`);
-    if (res.best) parts.push(` · ${L('new best', 'nouveau record')}`);
+    if (o === 'solved') {
+      if (res.best)
+        parts.push(
+          ' · ',
+          h('span', { class: 'record' }, `${L('New record!', 'Nouveau record!')} (${L('was', 'avant')} ${fmtTime(res.prevBest!)})`),
+        );
+      else if (res.prevBest == null) parts.push(' · ', h('span', { class: 'record' }, L('First clear!', 'Première réussite!')));
+      else parts.push(` · ${L('best', 'record')} ${fmtTime(res.prevBest)}`);
+      if (res.best || res.prevBest == null) {
+        const r = this.stage.getBoundingClientRect();
+        if (r.height) confetti(r.left + r.width / 2, r.top + r.height / 2, res.best ? 90 : 50);
+      }
+    }
     if (res.levelChange) {
       const up = res.levelChange.to > res.levelChange.from;
       parts.push(
@@ -301,7 +434,7 @@ export class Card {
     if (this.opts.lab) return;
     if (o === 'solved' && getProfile().autoAdvance) {
       const gen = this.gen;
-      setTimeout(() => gen === this.gen && this.onNext(this), 1400);
+      setTimeout(() => gen === this.gen && this.onNext(this), res.best || res.prevBest == null ? 2400 : 1400);
     } else if (o === 'skipped') {
       this.onNext(this);
     }
@@ -309,6 +442,7 @@ export class Card {
 
   destroy() {
     this.persist();
+    this.resize.disconnect();
     this.inst.destroy?.();
     this.gen++;
   }
