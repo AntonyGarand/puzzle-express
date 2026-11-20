@@ -1,0 +1,26 @@
+/* Gapless "plate" grid shared by the region games (stars, tiles). */
+:is([data-puzzle='stars'], [data-puzzle='tiles']) .grid.lk-plate {
+  gap: 0;
+  padding: 0;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r-cell);
+  overflow: hidden;
+  box-shadow: var(--sh) var(--sh) 0 var(--ink);
+  background: var(--cell);
+  touch-action: none;
+}
+:is([data-puzzle='stars'], [data-puzzle='tiles']) .lk-plate .cell {
+  --thin: color-mix(in srgb, var(--ink) 22%, transparent);
+  border: 0;
+  border-right: 1px solid var(--thin);
+  border-bottom: 1px solid var(--thin);
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--rc, var(--cell));
+  cursor: pointer;
+}
+:is([data-puzzle='stars'], [data-puzzle='tiles']) .lk-plate button.cell:active { transform: none; }
+:is([data-puzzle='stars'], [data-puzzle='tiles']) .lk-plate .cell.bt { border-top: 2px solid var(--ink); }
+:is([data-puzzle='stars'], [data-puzzle='tiles']) .lk-plate .cell.bl { border-left: 2px solid var(--ink); }
+:is([data-puzzle='stars'], [data-puzzle='tiles']) .lk-plate .cell.br { border-right: 2px solid var(--ink); }
+:is([data-puzzle='stars'], [data-puzzle='tiles']) .lk-plate .cell.bb { border-bottom: 2px solid var(--ink); }

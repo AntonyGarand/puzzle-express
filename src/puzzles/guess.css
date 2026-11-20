@@ -1,0 +1,26 @@
+[data-puzzle='guess'] { --accent: var(--p6); }
+[data-puzzle='guess'] .guess-board { gap: 1px; }
+[data-puzzle='guess'] .digits { display: flex; gap: 6px; }
+[data-puzzle='guess'] .code-row { padding: 3px 8px; }
+[data-puzzle='guess'] .gd {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--ink);
+  border-radius: var(--r-cell);
+  background: var(--cell);
+  font-weight: 700;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+[data-puzzle='guess'] .gd.empty { border-style: dashed; opacity: 0.5; }
+[data-puzzle='guess'] .code-row.cur .gd.empty { opacity: 1; }
+[data-puzzle='guess'] .code-row.cur .gd:not(.empty) { background: var(--accent); color: var(--on-tone); }
+[data-puzzle='guess'] .gd.secret { background: var(--accent); color: var(--on-tone); }
+[data-puzzle='guess'] .pad { width: min(var(--board), 340px); margin-top: -8px; }
+[data-puzzle='guess'] .pad .key { height: 40px; }
+@media (max-height: 760px) {
+  [data-puzzle='guess'] .gd { width: 26px; height: 26px; font-size: 16px; }
+}

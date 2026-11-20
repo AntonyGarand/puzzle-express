@@ -1,0 +1,44 @@
+[data-puzzle='unequal'] { --accent: var(--p1); }
+[data-puzzle='unequal'] .grid.unequal {
+  --g: calc(var(--board) / var(--cols) * 0.34);
+  gap: var(--g);
+}
+[data-puzzle='unequal'] .unequal .sg {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg);
+  font-size: max(14px, calc(var(--g) * 0.95));
+  font-weight: 700;
+  line-height: 1;
+}
+[data-puzzle='unequal'] .unequal .sg.r {
+  left: 100%;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--g) + var(--csh));
+  margin-left: var(--cbw);
+}
+[data-puzzle='unequal'] .unequal .sg.d {
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: calc(var(--g) + var(--csh));
+  margin-top: var(--cbw);
+}
+[data-puzzle='unequal'] .unequal .sg svg {
+  width: min(calc(var(--g) * 1.1), 26px);
+  height: min(calc(var(--g) * 1.1), 26px);
+  flex: none;
+  overflow: visible;
+}
+[data-puzzle='unequal'] .unequal .sg polyline {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: 16;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

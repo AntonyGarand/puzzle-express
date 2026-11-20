@@ -1,0 +1,25 @@
+[data-puzzle='bridges'] { --accent: var(--p2); }
+[data-puzzle='bridges'] .lk-bridges {
+  width: var(--board);
+  aspect-ratio: 1;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  background: var(--cell);
+  box-shadow: var(--sh) var(--sh) 0 var(--ink);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+[data-puzzle='bridges'] .lk-bsvg { display: block; width: 100%; height: 100%; }
+[data-puzzle='bridges'] .lk-bsvg .hit { stroke: transparent; stroke-width: 0.5; cursor: pointer; }
+[data-puzzle='bridges'] .lk-bsvg .br { stroke: var(--ink); stroke-width: 0.085; stroke-linecap: butt; pointer-events: none; }
+[data-puzzle='bridges'] .lk-bsvg .isl { cursor: pointer; }
+[data-puzzle='bridges'] .lk-bsvg .isl circle { fill: var(--cell); stroke: var(--ink); stroke-width: 0.07; transition: fill 0.12s; }
+[data-puzzle='bridges'] .lk-bsvg .isl text { fill: var(--fg); font-size: 0.48px; font-weight: 700; pointer-events: none; }
+[data-puzzle='bridges'] .lk-bsvg .isl.done circle { fill: var(--accent); }
+[data-puzzle='bridges'] .lk-bsvg .isl.done text { fill: var(--on-tone); }
+[data-puzzle='bridges'] .lk-bsvg .isl.err circle { fill: var(--bad); }
+[data-puzzle='bridges'] .lk-bsvg .isl.err text { fill: var(--on-tone); }
+[data-puzzle='bridges'] .lk-bsvg .isl.sel circle { stroke-width: 0.14; stroke-dasharray: 0.16 0.08; }
+[data-puzzle='bridges'] .lk-bsvg .isl.sel:not(.done):not(.err) circle { fill: var(--accent-soft); }

@@ -1,0 +1,67 @@
+[data-puzzle='gems'] { --accent: var(--p6); }
+[data-puzzle='gems'] .puzzle { --board: min(90vw, calc(100dvh - var(--head) - var(--tabs) - 320px), 420px); }
+
+[data-puzzle='gems'] .gems-grid {
+  position: relative;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--accent) 14%, var(--cell));
+  box-shadow: var(--sh) var(--sh) 0 var(--ink);
+  touch-action: none;
+}
+[data-puzzle='gems'] .pad { width: min(var(--board), 300px); }
+[data-puzzle='gems'] .gems-grid .cell {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  outline: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  outline-offset: -0.5px;
+}
+[data-puzzle='gems'] .gems-grid .cell.home::before {
+  content: '';
+  position: absolute;
+  inset: 30%;
+  border: 2px dashed color-mix(in srgb, var(--ink) 45%, transparent);
+  border-radius: 50%;
+}
+[data-puzzle='gems'] .gems-grid .cell.rock {
+  background: color-mix(in srgb, var(--ink) 78%, var(--cell));
+  outline: 0;
+  border-radius: 22%;
+  margin: 6%;
+}
+[data-puzzle='gems'] .gems-grid .cell.gem::after {
+  content: '';
+  width: 38%;
+  height: 38%;
+  transform: rotate(45deg);
+  background: var(--p7);
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+}
+.gems-token {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(100% / var(--n));
+  height: calc(100% / var(--n));
+  padding: 0;
+  pointer-events: none;
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.3, 0.6, 0.4, 1);
+}
+.gems-token::after {
+  content: '';
+  display: block;
+  width: 78%;
+  height: 78%;
+  margin: 11%;
+  border-radius: 50%;
+  background: var(--accent);
+  border: var(--bw) solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}

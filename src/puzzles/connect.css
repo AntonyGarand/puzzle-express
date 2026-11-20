@@ -1,0 +1,39 @@
+[data-puzzle='connect'] { --accent: var(--p2); }
+
+[data-puzzle='connect'] .connect-grid {
+  position: relative;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  background-color: var(--cell);
+  background-image: linear-gradient(to right, var(--line) 1px, transparent 1px), linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: calc(100% / var(--cols)) calc(100% / var(--cols));
+  background-position: -0.5px -0.5px;
+  --line: color-mix(in srgb, var(--ink) 28%, transparent);
+  box-shadow: var(--sh) var(--sh) 0 var(--ink);
+  touch-action: none;
+}
+[data-puzzle='connect'] .connect-grid .cell {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+[data-puzzle='connect'] .connect-grid .cell.on { background: color-mix(in srgb, var(--c) 32%, transparent); }
+.connect-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.connect-lines polyline {
+  fill: none;
+  stroke-width: 0.34;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.connect-lines circle { stroke: var(--ink); stroke-width: 0.07; }

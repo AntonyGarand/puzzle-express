@@ -1,0 +1,68 @@
+[data-puzzle='arrange'] { --accent: var(--p7); }
+[data-puzzle='arrange'] .puzzle {
+  --board: min(80vw, calc(100dvh - var(--head) - var(--tabs) - 430px), 360px);
+  gap: 14px;
+}
+
+[data-puzzle='arrange'] .arrange-grid {
+  gap: 0;
+  padding: 0;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  background: var(--cell);
+  box-shadow: var(--sh) var(--sh) 0 var(--ink);
+  overflow: hidden;
+  touch-action: none;
+}
+[data-puzzle='arrange'] .arrange-grid .cell {
+  border: 0 solid var(--ink);
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--cell);
+  outline: 1px dashed color-mix(in srgb, var(--ink) 25%, transparent);
+  outline-offset: -0.5px;
+}
+[data-puzzle='arrange'] .arrange-grid .cell.on { background: var(--c); outline: 0; cursor: grab; }
+[data-puzzle='arrange'] .arrange-grid .cell.et { border-top-width: var(--bw); }
+[data-puzzle='arrange'] .arrange-grid .cell.er { border-right-width: var(--bw); }
+[data-puzzle='arrange'] .arrange-grid .cell.eb { border-bottom-width: var(--bw); }
+[data-puzzle='arrange'] .arrange-grid .cell.el { border-left-width: var(--bw); }
+[data-puzzle='arrange'] .arrange-grid .cell.hint { background: var(--accent-soft); outline: 2px dashed var(--ink); outline-offset: -3px; }
+
+[data-puzzle='arrange'] .arrange-tray {
+  --mini: clamp(10px, calc(var(--board) / var(--bc) * 0.44), 22px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px 14px;
+  width: min(100%, 520px);
+  min-height: calc(var(--mini) * 2);
+  touch-action: none;
+  user-select: none;
+}
+.arr-piece, .arr-ghost {
+  display: grid;
+  grid-template-columns: repeat(var(--pc), var(--mini));
+  grid-template-rows: repeat(var(--pr), var(--mini));
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.arr-piece { cursor: grab; touch-action: none; }
+.arr-piece.lifted { visibility: hidden; }
+.arr-piece i, .arr-ghost i {
+  display: block;
+  background: var(--c);
+  border: 2px solid var(--ink);
+  margin: -1px;
+}
+.arr-piece:focus-visible { outline-offset: 4px; }
+.arr-ghost {
+  --mini: var(--cs);
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  filter: drop-shadow(4px 4px 0 var(--ink));
+  opacity: 0.92;
+}

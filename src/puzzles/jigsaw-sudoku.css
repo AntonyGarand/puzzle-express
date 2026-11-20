@@ -1,0 +1,4 @@
+[data-puzzle='jigsaw-sudoku'] { --accent: var(--p3); }
+[data-puzzle='jigsaw-sudoku'] .jigsaw .cell.t1:not(.sel, .peer, .same) { background: var(--cell-alt); }
+[data-puzzle='jigsaw-sudoku'] .jigsaw .cell.t2:not(.sel, .peer, .same) { background: color-mix(in srgb, var(--ink) 7%, var(--cell)); }
+[data-puzzle='jigsaw-sudoku'] .jigsaw .cell.t3:not(.sel, .peer, .same) { background: color-mix(in srgb, var(--ink) 7%, var(--cell-alt)); }

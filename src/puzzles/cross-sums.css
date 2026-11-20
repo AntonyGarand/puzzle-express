@@ -1,0 +1,16 @@
+[data-puzzle='cross-sums'] { --accent: var(--p6); }
+[data-puzzle='cross-sums'] .kakuro .cell.off {
+  background: color-mix(in srgb, var(--ink) 82%, var(--cell));
+  color: var(--cell);
+  border-color: color-mix(in srgb, var(--cell) 25%, transparent);
+  font-size: max(10px, calc(var(--board) / var(--cols) * 0.3));
+  line-height: 1;
+}
+[data-puzzle='cross-sums'] .kakuro .cell.off.split {
+  background: linear-gradient(to top right,
+    color-mix(in srgb, var(--ink) 82%, var(--cell)) calc(50% - 0.75px),
+    var(--cell) calc(50% - 0.75px) calc(50% + 0.75px),
+    color-mix(in srgb, var(--ink) 82%, var(--cell)) calc(50% + 0.75px));
+}
+[data-puzzle='cross-sums'] .kakuro .ac { position: absolute; top: 9%; right: 9%; }
+[data-puzzle='cross-sums'] .kakuro .dn { position: absolute; bottom: 9%; left: 9%; }

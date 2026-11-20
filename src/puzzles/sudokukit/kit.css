@@ -1,0 +1,39 @@
+/* Shared look for the number-logic grids (jigsaw-sudoku, killer-sudoku, cross-sums, unequal). */
+
+/* givens are ink, entries are tone-coloured */
+:is([data-puzzle='jigsaw-sudoku'], [data-puzzle='killer-sudoku'], [data-puzzle='cross-sums'], [data-puzzle='unequal']) .numgrid .cell:not(.given, .off) {
+  color: color-mix(in srgb, var(--accent) 70%, var(--fg));
+}
+:is([data-puzzle='jigsaw-sudoku'], [data-puzzle='killer-sudoku'], [data-puzzle='cross-sums'], [data-puzzle='unequal']) .numgrid .cell.sel:not(.given) {
+  color: var(--on-tone);
+}
+:is([data-puzzle='jigsaw-sudoku'], [data-puzzle='killer-sudoku'], [data-puzzle='cross-sums'], [data-puzzle='unequal']) .numgrid .cell .v {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+}
+
+/* slab: one framed board, hairlines inside, thick ink edges (`er` / `eb`) between regions */
+:is([data-puzzle='jigsaw-sudoku'], [data-puzzle='killer-sudoku'], [data-puzzle='cross-sums']) .grid.slab {
+  gap: 0;
+  padding: 0;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--cell);
+  box-shadow: var(--sh) var(--sh) 0 var(--ink);
+  width: calc(var(--board) - var(--sh));
+  margin-right: var(--sh);
+}
+:is([data-puzzle='jigsaw-sudoku'], [data-puzzle='killer-sudoku'], [data-puzzle='cross-sums']) .slab .cell {
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border-radius: 0;
+  box-shadow: none;
+}
+:is([data-puzzle='jigsaw-sudoku'], [data-puzzle='killer-sudoku'], [data-puzzle='cross-sums']) .slab button.cell:active { transform: none; }
+:is([data-puzzle='jigsaw-sudoku'], [data-puzzle='killer-sudoku'], [data-puzzle='cross-sums']) .slab .cell.lc { border-right: 0; }
+:is([data-puzzle='jigsaw-sudoku'], [data-puzzle='killer-sudoku'], [data-puzzle='cross-sums']) .slab .cell.lr { border-bottom: 0; }
+:is([data-puzzle='jigsaw-sudoku'], [data-puzzle='killer-sudoku'], [data-puzzle='cross-sums']) .slab .cell.er { border-right: 3px solid var(--ink); }
+:is([data-puzzle='jigsaw-sudoku'], [data-puzzle='killer-sudoku'], [data-puzzle='cross-sums']) .slab .cell.eb { border-bottom: 3px solid var(--ink); }

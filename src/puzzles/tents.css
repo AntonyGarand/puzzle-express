@@ -1,0 +1,26 @@
+[data-puzzle='tents'] { --accent: var(--p3); }
+[data-puzzle='tents'] .lk-tents .lk-clue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: calc(var(--board) / var(--cols) * 0.46);
+  transition: opacity 0.2s, color 0.2s;
+}
+[data-puzzle='tents'] .lk-tents .lk-clue.done { opacity: 0.3; }
+[data-puzzle='tents'] .lk-tents .lk-clue.over { color: var(--bad); }
+[data-puzzle='tents'] .lk-tents .cell { overflow: hidden; }
+[data-puzzle='tents'] .lk-tents .cell.tree { background: var(--cell-alt); }
+[data-puzzle='tents'] .lk-tents .cell.grass {
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--accent) 80%, var(--ink)) 0 9%, transparent 10%) 0 0 / 50% 50%,
+    var(--accent-soft);
+}
+[data-puzzle='tents'] .lk-tents svg { width: 82%; height: 82%; }
+[data-puzzle='tents'] .lk-tent { display: none; }
+[data-puzzle='tents'] .cell.tent .lk-tent { display: block; }
+[data-puzzle='tents'] .lk-tree .crown { fill: var(--p3); stroke: var(--ink); stroke-width: 6; }
+[data-puzzle='tents'] .lk-tree .trunk { fill: var(--p8); stroke: var(--ink); stroke-width: 6; }
+[data-puzzle='tents'] .lk-tent .canvas { fill: var(--p1); stroke: var(--ink); stroke-width: 6; stroke-linejoin: round; }
+[data-puzzle='tents'] .lk-tent .door { fill: var(--ink); }

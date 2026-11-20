@@ -1,0 +1,31 @@
+[data-puzzle='tower'] { --accent: var(--p5); }
+[data-puzzle='tower'] .puzzle { gap: 14px; }
+[data-puzzle='tower'] .tw {
+  --w: min(var(--board), calc((var(--board) - 8px) * var(--cols) / var(--rows)), calc(var(--cols) * 58px));
+  width: var(--w);
+  --gap: 4px !important;
+  row-gap: 4px;
+}
+[data-puzzle='tower'] .tw .cell {
+  font-size: calc(var(--w) / var(--cols) * 0.5);
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+/* top word: the roof, waiting */
+[data-puzzle='tower'] .tw .cell.tw-goal { background: var(--accent-soft); border-style: dashed; box-shadow: none; }
+/* bottom word: the foundation */
+[data-puzzle='tower'] .tw .cell.tw-base { background: var(--ink); color: var(--bg); }
+[data-puzzle='tower'] .tw .cell.tw-empty { background: transparent; border-style: dashed; box-shadow: none; opacity: 0.4; }
+[data-puzzle='tower'] .tw .cell.tw-cur { background: var(--cell); border-style: dashed; box-shadow: none; }
+[data-puzzle='tower'] .tw .cell.tw-typed { background: var(--cell); }
+/* the letter that changed on this floor */
+[data-puzzle='tower'] .tw .cell.tw-chg::after {
+  content: '';
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: 9%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--on-tone);
+}

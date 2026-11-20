@@ -1,0 +1,37 @@
+[data-puzzle='push'] { --accent: var(--p8); }
+[data-puzzle='push'] .push-grid { touch-action: none; }
+[data-puzzle='push'] .cell.wall {
+  background: repeating-linear-gradient(135deg, var(--ink) 0 3px, var(--cell-alt) 3px 8px);
+  box-shadow: none;
+}
+/* target: a ring on the floor */
+[data-puzzle='push'] .cell.tg::before {
+  content: '';
+  position: absolute;
+  width: 46%;
+  height: 46%;
+  border: 3px dashed var(--ink);
+  border-radius: 50%;
+}
+/* crate */
+[data-puzzle='push'] .cell.bx { background: var(--accent); }
+[data-puzzle='push'] .cell.bx::after {
+  content: '';
+  width: 58%;
+  height: 58%;
+  border: 3px solid var(--on-tone);
+  border-radius: 3px;
+  background: linear-gradient(45deg, transparent 45%, var(--on-tone) 45% 55%, transparent 55%);
+  opacity: 0.55;
+}
+[data-puzzle='push'] .cell.bx.tg::before { display: none; }
+[data-puzzle='push'] .cell.bx.on { background: var(--good); color: var(--on-tone); }
+/* player */
+[data-puzzle='push'] .cell.me::after {
+  content: '';
+  width: 56%;
+  height: 56%;
+  border-radius: 50%;
+  background: var(--fg);
+}
+[data-puzzle='push'] .push-pad { width: min(var(--board), 300px); }

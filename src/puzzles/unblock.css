@@ -1,0 +1,69 @@
+[data-puzzle='unblock'] { --accent: var(--p7); }
+[data-puzzle='unblock'] .ub-board {
+  --pad: 6px;
+  position: relative;
+  width: var(--board);
+  aspect-ratio: 1;
+  padding: var(--pad);
+  background: var(--cell-alt);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r);
+  box-shadow: var(--sh) var(--sh) 0 var(--ink);
+}
+[data-puzzle='unblock'] .ub-field {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--ink) 22%, transparent) 2px, transparent 2.5px);
+  background-size: calc(100% / var(--n)) calc(100% / var(--n));
+}
+/* exit: a tab sticking out of the frame on the key's row */
+[data-puzzle='unblock'] .ub-exit {
+  position: absolute;
+  right: calc(-1 * var(--bw) - 9px);
+  top: calc(var(--pad) + (100% - 2 * var(--pad)) / var(--n) * var(--exit) + 4px);
+  width: calc(var(--pad) + 9px);
+  height: calc((100% - 2 * var(--pad)) / var(--n) - 8px);
+  background: var(--accent);
+  border: var(--bw) solid var(--ink);
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+}
+[data-puzzle='unblock'] .ub-blk {
+  --u: calc(100% / var(--n));
+  position: absolute;
+  left: calc(100% / var(--n) * var(--x));
+  top: calc(100% / var(--n) * var(--y));
+  width: calc(100% / var(--n) * var(--w));
+  height: calc(100% / var(--n) * var(--h));
+  padding: 4px;
+  cursor: grab;
+  transition: left 0.12s ease, top 0.12s ease;
+}
+[data-puzzle='unblock'] .ub-blk::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  background: color-mix(in srgb, var(--c) 70%, var(--cell));
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--r-cell);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+[data-puzzle='unblock'] .ub-blk.key::before { background: var(--accent); }
+[data-puzzle='unblock'] .ub-blk.key::after {
+  content: '→';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: calc(var(--board) / 12);
+  color: var(--on-tone);
+}
+[data-puzzle='unblock'] .ub-blk.sel::before { border-style: dashed; box-shadow: 5px 5px 0 var(--ink); }
+[data-puzzle='unblock'] .ub-blk.drag { transition: none; z-index: 2; cursor: grabbing; }
+[data-puzzle='unblock'] .ub-blk.drag::before { box-shadow: 6px 6px 0 var(--ink); }

@@ -1,0 +1,9 @@
+[data-puzzle='pairs'] { --accent: var(--p5); }
+[data-puzzle='pairs'] .cell.pc {
+  background:
+    repeating-linear-gradient(45deg, color-mix(in srgb, var(--accent) 45%, var(--cell)) 0 5px, var(--accent-soft) 5px 10px);
+}
+[data-puzzle='pairs'] .cell.pc.up { background: var(--cell); }
+[data-puzzle='pairs'] .cell.pc.on { background: var(--accent-soft); box-shadow: none; transform: translate(var(--csh), var(--csh)); }
+[data-puzzle='pairs'] .cell.pc.miss { opacity: 0.6; }
+[data-puzzle='pairs'] .sym { width: 74%; height: 74%; display: block; pointer-events: none; }

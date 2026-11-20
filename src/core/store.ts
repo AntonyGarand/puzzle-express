@@ -1,0 +1,216 @@
+import type { Difficulty } from './types';
+
+export type Outcome = 'solved' | 'failed' | 'skipped';
+/** 0 = off, 1 = less, 2 = normal, 3 = more */
+export type Weight = 0 | 1 | 2 | 3;
+export type Theme = 'system' | 'light' | 'dark';
+
+export interface Result {
+  d: Difficulty;
+  o: Outcome;
+  ms: number;
+  m: number;
+  at: number;
+}
+
+export interface TypePrefs {
+  level: Difficulty;
+  /** true once the player picked a level by hand: auto-levelling stops for this puzzle. */
+  manual: boolean;
+  weight: Weight;
+  /** Timestamp of the last level change; only results after it count for auto-levelling. */
+  since: number;
+}
+
+export interface TypeStats {
+  played: number;
+  solved: number;
+  failed: number;
+  skipped: number;
+  /** Total time spent on solved puzzles (ms). */
+  time: number;
+  best: Partial<Record<Difficulty, number>>;
+  recent: Result[];
+}
+
+export interface Profile {
+  v: 1;
+  name: string;
+  created: number;
+  theme: Theme;
+  autoAdvance: boolean;
+  startLevel: Difficulty;
+  types: Record<string, TypePrefs>;
+  stats: Record<string, TypeStats>;
+  /** solved count per local day (YYYY-MM-DD) */
+  days: Record<string, number>;
+}
+
+const KEY = 'puzzle-express:v1';
+
+function fresh(): Profile {
+  return { v: 1, name: '', created: Date.now(), theme: 'system', autoAdvance: true, startLevel: 1, types: {}, stats: {}, days: {} };
+}
+
+function load(): Profile {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && p.v === 1) return { ...fresh(), ...p };
+    }
+  } catch {
+    /* corrupt storage: start over */
+  }
+  return fresh();
+}
+
+let profile = load();
+
+type Listener = (kind: 'level' | 'weight' | 'profile' | 'record', id?: string) => void;
+const listeners = new Set<Listener>();
+export const onChange = (fn: Listener) => {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+};
+const emit: Listener = (kind, id) => listeners.forEach((fn) => fn(kind, id));
+
+export function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(profile));
+  } catch {
+    /* quota / private mode: keep in memory */
+  }
+}
+
+export const getProfile = () => profile;
+
+export function update(patch: Partial<Pick<Profile, 'name' | 'theme' | 'autoAdvance' | 'startLevel'>>) {
+  Object.assign(profile, patch);
+  save();
+  emit('profile');
+}
+
+export function prefs(id: string): TypePrefs {
+  return (profile.types[id] ??= { level: profile.startLevel, manual: false, weight: 2, since: Date.now() });
+}
+
+export function stats(id: string): TypeStats {
+  return (profile.stats[id] ??= { played: 0, solved: 0, failed: 0, skipped: 0, time: 0, best: {}, recent: [] });
+}
+
+/** Set a fixed level (manual) or hand control back to auto-levelling. */
+export function setLevel(id: string, level: Difficulty | 'auto') {
+  const p = prefs(id);
+  if (level === 'auto') {
+    p.manual = false;
+  } else {
+    p.manual = true;
+    if (p.level !== level) p.since = Date.now();
+    p.level = level;
+  }
+  save();
+  emit('level', id);
+}
+
+export function setWeight(id: string, w: Weight) {
+  prefs(id).weight = w;
+  save();
+  emit('weight', id);
+}
+
+export function resetAllToAuto() {
+  for (const p of Object.values(profile.types)) p.manual = false;
+  save();
+  emit('level');
+}
+
+export const dayKey = (t = Date.now()) => new Date(t).toLocaleDateString('en-CA');
+
+export interface RecordOutcome {
+  levelChange?: { from: Difficulty; to: Difficulty };
+  best?: boolean;
+}
+
+/**
+ * Record a finished puzzle and run auto-levelling.
+ * Level goes up after 3 clean solves within par (or 2 very fast flawless ones) at the current level,
+ * and down after 2 failures/skips in a row. Manual levels are never touched.
+ */
+export function record(id: string, r: Omit<Result, 'at'>, parMs: number): RecordOutcome {
+  const s = stats(id);
+  const p = prefs(id);
+  const res: Result = { ...r, at: Date.now() };
+  const out: RecordOutcome = {};
+
+  s.played++;
+  if (r.o === 'solved') {
+    s.solved++;
+    s.time += r.ms;
+    const prev = s.best[r.d];
+    if (prev == null || r.ms < prev) {
+      s.best[r.d] = r.ms;
+      out.best = prev != null && prev - r.ms >= 1000; // only celebrate a real improvement
+    }
+    const k = dayKey();
+    profile.days[k] = (profile.days[k] ?? 0) + 1;
+  } else if (r.o === 'failed') s.failed++;
+  else s.skipped++;
+
+  s.recent.push(res);
+  if (s.recent.length > 30) s.recent.splice(0, s.recent.length - 30);
+
+  if (!p.manual) {
+    const rel = s.recent.filter((x) => x.d === p.level && x.at >= p.since);
+    const last3 = rel.slice(-3);
+    const last2 = rel.slice(-2);
+    const good = (x: Result) => x.o === 'solved' && x.ms <= parMs && x.m <= 1;
+    const great = (x: Result) => x.o === 'solved' && x.ms <= parMs * 0.5 && x.m === 0;
+    let to = p.level;
+    if (p.level < 5 && ((last3.length === 3 && last3.every(good)) || (last2.length === 2 && last2.every(great)))) {
+      to = (p.level + 1) as Difficulty;
+    } else if (p.level > 1 && last2.length === 2 && last2.every((x) => x.o !== 'solved')) {
+      to = (p.level - 1) as Difficulty;
+    }
+    if (to !== p.level) {
+      out.levelChange = { from: p.level, to };
+      p.level = to;
+      p.since = Date.now();
+    }
+  }
+  save();
+  if (out.levelChange) emit('level', id);
+  emit('record', id);
+  return out;
+}
+
+export function dayStreak(): number {
+  const d = new Date();
+  if (!profile.days[dayKey(d.getTime())]) d.setDate(d.getDate() - 1);
+  let n = 0;
+  while (profile.days[dayKey(d.getTime())]) {
+    n++;
+    d.setDate(d.getDate() - 1);
+  }
+  return n;
+}
+
+export function exportProfile(): string {
+  return JSON.stringify(profile, null, 2);
+}
+
+export function importProfile(json: string) {
+  const p = JSON.parse(json);
+  if (!p || p.v !== 1 || typeof p.types !== 'object' || typeof p.stats !== 'object') throw new Error('Not a puzzle express profile');
+  profile = { ...fresh(), ...p };
+  save();
+  emit('profile');
+  emit('level');
+}
+
+export function resetProfile() {
+  profile = fresh();
+  save();
+  emit('profile');
+  emit('level');
+}

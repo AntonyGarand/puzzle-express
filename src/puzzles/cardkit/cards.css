@@ -1,0 +1,115 @@
+/* Shared playing-card table (solitaire, freecell, spider, pyramid). Scoped by the .ctable root. */
+.ctable {
+  --cg: 4px;
+  --tw: min(100vw - 32px, 528px);
+  --cw: min(var(--cwmax, 66px), (var(--tw) - (var(--n) - 1) * var(--cg)) / var(--n), (var(--board) + 110px) / var(--hcw));
+  --ch: calc(var(--cw) * 1.4);
+  --pc-red: color-mix(in srgb, var(--bad) 78%, var(--fg));
+  position: relative;
+  width: calc(var(--n) * var(--cw) + (var(--n) - 1) * var(--cg) + 2px);
+  height: calc(var(--hcw) * var(--cw) + 2px);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ctable .pile {
+  position: absolute;
+  left: calc(var(--x, 0) * (var(--cw) + var(--cg)));
+  top: calc(var(--y, 0) * var(--cw));
+  width: var(--cw);
+  height: calc(var(--ph, 1.4) * var(--cw));
+}
+.ctable .pc,
+.ctable .pc-slot {
+  position: absolute;
+  left: calc(var(--x, 0) * (var(--cw) + var(--cg)) + var(--dx, 0) * var(--cw));
+  top: calc(var(--y, 0) * var(--cw));
+  width: var(--cw);
+  height: var(--ch);
+  margin: 0;
+  padding: 0;
+  border-radius: calc(var(--cw) * 0.12);
+}
+.ctable .pc-slot {
+  border: 2px dashed color-mix(in srgb, var(--ink) 45%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: calc(var(--cw) * 0.42);
+  color: color-mix(in srgb, var(--fg) 35%, transparent);
+  cursor: pointer;
+}
+.ctable .pc {
+  border: 2px solid var(--ink);
+  background: var(--cell);
+  color: var(--fg);
+  box-shadow: 2px 2px 0 var(--ink);
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.06s, background 0.1s, box-shadow 0.06s;
+}
+.ctable .pc.red { color: var(--pc-red); }
+.ctable .pc-r {
+  position: absolute;
+  left: calc(var(--cw) * 0.07);
+  top: calc(var(--cw) * 0.06);
+  display: flex;
+  align-items: baseline;
+  gap: 0.04em;
+  font-size: calc(var(--cw) * 0.31);
+  letter-spacing: -0.06em;
+  white-space: nowrap;
+}
+.ctable .pc-r i { font-style: normal; font-size: 0.92em; letter-spacing: 0; }
+.ctable .pc-s {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--cw) * 0.1);
+  text-align: center;
+  font-size: calc(var(--cw) * 0.62);
+}
+.ctable .pc.down {
+  background: repeating-linear-gradient(45deg, var(--accent) 0 calc(var(--cw) * 0.09), var(--accent-soft) calc(var(--cw) * 0.09) calc(var(--cw) * 0.18));
+  cursor: default;
+}
+.ctable .pc.sel {
+  background: var(--accent-soft);
+  outline: 3px solid var(--accent);
+  outline-offset: -1px;
+  transform: translate(-1px, -2px);
+  box-shadow: 3px 4px 0 var(--ink);
+}
+.ctable .pc.hint { background: var(--accent-soft); }
+.ctable .pc.lock { cursor: default; }
+.ctable .pc.lock::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--cell-alt) 45%, transparent); }
+.ctable .pc.lift {
+  z-index: 50;
+  pointer-events: none;
+  transition: none;
+  box-shadow: 4px 5px 0 var(--ink);
+}
+.ctable .pc:active:not(.down):not(.lift) { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink); }
+.ctable .pc.stock { cursor: pointer; }
+.ctable .badge {
+  position: absolute;
+  right: calc(var(--cw) * -0.12);
+  bottom: calc(var(--cw) * -0.12);
+  min-width: calc(var(--cw) * 0.42);
+  padding: 1px 4px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--cell);
+  color: var(--fg);
+  font-size: max(10px, calc(var(--cw) * 0.24));
+  font-weight: 700;
+  text-align: center;
+  z-index: 5;
+  pointer-events: none;
+}
+.card.is-solved .ctable { animation: pop 0.45s ease; }
+.ctable .pile > * { --x: 0; --y: 0; --dx: 0; }

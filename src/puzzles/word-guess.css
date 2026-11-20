@@ -1,0 +1,17 @@
+[data-puzzle='word-guess'] { --accent: var(--p2); }
+[data-puzzle='word-guess'] .puzzle { gap: 14px; }
+[data-puzzle='word-guess'] .wg {
+  --w: min(var(--board), calc((var(--board) - 8px) * var(--cols) / var(--rows)), calc(var(--cols) * 62px));
+  width: var(--w);
+}
+[data-puzzle='word-guess'] .wg .cell {
+  font-size: calc(var(--w) / var(--cols) * 0.5);
+  text-transform: uppercase;
+}
+[data-puzzle='word-guess'] .wg .cell.wg-empty { border-style: dashed; box-shadow: none; background: transparent; opacity: 0.55; }
+[data-puzzle='word-guess'] .wg .cell.wg-cur { border-style: dashed; box-shadow: none; background: var(--accent-soft); }
+[data-puzzle='word-guess'] .wg .cell.wg-typed { background: var(--cell); transform: translate(-1px, -1px); }
+[data-puzzle='word-guess'] .wg .cell.wg-hit { background: var(--good); color: var(--on-tone); }
+[data-puzzle='word-guess'] .wg .cell.wg-near { background: var(--p4); color: var(--on-tone); }
+[data-puzzle='word-guess'] .wg .cell.wg-out { background: var(--cell-alt); color: var(--muted); }
+[data-puzzle='word-guess'] .wg-answer { display: flex; flex-direction: column; align-items: center; gap: 16px; }
