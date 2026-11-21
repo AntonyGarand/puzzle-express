@@ -160,6 +160,9 @@ export const crossSums: PuzzleDef = {
       down = new Map<number, number>();
     runs.forEach((run, k) => (run.across ? across : down).set(run.clue, units[k].sum!));
     const cellEls: Element[] = [];
+    // Clue number element per run, so the selected cell's runs light up and finished runs fade.
+    const clueEls: HTMLElement[] = runs.map((run, k) => h('span', { class: run.across ? 'ac' : 'dn' }, units[k].sum));
+    const clueAt = (i: number, isAcross: boolean) => clueEls[runs.findIndex((r) => r.clue === i && r.across === isAcross)];
     const inst = entryGame({
       ctx,
       cols: n,
@@ -167,12 +170,22 @@ export const crossSums: PuzzleDef = {
       problem,
       puzzle,
       boardClass: 'slab kakuro',
-      cellClass: (i) => (puzzle[i] < 0 && (across.has(i) || down.has(i)) ? 'split' : ''),
+      cellClass: (i) =>
+        puzzle[i] < 0 && (across.has(i) || down.has(i)) ? `clue${across.has(i) ? ' has-ac' : ''}${down.has(i) ? ' has-dn' : ''}` : '',
       decorate(el, i) {
         cellEls[i] = el;
         if (puzzle[i] >= 0) return;
-        if (across.has(i)) el.append(h('span', { class: 'ac' }, across.get(i)));
-        if (down.has(i)) el.append(h('span', { class: 'dn' }, down.get(i)));
+        if (across.has(i)) el.append(clueAt(i, true));
+        if (down.has(i)) el.append(clueAt(i, false));
+      },
+      onRender(sel, vals) {
+        runs.forEach((run, k) => {
+          const full = run.cells.every((c) => vals[c] > 0);
+          const sum = run.cells.reduce((s, c) => s + Math.max(0, vals[c]), 0);
+          const el = clueEls[k];
+          el.classList.toggle('on', sel >= 0 && run.cells.includes(sel));
+          el.classList.toggle('ok', full && sum === units[k].sum && new Set(run.cells.map((c) => vals[c])).size === run.cells.length);
+        });
       },
     });
     inst.hint = makeHint({

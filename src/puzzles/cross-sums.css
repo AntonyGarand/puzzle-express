@@ -1,28 +1,83 @@
 [data-puzzle='cross-sums'] {
   --accent: var(--p6);
+  /* blank blocks recede; clue cells sit a step lighter so the sums read as part of the grid */
+  --cs-block: color-mix(in srgb, var(--ink) 90%, var(--cell));
+  --cs-clue: color-mix(in srgb, var(--ink) 74%, var(--cell));
+  --cs-line: color-mix(in srgb, var(--cell) 45%, transparent);
+  --cs-fg: var(--cell);
 }
+:root[data-theme='dark'] [data-puzzle='cross-sums'] {
+  --cs-block: color-mix(in srgb, var(--bg) 50%, #000);
+  --cs-clue: color-mix(in srgb, var(--accent) 16%, var(--bg));
+  --cs-line: color-mix(in srgb, var(--fg) 22%, transparent);
+  --cs-fg: var(--fg);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) [data-puzzle='cross-sums'] {
+    --cs-block: color-mix(in srgb, var(--bg) 50%, #000);
+    --cs-clue: color-mix(in srgb, var(--accent) 16%, var(--bg));
+    --cs-line: color-mix(in srgb, var(--fg) 22%, transparent);
+    --cs-fg: var(--fg);
+  }
+}
+
 [data-puzzle='cross-sums'] .kakuro .cell.off {
-  background: color-mix(in srgb, var(--ink) 82%, var(--cell));
-  color: var(--cell);
-  border-color: color-mix(in srgb, var(--cell) 25%, transparent);
-  font-size: max(10px, calc(var(--board) / var(--cols) * 0.3));
+  position: relative;
+  background: var(--cs-block);
+  color: var(--cs-fg);
+  border-color: color-mix(in srgb, var(--cs-fg) 14%, transparent);
+  font-size: max(11px, calc(var(--board) / var(--cols) * 0.32));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
-[data-puzzle='cross-sums'] .kakuro .cell.off.split {
+
+/* Clue cell: a hairline diagonal; each half is clue-coloured only when it holds a sum. */
+[data-puzzle='cross-sums'] .kakuro .cell.off.clue {
+  --lo: var(--cs-block);
+  --hi: var(--cs-block);
   background: linear-gradient(
     to top right,
-    color-mix(in srgb, var(--ink) 82%, var(--cell)) calc(50% - 0.75px),
-    var(--cell) calc(50% - 0.75px) calc(50% + 0.75px),
-    color-mix(in srgb, var(--ink) 82%, var(--cell)) calc(50% + 0.75px)
+    var(--lo) calc(50% - 0.5px),
+    var(--cs-line) calc(50% - 0.5px) calc(50% + 0.5px),
+    var(--hi) calc(50% + 0.5px)
   );
 }
-[data-puzzle='cross-sums'] .kakuro .ac {
-  position: absolute;
-  top: 9%;
-  right: 9%;
+[data-puzzle='cross-sums'] .kakuro .cell.off.has-ac {
+  --hi: var(--cs-clue);
 }
+[data-puzzle='cross-sums'] .kakuro .cell.off.has-dn {
+  --lo: var(--cs-clue);
+}
+
+/* Sums sit in the middle of their triangle */
+[data-puzzle='cross-sums'] .kakuro .ac,
 [data-puzzle='cross-sums'] .kakuro .dn {
   position: absolute;
-  bottom: 9%;
-  left: 9%;
+  transform: translate(-50%, -50%);
+  transition:
+    color 0.15s,
+    opacity 0.15s;
+}
+[data-puzzle='cross-sums'] .kakuro .ac {
+  top: 30%;
+  left: 70%;
+}
+[data-puzzle='cross-sums'] .kakuro .dn {
+  top: 70%;
+  left: 30%;
+}
+/* the selected cell's runs */
+[data-puzzle='cross-sums'] .kakuro .ac.on,
+[data-puzzle='cross-sums'] .kakuro .dn.on {
+  color: var(--accent);
+}
+/* runs that are complete and add up */
+[data-puzzle='cross-sums'] .kakuro .ac.ok,
+[data-puzzle='cross-sums'] .kakuro .dn.ok {
+  opacity: 0.4;
+}
+[data-puzzle='cross-sums'] .kakuro .ac.on.ok,
+[data-puzzle='cross-sums'] .kakuro .dn.on.ok {
+  opacity: 0.7;
 }

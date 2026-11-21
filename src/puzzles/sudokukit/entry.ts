@@ -17,6 +17,8 @@ export interface EntryOpts {
   cellClass?: (i: number) => string;
   /** Add static children to a cell (cage sums, signs, clue numbers…). Called for inactive cells too. */
   decorate?: (el: HTMLElement, i: number) => void;
+  /** Called after every render with the selected cell (-1 for none) and current values. */
+  onRender?: (sel: number, vals: readonly number[]) => void;
 }
 
 /**
@@ -71,6 +73,7 @@ export function entryGame(o: EntryOpts): PuzzleInstance {
       if (bad.has(i) && !given[i]) cls += ' err';
       if (el.className !== cls) el.className = cls;
     });
+    o.onRender?.(sel, vals);
     return bad;
   };
 
