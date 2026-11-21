@@ -1,7 +1,7 @@
 import { L } from '../core/i18n';
 import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, PALETTE, s } from '../core/ui';
-import { genConnect } from './pathkit/connect-gen';
+import { genConnect, touchesSelf } from './pathkit/connect-gen';
 import { adjacent, capture, cellAt, nbrs, pts, stepsToward } from './pathkit/grid';
 import './connect.css';
 
@@ -12,12 +12,12 @@ export const connect: PuzzleDef = {
   },
   category: 'paths',
   get rules() {
-    return L('Link same-colour dots. Fill every cell, no crossing.', 'Reliez les points de même couleur. Remplissez tout.');
+    return L('Link same-colour dots. Fill every cell. No U-turns.', 'Reliez les couleurs. Remplissez tout, sans demi-tour.');
   },
   help: () => ({
     goal: L(
-      'Join each pair of same-colour dots with a path, and fill every cell of the grid. Paths can’t cross.',
-      'Reliez chaque paire de points de même couleur par un chemin et remplissez toutes les cases. Les chemins ne se croisent pas.',
+      'Join each pair of same-colour dots with a path, and fill every cell of the grid. Paths can’t cross, and a path can never run alongside itself.',
+      'Reliez chaque paire de points de même couleur par un chemin et remplissez toutes les cases. Les chemins ne se croisent pas, et un chemin ne peut jamais longer sa propre trace.',
     ),
     steps: [
       L(
@@ -30,6 +30,10 @@ export const connect: PuzzleDef = {
         'Revenez sur un chemin pour le raccourcir, ou reprenez-le au milieu pour le retracer à partir de là.',
       ),
       L('Drawing over another colour cuts that path.', 'Tracer par-dessus une autre couleur coupe ce chemin.'),
+      L(
+        'No U-turns: a path can’t step next to a cell it already went through, so you can’t fold one colour back and forth to fill a gap.',
+        'Pas de demi-tour : un chemin ne peut pas passer à côté d’une case qu’il a déjà traversée. Impossible donc de replier une couleur en zigzag pour combler un trou.',
+      ),
       L('Clear erases every path.', 'Effacer supprime tous les chemins.'),
     ],
     tips: [
@@ -38,8 +42,8 @@ export const connect: PuzzleDef = {
         'Commencez par les points en bordure ou proches l’un de l’autre : les chemins le long des bords gênent rarement.',
       ),
       L(
-        'Every cell must be used, so let long paths wind through empty areas.',
-        'Toutes les cases doivent servir : faites serpenter les longs chemins dans les zones vides.',
+        'Every cell must be used, but a path can’t double back on itself: an empty pocket has to be filled by the colours around it.',
+        'Toutes les cases doivent servir, mais un chemin ne peut pas revenir sur lui-même : une poche vide doit être remplie par les couleurs voisines.',
       ),
     ],
   }),
@@ -109,11 +113,17 @@ export const connect: PuzzleDef = {
 
     // ---- drawing ----
     let active = -1;
+    /** Would stepping onto `j` put line `c` beside one of its own earlier cells (a U-turn)? */
+    const doublesBack = (c: number, j: number) => {
+      const p = paths[c];
+      return nbrs(j, n, n).some((x) => owner[x] === c && x !== p[p.length - 1]);
+    };
     const tryAdd = (c: number, j: number): boolean => {
       const p = paths[c];
       if (complete(c)) return false;
       if (dot[j] >= 0 && dot[j] !== c) return false;
       if (!adjacent(p[p.length - 1], j, n)) return false;
+      if (doublesBack(c, j)) return false;
       const o = owner[j];
       if (o >= 0 && o !== c) {
         // cut the other colour's path just before this cell
@@ -197,7 +207,7 @@ export const connect: PuzzleDef = {
             (i === 0 || adjacent(p[i - 1], v, n)) &&
             (i === 0 || dot[v] < 0 || (dot[v] === c && i === p.length - 1)),
         );
-        if (!ok) return;
+        if (!ok || touchesSelf(p as number[], n)) return;
         p.forEach((v: number) => used.add(v));
         paths[c] = [...p];
       });
@@ -233,7 +243,8 @@ export const connect: PuzzleDef = {
           };
       }
       const free = (i: number) => owner[i] < 0 && dot[i] < 0;
-      const open = (head: number, target: number) => nbrs(head, n, n).filter((j) => free(j) || j === target);
+      const open = (c: number, head: number, target: number) =>
+        nbrs(head, n, n).filter((j) => (free(j) || j === target) && !doublesBack(c, j));
       /** Press on `from` (a dot or a line end), then drag through `more`. */
       const draw = (from: number, more: number[]) => () => {
         start(from);
@@ -270,22 +281,24 @@ export const connect: PuzzleDef = {
         },
         forced: () => {
           for (const o of opts) {
-            const choices = open(o.head, o.target);
+            const choices = open(o.c, o.head, o.target);
             if (choices.length !== 1 || choices[0] !== o.rest[0]) continue;
             // Follow the chain of forced cells.
             const run = [o.rest[0]];
             const taken = new Set([...paths[o.c], o.head, o.rest[0]]);
             for (let t = 1; t < o.rest.length; t++) {
               const at = run[run.length - 1];
-              const ch = nbrs(at, n, n).filter((j) => !taken.has(j) && (free(j) || j === o.target));
+              const ch = nbrs(at, n, n).filter(
+                (j) => !taken.has(j) && (free(j) || j === o.target) && !nbrs(j, n, n).some((x) => x !== at && taken.has(x)),
+              );
               if (ch.length !== 1 || ch[0] !== o.rest[t]) break;
               run.push(o.rest[t]);
               taken.add(o.rest[t]);
             }
             return {
               text: L(
-                `This ${paths[o.c].length > 1 ? 'line end' : 'dot'} has only one free neighbour, so the line must go there${run.length > 1 ? ', and on until it gets a choice' : ''}.`,
-                `${paths[o.c].length > 1 ? 'Ce bout de ligne' : 'Ce point'} n’a qu’une case libre à côté : la ligne doit y passer${run.length > 1 ? ', puis continuer jusqu’à avoir le choix' : ''}.`,
+                `This ${paths[o.c].length > 1 ? 'line end' : 'dot'} can only step to one cell (free, and not beside its own line), so the line must go there${run.length > 1 ? ', and on until it gets a choice' : ''}.`,
+                `${paths[o.c].length > 1 ? 'Ce bout de ligne' : 'Ce point'} n’a qu’une case où aller (libre, et pas à côté de sa propre ligne) : la ligne doit y passer${run.length > 1 ? ', puis continuer jusqu’à avoir le choix' : ''}.`,
               ),
               why: [el(o.head)],
               at: run.map(el),
