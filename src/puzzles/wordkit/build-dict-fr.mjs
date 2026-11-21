@@ -9,7 +9,8 @@
 //   - french-badwords-list (MIT, © Maurice Butler): words kept out of the answers and the common list.
 // Gameplay is A–Z only: words are folded (é→e, ç→c, œ→oe) before use.
 // Outputs (committed):
-//   dict-fr.txt   – validation dictionary, 3–8 letters, front-coded like dict.txt; lazily loaded chunk.
+//   dict-fr.txt   – validation dictionary, 3–8 letters, familiar words only (see THREE / RESCUE_4 / DROP_4 / QC_*),
+//                   front-coded like dict.txt; lazily loaded chunk.
 //   common-fr.ts  – the most frequent ~6000 words (3–8 letters) split into ANSWERS (base forms, safe)
 //                   and OTHER (inflections, function words…), bundled for synchronous generation.
 import { createRequire } from 'node:module';
@@ -119,6 +120,85 @@ semblent signifie souhaite soutient souviens souvient tiendrai tracasse vaudrait
 napoleon portland victoria virginie superman ressenti transmis souffert parcouru corrompu suspendu reverend
 soul bouge brille ennuie degage admire retiens savions aimeriez meprenez enverrai devrions consiste jan rob kit fonce`.split(/\s+/);
 
+// ---- familiar-words filter ----
+// The source list has ~336k words, many of them archaic, technical or English (FATS, LET, ERS, RAI…). Short
+// words are where those bite: a random letter grid traces them by accident. So:
+//   3 letters  – only this hand-picked list of words a Québec player knows.
+//   4 letters  – words whose base form is in the OpenSubtitles frequency list, plus RESCUE_4, minus DROP_4.
+//   5+ letters – the whole dictionary (long obscure words rarely come up by accident; cutting them rejects
+//                real words like ADAGE, IGLOO, RUGIR).
+const THREE = `age ail air aie ais ait ame ami ane ans arc art axe aux bac bal bar bas bat bec bel ben ble boa bof bol bon
+bus but cap car cas ces cet cle col coq cor cou cri cru des dis dit dix don dos duc due duo dur eau ego elu emu epi ere est
+ete eut eux fee fer feu fil fin fit foi fou fut gag gai gaz gel gym hic hop ici ile ils ira jet jeu job jus lac les lie lin lis
+lit loi lot lue lui lus lys mai mal mat mec mer mes met mie mis mit moi mon mot mou mue mur nee nes net nez nid nie nom non nos
+nue nul nus oie ont ose ote ouf oui par pas pet peu pic pie pif pin pis pli plu pop pot pou pro pub pue pur pus que qui ras rat
+ris rit riz roc roi rue sac sec sel ses six ski soi sol son sot sou sud sue sur tas tel tes the tic tir toi ton top tri tue une
+uni uns use van ver via vie vif vil vin vis vit vol vos vue vus zen zoo zut`.split(/\s+/);
+
+// Known 4-letter words missing from the frequency list.
+const RESCUE_4 = `acre alpe alto apex ardu atre auge aune axer axee beur brie brio bris broc buee buis cane cepe cime crac crin croc
+cyan dodu dune echu eden emeu emir euro faon fard feve fiel flop fret geai glas gnou goal gond gril grog guru halo huee huer ibis
+ilot inox iota jonc jute kaki kart kilt kiwi lest lift loir luth lynx lyre moka musc neon ocre onyx opus orme ovin peso piaf puma
+rapt ruee ruer saxo serf silo smog souk soya taon teck thym tome tutu typo urge velu watt yogi zebu`.split(/\s+/);
+
+// 4-letter words the frequency rule lets through but nobody plays (English, names, rare forms).
+const DROP_4 = `aces aspe bais bata bate beys bibi bill bled bora cade cadi caid cals cene cens chai chas chia chue chus cule deca
+dole dols duce duit elis ente etai eues fars fats feue feus fiai fias fies fora fors foui frai fris full gals gaza gent gins girl
+guis guss hart have hies home houe huai huas huis ives jans jars kali kans khan kiki lady laie lais land lege lese liai lias lite
+live lord lori lote lyse macs maie maki mans mark mati maya mesa mess meus meut mies more must nase niai nias nome none nota nova
+nuai nuas ores osai osas otai otas pack pais pane para pers pife pifs pive puna raja rani reas rees regs rias rene rets robs sake
+sied siee sils sirs shah slow soue soul suai suas tacs tans tara tees tell tian tory toto tris tuai tuas vals vils vine yang yard
+yens alla mata mina mira rama crea cuba dora rosa lima usas bobs boys ding jack love bush data colt open self ring rush pope
+bang`.split(/\s+/);
+
+// Québec words the source list lacks or the frequency list misses. Nouns/adjectives also get an -s plural,
+// verbs their common present / imparfait / participle forms.
+const QC_NOUNS = `tuque chum bleuet poutine cegep mitaine toune chicane pinotte bebelle sacoche patente piastre piasse cenne bine
+creton guedille gougoune jasette huard orignal frette quetaine pitou minou minoune bobette sloche brunante garnotte poudrerie
+dep depanneur`.split(/\s+/);
+const QC_WORDS = `pantoute niaiseux chialeux`.split(/\s+/);
+const QC_VERBS = `pogner niaiser jaser placoter achaler chialer gosser magasiner capoter zigonner taponner`.split(/\s+/);
+
+function quebec() {
+  const out = new Set(QC_WORDS);
+  for (const w of QC_NOUNS) out.add(w).add(w + 's');
+  for (const v of QC_VERBS) {
+    const st = v.slice(0, -2);
+    for (const e of ['er', 'e', 'es', 'ent', 'ez', 'ons', 'e', 'ee', 'es', 'ees', 'ait', 'ais', 'aient', 'ant', 'era']) out.add(st + e);
+  }
+  return [...out].filter((w) => /^[a-z]{3,8}$/.test(w));
+}
+
+/** Plausible base forms of an (accented) word: itself, singular, masculine, infinitive. Passé simple is ignored. */
+function lemmas(w) {
+  const o = [w];
+  if (/[sx]$/.test(w)) o.push(w.slice(0, -1));
+  if (w.endsWith('aux')) o.push(w.slice(0, -3) + 'al');
+  for (const [a, b] of [
+    ['e', ''],
+    ['es', ''],
+    ['euse', 'eur'],
+    ['ive', 'if'],
+    ['elle', 'el'],
+    ['enne', 'en'],
+    ['ette', 'et'],
+    ['ère', 'er'],
+    ['rice', 'eur'],
+    ['onne', 'on'],
+  ])
+    if (w.endsWith(a)) o.push(w.slice(0, -a.length) + b);
+  const ends = ['e', 'es', 'ent', 'ons', 'ez', 'ais', 'ait', 'aient', 'ions', 'iez', 'erai', 'eras', 'era', 'erons', 'erez', 'eront'];
+  ends.push('erais', 'erait', 'é', 'ée', 'és', 'ées', 'ant', 'is', 'it', 'i', 'ie', 'ies', 'irai', 'ira', 'u', 'ue', 'us', 'ues');
+  ends.push('s', 't', 'd');
+  for (const e of ends)
+    if (w.endsWith(e) && w.length > e.length + 1) {
+      const st = w.slice(0, -e.length);
+      for (const s of [st, st.replace(/è([^è]*)$/, 'e$1'), st.replace(/è([^è]*)$/, 'é$1'), st.replace(/ç$/, 'c'), st.replace(/ge$/, 'g')])
+        for (const i of [s + 'er', s + 'ir', s + 're', s + 'ire', s + 'dre', s + 'tre']) o.push(i);
+    }
+  return o;
+}
+
 const STRICT_VERB = [
   'ez',
   'ons',
@@ -202,11 +282,21 @@ export function buildFr() {
 
   // ---- validation dictionary ----
   const acc = new Set(all); // accented forms, for morphology checks
+  const frequent = new Set(freq.filter((w) => acc.has(w)));
+  const three = new Set(THREE);
+  const rescue4 = new Set(RESCUE_4);
+  const drop4 = new Set(DROP_4);
+  const familiar = (w, f) => {
+    if (f.length === 3) return three.has(f);
+    if (f.length === 4) return rescue4.has(f) || (!drop4.has(f) && lemmas(w).some((l) => frequent.has(l)));
+    return true;
+  };
   const dictSet = new Set();
   for (const w of all) {
     const f = fold(w);
-    if (/^[a-z]{3,8}$/.test(f) && !hard.has(f)) dictSet.add(f);
+    if (/^[a-z]{3,8}$/.test(f) && !hard.has(f) && familiar(w, f)) dictSet.add(f);
   }
+  for (const f of [...three, ...rescue4, ...quebec()]) if (!hard.has(f)) dictSet.add(f);
   const dict = [...dictSet].sort();
   let packed = '';
   let prev = '';
