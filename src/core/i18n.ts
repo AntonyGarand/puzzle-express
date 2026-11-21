@@ -26,6 +26,18 @@ function detect(): Locale {
 let current: Locale = detect();
 
 export const locale = (): Locale => current;
+
+// Word games normally draw from the interface language's word list. A shared puzzle from the other
+// language overrides it while that puzzle is on screen, so the interface stays in yours.
+let words: Locale | null = null;
+
+/** The language word games generate from and check words against. */
+export const wordLocale = (): Locale => words ?? current;
+
+/** Play word games in `l`'s word list (null: back to the interface language). */
+export function setWordLocale(l: Locale | null) {
+  words = l === current ? null : l;
+}
 export const localeTag = () => LOCALES.find((l) => l.id === current)!.tag;
 
 /** Pick the string for the current locale. */

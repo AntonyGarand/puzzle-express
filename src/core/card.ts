@@ -1,7 +1,7 @@
 import { telemetry } from './analytics';
 import { confetti } from './confetti';
 import { helpButton } from './help';
-import { L, locale, P } from './i18n';
+import { L, P, wordLocale } from './i18n';
 import { Rng } from './rng';
 import { clearSave, dailySaveKey, putSave, type Save, type Slot } from './saves';
 import { encodeCode, shareSection } from './share';
@@ -85,7 +85,7 @@ export class Card {
 
   /** Share code of the current puzzle: game, level, seed (and locale for word games). */
   get code() {
-    return encodeCode({ id: this.def.id, level: this.level, seed: this.seed, locale: this.def.localized ? locale() : undefined });
+    return encodeCode({ id: this.def.id, level: this.level, seed: this.seed, locale: this.def.localized ? wordLocale() : undefined });
   }
 
   /** Where this card's progress is saved, and under which key. */
@@ -331,7 +331,7 @@ export class Card {
     this.inst.destroy?.();
     this.inst = {};
     // Word games generate from the locale's word list: a save from the other language can't be resumed.
-    const resume = launch?.resume && (!this.def.localized || (launch.resume.locale ?? 'en') === locale()) ? launch.resume : undefined;
+    const resume = launch?.resume && (!this.def.localized || (launch.resume.locale ?? 'en') === wordLocale()) ? launch.resume : undefined;
     this.level = resume?.level ?? launch?.level ?? (this.opts.lab && this.mounted ? this.level : prefs(this.def.id).level);
     this.seed = resume?.seed ?? launch?.seed ?? (Math.random() * 2 ** 32) >>> 0;
     this.shared = !!launch?.shared;
@@ -420,7 +420,7 @@ export class Card {
         mistakes: this.mistakes,
         state,
         at: Date.now(),
-        locale: locale(),
+        locale: wordLocale(),
         ...(this.reached ? { reached: true as const } : {}),
       },
       this.slot,

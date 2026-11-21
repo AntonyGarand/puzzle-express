@@ -98,6 +98,8 @@ function route() {
   // #/games (alias #/labs) lists games; #/game/<id> (alias #/lab/<id>) opens one.
   let view: View = r === 'stats' || r === 'settings' || r === 'daily' ? r : r === 'labs' || r === 'games' || codeError ? 'labs' : 'feed';
   if (((r === 'lab' || r === 'game') && def) || sharedOk) view = 'lab';
+  // Leaving the lab drops a shared puzzle's word list before the feed deals any cards.
+  if (view !== 'lab') lab.setShown(false);
 
   // #/daily/<level> shows that level's list; #/daily/<level>/<n> plays its n-th puzzle.
   const dailyLevel = r === 'daily' && LEVELS.includes(Number(arg) as Difficulty) ? (Number(arg) as Difficulty) : undefined;

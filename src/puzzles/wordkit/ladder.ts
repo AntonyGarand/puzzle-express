@@ -1,4 +1,4 @@
-import { locale } from '../../core/i18n';
+import { wordLocale } from '../../core/i18n';
 import type { Rng } from '../../core/rng';
 import { answers, commonOfLength } from './lexicon';
 
@@ -12,7 +12,7 @@ export const diff = (a: string, b: string) => {
 const graphs = new Map<string, Map<string, string[]>>();
 /** Adjacency (one letter changed) over the common words of a length. Built once per locale and length. */
 function graph(len: number) {
-  const id = `${locale()}:${len}`;
+  const id = `${wordLocale()}:${len}`;
   let g = graphs.get(id);
   if (g) return g;
   const words = commonOfLength(len);

@@ -1,4 +1,4 @@
-import { L, locale, P } from '../core/i18n';
+import { L, P, wordLocale } from '../core/i18n';
 import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, s as svg, shake } from '../core/ui';
 import { adjacent, findPath, makeGrid, points } from './wordkit/hunt-solver';
@@ -321,7 +321,8 @@ export const hunt: PuzzleDef = {
     whenDict(() => renderWord());
 
     // ---------- guide ----------
-    const CHUNKS = locale() === 'fr' ? ['qu', 'ou', 'on', 'en', 'er', 'es', 'ai', 'ch'] : ['th', 'ing', 'er', 'ed', 'st', 'ch', 'ea', 'ou'];
+    const CHUNKS =
+      wordLocale() === 'fr' ? ['qu', 'ou', 'on', 'en', 'er', 'es', 'ai', 'ch'] : ['th', 'ing', 'er', 'ed', 'st', 'ch', 'ea', 'ou'];
     const up = (s: string) => s.toUpperCase();
     const pts = (w: string) => P(points(w.length), ['pt', 'pts'], ['pt', 'pts']);
     let lastRule = '';
