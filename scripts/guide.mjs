@@ -11,7 +11,7 @@ let ids = (process.env.IDS ?? '').split(',').filter(Boolean);
 
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
 const ctx = await browser.newContext({ viewport: { width: 412, height: 860 }, deviceScaleFactor: 2 });
-if (process.env.LOCALE) await ctx.addInitScript((l) => localStorage.setItem('puzzle-express:locale', l), process.env.LOCALE);
+if (process.env.LOCALE) await ctx.addInitScript((l) => localStorage.setItem('puzzle-feed:locale', l), process.env.LOCALE);
 const page = await ctx.newPage();
 page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
 if (!ids.length) {

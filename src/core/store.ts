@@ -70,7 +70,7 @@ export interface Profile {
   daily: Record<string, DailyDay>;
 }
 
-const KEY = 'puzzle-express:v1';
+const KEY = 'puzzle-feed:v1';
 
 function fresh(): Profile {
   return {
@@ -265,7 +265,7 @@ export function exportProfile(): string {
 
 export function importProfile(json: string) {
   const p = JSON.parse(json);
-  if (!p || p.v !== 1 || typeof p.types !== 'object' || typeof p.stats !== 'object') throw new Error('Not a puzzle express profile');
+  if (!p || p.v !== 1 || typeof p.types !== 'object' || typeof p.stats !== 'object') throw new Error('Not a puzzle feed profile');
   profile = { ...fresh(), ...p };
   save();
   emit('profile');

@@ -4,7 +4,7 @@ import { openSheet } from './sheet';
 import type { Hint, PuzzleDef, PuzzleInstance } from './types';
 import { btn, h, s as svg } from './ui';
 
-const SEEN_KEY = 'puzzle-express:help-seen';
+const SEEN_KEY = 'puzzle-feed:help-seen';
 
 function seenSet(): Set<string> {
   try {

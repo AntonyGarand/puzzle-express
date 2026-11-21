@@ -1,5 +1,5 @@
 {
-  "name": "puzzle-express",
+  "name": "puzzle-feed",
   "version": "0.1.0",
   "private": true,
   "description": "An endless feed of procedurally generated puzzles — puzzle.garand.dev",
@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AntonyGarand/puzzle-express.git"
+    "url": "https://github.com/AntonyGarand/puzzle-feed.git"
   },
   "type": "module",
   "scripts": {

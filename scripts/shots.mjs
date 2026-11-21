@@ -25,7 +25,7 @@ for (const vp of vps)
   for (const theme of themes) {
     const ctx = await browser.newContext({ viewport: viewports[vp], deviceScaleFactor: 2, colorScheme: theme });
     // LOCALE=fr screenshots the French UI; HELP=1 opens the how-to-play dialog before each shot.
-    if (process.env.LOCALE) await ctx.addInitScript((l) => localStorage.setItem('puzzle-express:locale', l), process.env.LOCALE);
+    if (process.env.LOCALE) await ctx.addInitScript((l) => localStorage.setItem('puzzle-feed:locale', l), process.env.LOCALE);
     const page = await ctx.newPage();
     page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
     if (!ids.length) {

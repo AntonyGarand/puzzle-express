@@ -21,9 +21,9 @@ export interface Save {
 export type Slot = 'own' | 'shared' | 'daily';
 
 const KEYS: Record<Slot, string> = {
-  own: 'puzzle-express:saves:v1',
-  shared: 'puzzle-express:shared:v1',
-  daily: 'puzzle-express:daily-saves:v1',
+  own: 'puzzle-feed:saves:v1',
+  shared: 'puzzle-feed:shared:v1',
+  daily: 'puzzle-feed:daily-saves:v1',
 };
 
 function read(slot: Slot = 'own'): Record<string, Save> {

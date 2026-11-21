@@ -10,7 +10,7 @@ export const LOCALES: { id: Locale; name: string; tag: string }[] = [
   { id: 'fr', name: 'Français (Québec)', tag: 'fr-CA' },
 ];
 
-const KEY = 'puzzle-express:locale';
+const KEY = 'puzzle-feed:locale';
 
 function detect(): Locale {
   try {

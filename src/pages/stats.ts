@@ -182,7 +182,7 @@ export function renderStats(el: HTMLElement, defs: PuzzleDef[]) {
           () => {
             const a = h('a', {
               href: URL.createObjectURL(new Blob([exportProfile()], { type: 'application/json' })),
-              download: 'puzzle-express-profile.json',
+              download: 'puzzle-feed-profile.json',
             });
             a.click();
             setTimeout(() => URL.revokeObjectURL(a.href), 1000);

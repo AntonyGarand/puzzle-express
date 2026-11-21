@@ -209,7 +209,7 @@ export function renderSettings(el: HTMLElement, defs: PuzzleDef[]) {
           'Des statistiques de jeu anonymes (jeu, niveau, temps, résultat) sont partagées pour ajuster les casse-têtes. Votre nom ne quitte jamais cet appareil.',
         ),
       ),
-      h('p', { class: 'muted small app-version' }, `puzzle express · ${__APP_VERSION__}`),
+      h('p', { class: 'muted small app-version' }, `puzzle feed · ${__APP_VERSION__}`),
     ),
   );
 }

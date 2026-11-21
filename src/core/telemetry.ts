@@ -13,7 +13,7 @@ type Attr = string | number | boolean | null | undefined;
 type Attrs = Record<string, Attr>;
 
 export interface TelemetryOptions {
-  /** OTLP service.name: lowercase slug, e.g. "puzzle-express". */
+  /** OTLP service.name: lowercase slug, e.g. "puzzle-feed". */
   service: string;
   version?: string;
   enabled?: boolean;

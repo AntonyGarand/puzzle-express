@@ -30,7 +30,7 @@ export default defineConfig({
       injectRegister: false,
       manifest: {
         id: '/',
-        name: 'puzzle express',
+        name: 'puzzle feed',
         short_name: 'puzzles',
         description: 'An endless feed of procedurally generated puzzles. Works offline.',
         lang: 'en',

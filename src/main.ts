@@ -1,3 +1,5 @@
+// oxlint-disable-next-line import/no-unassigned-import -- must run before any module reads localStorage
+import './core/migrate-storage';
 import { telemetry } from './core/analytics';
 import { L, localeTag } from './core/i18n';
 import '@fontsource-variable/space-grotesk';
@@ -51,7 +53,7 @@ const practice = h('a', { class: 'practice', href: '#/', title: L('Back to the m
 const header = h(
   'header',
   { class: 'top' },
-  h('a', { class: 'brand', href: '#/' }, h('span', { class: 'logo' }, h('i'), h('i'), h('i'), h('i')), 'puzzle express'),
+  h('a', { class: 'brand', href: '#/' }, h('span', { class: 'logo' }, h('i'), h('i'), h('i'), h('i')), 'puzzle feed'),
   h('div', { class: 'top-extra' }, streak, practice),
   h('nav', { class: 'tabs', 'aria-label': L('Main', 'Principal') }, ...Object.values(tabs)),
 );

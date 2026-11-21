@@ -9,7 +9,7 @@ import './blocks.css';
 const colour = (p: Piece) => PALETTE[p.fam % PALETTE.length];
 
 /** Best score per difficulty, kept on this device. */
-const BEST_KEY = 'puzzle-express:blocks:best:v1';
+const BEST_KEY = 'puzzle-feed:blocks:best:v1';
 const readBests = (): Record<string, number> => {
   try {
     const v = JSON.parse(localStorage.getItem(BEST_KEY) ?? '{}');

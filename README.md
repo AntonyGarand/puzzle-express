@@ -1,4 +1,4 @@
-# puzzle express
+# puzzle feed
 
 An endless, scroll-snapping feed of short puzzles: 53 games in English and Québec French. It's a static site with no backend; your profile, stats, preferences and unfinished games live in `localStorage`.
 
