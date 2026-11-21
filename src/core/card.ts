@@ -3,10 +3,10 @@ import { confetti } from './confetti';
 import { helpButton } from './help';
 import { L, locale, P } from './i18n';
 import { Rng } from './rng';
-import { clearSave, putSave, type Save } from './saves';
+import { clearSave, dailySaveKey, putSave, type Save, type Slot } from './saves';
 import { encodeCode, shareSection } from './share';
 import { openSheet } from './sheet';
-import { prefs, record, setLevel, setWeight, getProfile, type RecordOutcome, type Weight } from './store';
+import { prefs, record, recordDaily, setLevel, setWeight, getProfile, type RecordOutcome, type Weight } from './store';
 import { LEVELS, LEVEL_NAMES, type Difficulty, type PuzzleDef, type PuzzleInstance } from './types';
 import { btn, cogIcon, fmtTime, h } from './ui';
 
@@ -23,6 +23,17 @@ export interface CardOptions {
   shared?: boolean;
   /** Called after every (re)generation, e.g. to keep the URL in sync. */
   onMount?: (card: Card) => void;
+  /**
+   * A daily challenge puzzle (with `level` and `seed`): every (re)mount plays that exact puzzle, it
+   * has its own save slot, results go to the daily list and never move auto-levelling.
+   */
+  daily?: DailyRef;
+}
+
+export interface DailyRef {
+  date: string;
+  level: Difficulty;
+  index: number;
 }
 
 interface Launch {
@@ -77,6 +88,15 @@ export class Card {
     return encodeCode({ id: this.def.id, level: this.level, seed: this.seed, locale: this.def.localized ? locale() : undefined });
   }
 
+  /** Where this card's progress is saved, and under which key. */
+  private get slot(): Slot {
+    return this.opts.daily ? 'daily' : this.shared ? 'shared' : 'own';
+  }
+  private get saveId(): string {
+    const d = this.opts.daily;
+    return d ? dailySaveKey(d.date, d.level, d.index) : this.def.id;
+  }
+
   /** Not yet started: safe to regenerate or drop. */
   get pristine() {
     return !this.done && !this.interacted && this.time() < 1500;
@@ -128,6 +148,7 @@ export class Card {
   private openSettings() {
     const resume = this.pauseWhile();
     const p = prefs(this.def.id);
+    const daily = !!this.opts.daily;
     const options: { label: string; value: Difficulty | 'auto' }[] = [
       ...(this.opts.lab ? [] : [{ label: L('Auto', 'Auto'), value: 'auto' as const }]),
       ...LEVELS.map((l) => ({ label: LEVEL_NAMES[l], value: l })),
@@ -180,8 +201,8 @@ export class Card {
       puzzle: this.def.id,
       className: 'game-settings',
       body: [
-        h('h3', null, L('Difficulty', 'Difficulté')),
-        seg('level', options, current, pickLevel),
+        daily ? null : h('h3', null, L('Difficulty', 'Difficulté')),
+        daily ? null : seg('level', options, current, pickLevel),
         this.opts.lab
           ? null
           : h(
@@ -205,14 +226,16 @@ export class Card {
               close();
               this.finish(this.opts.lab ? 'failed' : 'skipped');
             }),
-        btn(
-          L('New puzzle', 'Nouvelle partie'),
-          () => {
-            close();
-            this.mount({ level: this.level });
-          },
-          'primary',
-        ),
+        daily
+          ? null
+          : btn(
+              L('New puzzle', 'Nouvelle partie'),
+              () => {
+                close();
+                this.mount({ level: this.level });
+              },
+              'primary',
+            ),
       ],
       onClose: resume,
     });
@@ -251,7 +274,13 @@ export class Card {
 
   private syncLevelSel() {
     const auto = !this.opts.lab && !this.shared && !prefs(this.def.id).manual;
-    const tag = this.shared ? ` · ${L('shared', 'partagée')}` : auto ? ' · auto' : '';
+    const tag = this.opts.daily
+      ? ` · ${L('daily', 'du jour')} ${this.opts.daily.index + 1}`
+      : this.shared
+        ? ` · ${L('shared', 'partagée')}`
+        : auto
+          ? ' · auto'
+          : '';
     this.levelEl.textContent = LEVEL_NAMES[this.level] + tag;
   }
 
@@ -295,6 +324,8 @@ export class Card {
 
   mount(launch: Launch | null = this.launch) {
     this.launch = null; // the launch options only apply to the first mount
+    // A daily card always replays its own puzzle.
+    if (this.opts.daily) launch = { level: this.opts.daily.level, seed: this.opts.seed, resume: launch?.resume };
     this.gen++;
     const gen = this.gen;
     this.inst.destroy?.();
@@ -381,7 +412,7 @@ export class Card {
       state = undefined;
     }
     putSave(
-      this.def.id,
+      this.saveId,
       {
         seed: this.seed,
         level: this.level,
@@ -392,7 +423,7 @@ export class Card {
         locale: locale(),
         ...(this.reached ? { reached: true as const } : {}),
       },
-      this.shared,
+      this.slot,
     );
   }
 
@@ -446,9 +477,10 @@ export class Card {
   }
 
   private recordResult(o: 'solved' | 'failed' | 'skipped', ms: number) {
+    const daily = this.opts.daily;
     const res = record(
       this.def.id,
-      { d: this.level, o, ms, m: this.mistakes, ...(this.shared ? { sh: true as const } : {}) },
+      { d: this.level, o, ms, m: this.mistakes, ...(this.shared ? { sh: true as const } : {}), ...(daily ? { dy: true as const } : {}) },
       this.def.par(this.level) * 1000,
     );
     telemetry.track('puzzle.result', {
@@ -457,12 +489,13 @@ export class Card {
       'puzzle.outcome': o,
       'puzzle.duration_ms': ms,
       'puzzle.mistakes': this.mistakes,
-      'puzzle.mode': this.opts.lab ? 'lab' : this.shared ? 'shared' : 'feed',
+      'puzzle.mode': daily ? 'daily' : this.opts.lab ? 'lab' : this.shared ? 'shared' : 'feed',
       'puzzle.auto_level': !this.opts.lab && !this.shared && !prefs(this.def.id).manual,
       'puzzle.personal_best': !!res.best,
       'puzzle.first_clear': o === 'solved' && res.prevBest == null,
       'puzzle.level_change': res.levelChange ? res.levelChange.to - res.levelChange.from : 0,
     });
+    if (daily) recordDaily(daily.date, daily.level, daily.index, o, ms, this.mistakes);
     return res;
   }
 
@@ -473,7 +506,7 @@ export class Card {
     if (early) o = 'solved';
     const ms = early ? early.ms : Math.round(this.time());
     this.done = true;
-    clearSave(this.def.id, this.seed, this.shared);
+    clearSave(this.saveId, this.seed, this.slot);
     this.setActive(false);
     this.active = true; // still the visible card; just stop the clock
     this.stage.inert = true;
@@ -513,14 +546,20 @@ export class Card {
       );
     }
 
+    const daily = !!this.opts.daily;
     this.foot.replaceChildren(
       h('span', { class: 'status result' }, ...parts),
       h(
         'div',
         { class: 'actions' },
         this.opts.lab ? btn(L('Share', 'Partager'), () => this.openShare(), 'ghost') : null,
+        daily && o !== 'solved' ? btn(L('Try again', 'Réessayer'), () => this.mount(), 'ghost') : null,
         this.opts.lab ? null : btn(L('Again', 'Rejouer'), () => this.mount(), 'ghost'),
-        btn(this.opts.lab ? L('New puzzle', 'Nouvelle partie') : L('Next ↓', 'Suivant ↓'), () => this.onNext(this), 'primary'),
+        btn(
+          daily ? L('Next', 'Suivant') : this.opts.lab ? L('New puzzle', 'Nouvelle partie') : L('Next ↓', 'Suivant ↓'),
+          () => this.onNext(this),
+          'primary',
+        ),
       ),
     );
 

@@ -13,7 +13,27 @@ export interface Result {
   at: number;
   /** Played from a share code: counts in stats, never in auto-levelling. */
   sh?: true;
+  /** A daily challenge puzzle: counts in stats, never in auto-levelling. */
+  dy?: true;
 }
+
+/** One puzzle of a daily list, with the player's progress on it. */
+export interface DailyEntry {
+  id: string;
+  seed: number;
+  /** Best outcome so far: solved beats failed (a failed or skipped daily can be retried). */
+  o?: 'solved' | 'failed';
+  /** Time and mistakes of the solve. */
+  ms?: number;
+  m?: number;
+  /** Attempts that ended (solved, failed or skipped). */
+  tries?: number;
+  /** When it was solved. */
+  at?: number;
+}
+
+/** A day's daily lists, one per difficulty, stored the first time the player opens one. */
+type DailyDay = Partial<Record<Difficulty, DailyEntry[]>>;
 
 export interface TypePrefs {
   level: Difficulty;
@@ -46,12 +66,25 @@ export interface Profile {
   stats: Record<string, TypeStats>;
   /** solved count per local day (YYYY-MM-DD) */
   days: Record<string, number>;
+  /** Daily challenges by calendar date (YYYY-MM-DD). */
+  daily: Record<string, DailyDay>;
 }
 
 const KEY = 'puzzle-express:v1';
 
 function fresh(): Profile {
-  return { v: 1, name: '', created: Date.now(), theme: 'system', autoAdvance: true, startLevel: 1, types: {}, stats: {}, days: {} };
+  return {
+    v: 1,
+    name: '',
+    created: Date.now(),
+    theme: 'system',
+    autoAdvance: true,
+    startLevel: 1,
+    types: {},
+    stats: {},
+    days: {},
+    daily: {},
+  };
 }
 
 function load(): Profile {
@@ -142,7 +175,7 @@ export interface RecordOutcome {
 /**
  * Record a finished puzzle and run auto-levelling.
  * Level goes up after 3 clean solves within par (or 2 very fast flawless ones) at the current level,
- * and down after 2 failures/skips in a row. Manual levels and shared puzzles (`sh`) never move it.
+ * and down after 2 failures/skips in a row. Manual levels, shared (`sh`) and daily (`dy`) puzzles never move it.
  */
 export function record(id: string, r: Omit<Result, 'at'>, parMs: number): RecordOutcome {
   const s = stats(id);
@@ -168,8 +201,8 @@ export function record(id: string, r: Omit<Result, 'at'>, parMs: number): Record
   s.recent.push(res);
   if (s.recent.length > 30) s.recent.splice(0, s.recent.length - 30);
 
-  if (!p.manual && !r.sh) {
-    const rel = s.recent.filter((x) => x.d === p.level && x.at >= p.since && !x.sh);
+  if (!p.manual && !r.sh && !r.dy) {
+    const rel = s.recent.filter((x) => x.d === p.level && x.at >= p.since && !x.sh && !x.dy);
     const last3 = rel.slice(-3);
     const last2 = rel.slice(-2);
     const good = (x: Result) => x.o === 'solved' && x.ms <= parMs && x.m <= 1;
@@ -190,6 +223,29 @@ export function record(id: string, r: Omit<Result, 'at'>, parMs: number): Record
   if (out.levelChange) emit('level', id);
   emit('record', id);
   return out;
+}
+
+/** The stored daily list for `date` at `level`; `make` builds (and stores) it the first time. */
+export function dailyList(date: string, level: Difficulty, make: () => { id: string; seed: number }[]): DailyEntry[] {
+  const day = (profile.daily[date] ??= {});
+  if (!day[level]) {
+    day[level] = make().map(({ id, seed }) => ({ id, seed }));
+    save();
+  }
+  return day[level];
+}
+
+/** Record the end of an attempt at a daily puzzle. A solve sticks; later attempts don't overwrite it. */
+export function recordDaily(date: string, level: Difficulty, index: number, o: 'solved' | 'failed' | 'skipped', ms: number, m: number) {
+  const e = profile.daily[date]?.[level]?.[index];
+  if (!e) return;
+  e.tries = (e.tries ?? 0) + 1;
+  if (e.o !== 'solved') {
+    if (o === 'solved') Object.assign(e, { o, ms, m, at: Date.now() });
+    else e.o = 'failed';
+  }
+  save();
+  emit('record');
 }
 
 export function dayStreak(): number {

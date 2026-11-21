@@ -7,6 +7,8 @@ import { dayStreak, getProfile, onChange } from './core/store';
 import { LEVELS, type Difficulty } from './core/types';
 import { cogIcon, h, s } from './core/ui';
 import { LabView } from './pages/lab';
+import { renderDaily } from './pages/daily';
+import { dailyDate, getDaily } from './core/daily';
 import { renderLabs } from './pages/labs';
 import { renderSettings } from './pages/settings';
 import { renderStats } from './pages/stats';
@@ -28,6 +30,7 @@ const icon = (...paths: string[]) =>
   s('svg', { viewBox: '0 0 24 24', class: 'tab-icon', 'aria-hidden': 'true' }, ...paths.map((d) => s('path', { d })));
 const ICONS = {
   feed: () => icon('M5 4h14v7H5z', 'M5 15h14v5H5z'),
+  daily: () => icon('M4 6h16v14H4z', 'M4 10h16', 'M8 3v5', 'M16 3v5', 'M9 15l2 2 4-4'),
   labs: () => icon('M9 3h6', 'M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3', 'M7.5 15h9'),
   stats: () => icon('M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M4 21c1-4 4-6 8-6s7 2 8 6'),
   settings: () => cogIcon('tab-icon'),
@@ -36,6 +39,7 @@ const tab = (key: keyof typeof ICONS, href: string, label: string) =>
   h('a', { href, class: 'tab', 'data-tab': key }, ICONS[key](), h('span', null, label));
 const tabs = {
   feed: tab('feed', '#/', L('Feed', 'Fil')),
+  daily: tab('daily', '#/daily', L('Daily', 'Défis')),
   labs: tab('labs', '#/games', L('Games', 'Jeux')),
   stats: tab('stats', '#/stats', L('Profile', 'Profil')),
   settings: tab('settings', '#/settings', L('Settings', 'Réglages')),
@@ -68,7 +72,7 @@ function updateStreak() {
   streak.textContent = n > 1 ? L(`${n} day streak`, `${n} jours de suite`) : '';
 }
 
-type View = 'feed' | 'labs' | 'lab' | 'stats' | 'settings';
+type View = 'feed' | 'daily' | 'labs' | 'lab' | 'stats' | 'settings';
 let labOpen: string | null = null;
 
 const safeDecode = (str: string) => {
@@ -92,8 +96,13 @@ function route() {
   const sharedOk = shared && 'def' in shared ? shared : undefined;
   const def = sharedOk?.def ?? PUZZLES.find((p) => p.id === arg);
   // #/games (alias #/labs) lists games; #/game/<id> (alias #/lab/<id>) opens one.
-  let view: View = r === 'stats' || r === 'settings' ? r : r === 'labs' || r === 'games' || codeError ? 'labs' : 'feed';
+  let view: View = r === 'stats' || r === 'settings' || r === 'daily' ? r : r === 'labs' || r === 'games' || codeError ? 'labs' : 'feed';
   if (((r === 'lab' || r === 'game') && def) || sharedOk) view = 'lab';
+
+  // #/daily/<level> shows that level's list; #/daily/<level>/<n> plays its n-th puzzle.
+  const dailyLevel = r === 'daily' && LEVELS.includes(Number(arg) as Difficulty) ? (Number(arg) as Difficulty) : undefined;
+  const daily = dailyLevel && sub ? openDaily(dailyLevel, Number(sub) - 1) : false;
+  if (daily) view = 'lab';
 
   // Feed (optionally a single-puzzle "endless" feed)
   const only = r === 'play' && def ? def.id : null;
@@ -102,7 +111,9 @@ function route() {
   if (only && def) practice.replaceChildren(h('span', { class: 'swatchlet', 'data-puzzle': def.id }), `${def.name} ✕`);
 
   // Lab: #/lab/<id> resumes (or starts) · #/lab/<id>/new/<level> starts fresh
-  if (sharedOk) {
+  if (daily) {
+    // opened by openDaily()
+  } else if (sharedOk) {
     const key = `s:${sharedOk.code.id}-${sharedOk.code.level}-${sharedOk.code.seed}`;
     if (labOpen !== key) {
       lab.open(sharedOk.def, undefined, sharedOk.code);
@@ -119,7 +130,7 @@ function route() {
     lab.setShown(false);
   }
 
-  const activeTab = view === 'lab' ? 'labs' : view;
+  const activeTab = daily ? 'daily' : view === 'lab' ? 'labs' : view;
   for (const [k, a] of Object.entries(tabs)) a.classList.toggle('on', k === activeTab && !(k === 'feed' && only));
 
   feed.el.hidden = view !== 'feed';
@@ -127,11 +138,37 @@ function route() {
   page.hidden = view === 'feed' || view === 'lab';
   feed.setShown(view === 'feed');
   lab.setShown(view === 'lab');
+  if (view === 'daily') renderDaily(page, PUZZLES, dailyLevel);
   if (view === 'labs') renderLabs(page, PUZZLES, codeError);
   if (view === 'stats') renderStats(page, PUZZLES);
   if (view === 'settings') renderSettings(page, PUZZLES);
   if (!page.hidden) page.scrollTop = 0;
   updateStreak();
+}
+
+/** Open puzzle `index` of today's `level` list in the lab view. False when there's no such puzzle. */
+function openDaily(level: Difficulty, index: number): boolean {
+  const date = dailyDate();
+  const list = getDaily(date, level, PUZZLES);
+  const entry = list[index];
+  const def = entry && PUZZLES.find((p) => p.id === entry.id);
+  if (!def) {
+    history.replaceState(null, '', `#/daily/${level}`);
+    return false;
+  }
+  const key = `d:${date}:${level}:${index}`;
+  if (labOpen !== key) {
+    lab.openDaily(def, entry, { date, level, index }, list.length, () => {
+      // Next: the following unsolved puzzle of the list (wrapping around), or back to the list.
+      const n = list.length;
+      const next = Array.from({ length: n - 1 }, (_, k) => (index + 1 + k) % n).find(
+        (i) => list[i].o !== 'solved' && PUZZLES.some((p) => p.id === list[i].id),
+      );
+      location.hash = next == null ? `#/daily/${level}` : `#/daily/${level}/${next + 1}`;
+    });
+    labOpen = key;
+  }
+  return true;
 }
 
 onChange((kind) => {
