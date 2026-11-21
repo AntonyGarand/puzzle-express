@@ -1,5 +1,5 @@
-import { sheetOpen } from '../core/sheet';
-import { L, locale } from '../core/i18n';
+import { openSheet, sheetOpen } from '../core/sheet';
+import { L, locale, setLocale, setWordLocale, wordLocale, type Locale } from '../core/i18n';
 import { Card, type DailyRef } from '../core/card';
 import { dailySaveKey, getSave } from '../core/saves';
 import type { DailyEntry } from '../core/store';
@@ -13,6 +13,10 @@ export class LabView {
   readonly el = h('div', { class: 'lab' });
   private card: Card | null = null;
   private shown = false;
+  /** Word list of the open puzzle when it isn't the interface language's (a shared word puzzle). */
+  private words: Locale | null = null;
+  /** Explain the language mismatch once the lab is on screen. */
+  private notice: Locale | null = null;
 
   constructor() {
     window.setInterval(() => this.card?.tick(), 250);
@@ -33,6 +37,7 @@ export class LabView {
    */
   open(def: PuzzleDef, level?: Difficulty, shared?: ShareCode) {
     this.close();
+    this.useWords(def, shared);
     const sharedSave = shared && getSave(def.id, 'shared');
     const saved = shared
       ? sharedSave && sharedSave.seed === shared.seed && sharedSave.level === shared.level
@@ -41,10 +46,11 @@ export class LabView {
       : level
         ? undefined
         : getSave(def.id);
-    const save = saved && (!def.localized || (saved.locale ?? 'en') === locale()) ? saved : undefined;
+    const save = saved && (!def.localized || (saved.locale ?? 'en') === wordLocale()) ? saved : undefined;
     const start = (lvl?: Difficulty, resume = save, code = shared) => {
       this.card?.setActive(false);
       this.card?.destroy();
+      this.useWords(def, code); // "New puzzle" after a shared one goes back to your own language
       const note = h('span', { class: 'small muted' });
       const card = new Card(def, (c) => start(c.level, undefined, undefined), {
         lab: true,
@@ -79,6 +85,8 @@ export class LabView {
       card.setActive(this.shown && !document.hidden);
     };
     start(level);
+    this.notice = this.words;
+    if (this.shown) this.showNotice();
   }
 
   /**
@@ -120,12 +128,62 @@ export class LabView {
   }
   setShown(shown: boolean) {
     this.shown = shown;
+    // The feed and the rest of the app always use the interface language's words.
+    setWordLocale(shown ? this.words : null);
     this.card?.setActive(shown && !document.hidden);
+    if (shown) this.showNotice();
   }
 
   close() {
     this.card?.setActive(false);
     this.card?.destroy();
     this.card = null;
+    this.useWords();
+  }
+
+  /** A shared word puzzle keeps the word list it was made with, whatever the interface language. */
+  private useWords(def?: PuzzleDef, code?: ShareCode) {
+    const l = def?.localized && code ? (code.locale ?? 'en') : null;
+    this.words = l && l !== locale() ? l : null;
+    setWordLocale(this.words);
+  }
+
+  /** "This puzzle is in French": play it as is, or switch the whole interface to its language. */
+  private showNotice() {
+    const l = this.notice;
+    const card = this.card;
+    if (!l || !card) return;
+    this.notice = null;
+    const name = l === 'fr' ? L('French', 'français') : L('English', 'anglais');
+    const own = locale() === 'fr' ? L('French', 'français') : L('English', 'anglais');
+    card.setActive(false);
+    const close = openSheet({
+      title: L(`This puzzle is in ${name}`, `Cette partie est en ${name}`),
+      puzzle: card.def.id,
+      className: 'language-sheet',
+      body: [
+        h(
+          'p',
+          null,
+          L(
+            `You can play it right here, but the words to find are in ${name}.`,
+            `Vous pouvez y jouer tel quel, mais les mots à trouver sont en ${name}.`,
+          ),
+        ),
+        h(
+          'p',
+          { class: 'muted small' },
+          L(
+            `Prefer the whole interface in ${name}? You can switch back anytime in Settings.`,
+            `Vous préférez toute l’interface en ${name}? Vous pourrez revenir en arrière en tout temps dans les Réglages.`,
+          ),
+        ),
+      ],
+      footer: [
+        btn(L(`Keep ${own}`, `Garder le ${own}`), () => close(), 'ghost'),
+        btn(L(`Switch to ${name}`, `Passer en ${name}`), () => setLocale(l), 'primary'),
+      ],
+      onClose: () => this.card === card && card.setActive(this.shown && !document.hidden),
+    });
   }
 }

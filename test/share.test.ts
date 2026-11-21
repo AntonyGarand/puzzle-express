@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import { afterAll, describe, expect, it } from 'vitest';
-import { _setLocaleForTests } from '../src/core/i18n';
+import { _setLocaleForTests, setWordLocale, wordLocale } from '../src/core/i18n';
 import { decodeCode, encodeCode, resolveCode } from '../src/core/share';
 import { PUZZLES } from '../src/puzzles';
+import { answers } from '../src/puzzles/wordkit/lexicon';
 
 afterAll(() => _setLocaleForTests('en'));
 
@@ -39,10 +40,27 @@ describe('share codes', () => {
     expect('def' in ok && ok.def.id).toBe('killer-sudoku');
     expect('error' in resolveCode('nope-1-a', PUZZLES)).toBe(true);
     expect('error' in resolveCode('garbage', PUZZLES)).toBe(true);
-    // Word games are tied to the locale's word list.
-    expect('error' in resolveCode('anagram-1-a-fr', PUZZLES)).toBe(true);
-    expect('def' in resolveCode('anagram-1-a', PUZZLES)).toBe(true);
+    // Word puzzles from either language resolve, keeping the language they were made in.
+    const fr = resolveCode('anagram-1-a-fr', PUZZLES);
+    expect('code' in fr && fr.code.locale).toBe('fr');
     _setLocaleForTests('fr');
-    expect('def' in resolveCode('anagram-1-a-fr', PUZZLES)).toBe(true);
+    const en = resolveCode('anagram-1-a', PUZZLES);
+    expect('code' in en && en.code.locale).toBeUndefined();
+  });
+
+  it('plays a word puzzle with its own language’s words, whatever the interface language', () => {
+    _setLocaleForTests('en');
+    const words = () => {
+      setWordLocale('fr');
+      const w = answers(5).slice(0, 20);
+      setWordLocale(null);
+      return w;
+    };
+    const fromEn = words();
+    _setLocaleForTests('fr');
+    expect(words()).toEqual(fromEn);
+    expect(wordLocale()).toBe('fr');
+    _setLocaleForTests('en');
+    expect(fromEn).not.toEqual(answers(5).slice(0, 20));
   });
 });

@@ -5,7 +5,7 @@
 // - The full validation dictionary of the current locale (en ~40k, fr ~85k words) is a lazily loaded
 //   chunk, fetched at module init for the page's locale (or on first use for the other one, in tests).
 // All words are lowercase a–z: French is folded (é→e, ç→c, œ→oe), see fold().
-import { locale, type Locale } from '../../core/i18n';
+import { wordLocale, type Locale } from '../../core/i18n';
 import { WORDS } from '../words';
 import { COMMON_RAW } from './common';
 import { ANSWERS_FR, OTHER_FR } from './common-fr';
@@ -96,7 +96,7 @@ function french(): Lang {
 }
 
 const langs: Partial<Record<Locale, Lang>> = {};
-const lang = (l: Locale = locale()): Lang => (langs[l] ??= l === 'fr' ? french() : english());
+const lang = (l: Locale = wordLocale()): Lang => (langs[l] ??= l === 'fr' ? french() : english());
 
 /** The bundled common words of the current locale. */
 export const commonSet = () => lang().common;

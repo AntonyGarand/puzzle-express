@@ -1,4 +1,4 @@
-import { locale, type Locale } from '../../core/i18n';
+import { wordLocale, type Locale } from '../../core/i18n';
 import type { Rng } from '../../core/rng';
 import { commonSet } from './lexicon';
 
@@ -8,10 +8,10 @@ interface Node {
 }
 const tries: Partial<Record<Locale, Node>> = {};
 function root(): Node {
-  const have = tries[locale()];
+  const have = tries[wordLocale()];
   if (have) return have;
   const trie: Node = { k: new Map() };
-  tries[locale()] = trie;
+  tries[wordLocale()] = trie;
   for (const w of commonSet()) {
     if (w.length < 3) continue;
     let n = trie;
@@ -143,9 +143,9 @@ const roll = (rng: Rng, weights: [string, number][], total: number) => {
 
 /** Generate a grid with plenty of common words. Returns letters + the common words in it. */
 export function makeGrid(rng: Rng, n: number, minLen: number, minPoints: number) {
-  const weights = WEIGHTS[locale()];
+  const weights = WEIGHTS[wordLocale()];
   const total = weights.reduce((s, [, w]) => s + w, 0);
-  const odds = ODD[locale()];
+  const odds = ODD[wordLocale()];
   let best: { letters: string[]; words: Set<string>; pts: number } | null = null;
   for (let attempt = 0; attempt < 80; attempt++) {
     const letters = Array.from({ length: n * n }, () => roll(rng, weights, total));

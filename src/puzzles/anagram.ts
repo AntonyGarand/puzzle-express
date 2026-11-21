@@ -1,4 +1,4 @@
-import { L, locale } from '../core/i18n';
+import { L, wordLocale } from '../core/i18n';
 import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, shake } from '../core/ui';
 import { answers, commonOfLength, isWord, letterKey } from './wordkit/lexicon';
@@ -47,7 +47,7 @@ export const anagram: PuzzleDef = {
   create(ctx) {
     const { root, rng, difficulty: d } = ctx;
     const len = byLevel(d, [4, 5, 6, 7, 8]);
-    const fr = locale() === 'fr';
+    const fr = wordLocale() === 'fr';
     const word = rng.pick(fr ? answers(len) : WORDS[len]);
     const key = anagramKey(word);
     // French: any common word with the same letters (and, once loaded, any dictionary word) also counts.

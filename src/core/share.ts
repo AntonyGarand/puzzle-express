@@ -1,4 +1,4 @@
-import { L, locale, type Locale } from './i18n';
+import { L, type Locale } from './i18n';
 import { LEVELS, type Difficulty } from './types';
 import { h } from './ui';
 
@@ -85,11 +85,11 @@ export function shareSection(code: string, title: string): HTMLElement {
   return h('div', { class: 'share' }, h('div', { class: 'share-row' }, field, codeBtn, linkBtn), note);
 }
 
-/** Turn what the player typed or opened into a playable puzzle, or a friendly error. */
-export function resolveCode<D extends { id: string; localized?: boolean }>(
-  input: string,
-  defs: D[],
-): { def: D; code: ShareCode } | { error: string } {
+/**
+ * Turn what the player typed or opened into a playable puzzle, or a friendly error. A word puzzle from the
+ * other language still resolves: it's played with that language's word list (see LabView).
+ */
+export function resolveCode<D extends { id: string }>(input: string, defs: D[]): { def: D; code: ShareCode } | { error: string } {
   if (!input.trim()) return { error: L('Enter a puzzle code first.', 'Entrez d’abord un code de partie.') };
   const code = decodeCode(input);
   if (!code)
@@ -101,21 +101,5 @@ export function resolveCode<D extends { id: string; localized?: boolean }>(
     };
   const def = defs.find((d) => d.id === code.id);
   if (!def) return { error: L(`There’s no game called “${code.id}”.`, `Aucun jeu ne s’appelle « ${code.id} ».`) };
-  if (def.localized) {
-    const want = code.locale ?? 'en';
-    if (want !== locale())
-      return {
-        error:
-          want === 'fr'
-            ? L(
-                'This word puzzle is from the French version. Switch the language to French in Settings to play it.',
-                'Cette partie de mots vient de la version française. Passez au français dans les Réglages pour y jouer.',
-              )
-            : L(
-                'This word puzzle is from the English version. Switch the language to English in Settings to play it.',
-                'Cette partie de mots vient de la version anglaise. Passez à l’anglais dans les Réglages pour y jouer.',
-              ),
-      };
-  }
   return { def, code };
 }
