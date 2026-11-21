@@ -2,15 +2,14 @@ import './solitaire.css';
 import { L, P } from '../core/i18n';
 import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, shake } from '../core/ui';
-import { cap, cardEl, deck, elAt, fan, isRed, label, leCard, pileEl, rank, slotEl, suit, SUITS, tableEl, topEl } from './cardkit/cards';
+import { cap, cardEl, elAt, fan, isRed, label, leCard, pileEl, rank, slotEl, suit, SUITS, tableEl, topEl } from './cardkit/cards';
 import {
   bestDest,
   canDraw,
   canRedeal,
-  dealK,
+  genK,
   draw,
   finishK,
-  greedyK,
   hasProgress,
   moveK,
   picked,
@@ -89,11 +88,7 @@ export const solitaire: PuzzleDef = {
       { draw: 3, redeals: -1 },
       { draw: 3, redeals: 2 },
     ]);
-    // Bias toward deals a quick greedy player can win (deterministic attempt budget).
-    const biasRules: KRules = d === 5 ? { draw: 3, redeals: -1 } : rules;
-    const tries = byLevel(d, [500, 500, 500, 600, 600]);
-    let s: KState = dealK(deck(rng));
-    for (let t = 0; t < tries && !greedyK(s, biasRules); t++) s = dealK(deck(rng));
+    let s = genK(rng, rules);
 
     const hist = new History<KState>(80);
     const sv = ctx.saved as { s?: unknown; hist?: unknown } | undefined;
@@ -162,14 +157,12 @@ export const solitaire: PuzzleDef = {
         ctx.solved();
         return;
       }
+      // Nothing can ever be flipped, played home or taken from the talon again: cycling the stock
+      // (even with unlimited redeals) or shuffling runs around won't change that.
       if (!hasProgress(s, rules)) {
-        if (!canRedeal(s, rules)) {
-          over = true;
-          status(L('No moves left', 'Aucun coup possible'));
-          ctx.failed();
-          return;
-        }
-        status(L('No useful moves left · Undo or skip', 'Plus de coup utile · Annulez ou passez'));
+        over = true;
+        status(L('No useful moves left', 'Plus aucun coup utile'));
+        ctx.failed();
         return;
       }
       status();

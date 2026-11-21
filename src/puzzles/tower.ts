@@ -197,10 +197,11 @@ export const tower: PuzzleDef = {
     whenDict(() => {
       if (!won) status();
     });
-    /** Next word on a shortest ladder from `w` to the goal: the built path, else a BFS over common words. */
+    /** Next word on a shortest ladder from `w` to the goal, skipping words already used: the built path, else a BFS over common words. */
     const nextWord = (w: string): string | null => {
       const k = path.indexOf(w);
-      if (k >= 0 && k < path.length - 1) return path[k + 1];
+      const used = new Set([start, ...rungs]);
+      if (k >= 0 && k < path.length - 1 && !used.has(path[k + 1])) return path[k + 1];
       const words = new Set(commonOfLength(len));
       const prev = new Map<string, string>([[w, '']]);
       let frontier = [w];
@@ -210,7 +211,7 @@ export const tower: PuzzleDef = {
           for (let i = 0; i < len; i++)
             for (let ch = 97; ch <= 122; ch++) {
               const v = u.slice(0, i) + String.fromCharCode(ch) + u.slice(i + 1);
-              if ((!words.has(v) && v !== goal) || prev.has(v)) continue;
+              if ((!words.has(v) && v !== goal) || prev.has(v) || used.has(v)) continue;
               prev.set(v, u);
               if (v === goal) {
                 let x = v;

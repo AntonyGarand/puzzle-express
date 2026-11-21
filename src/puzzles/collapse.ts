@@ -2,7 +2,7 @@ import { L, P } from '../core/i18n';
 import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, PALETTE, shake } from '../core/ui';
 import { anim } from './movekit/kit';
-import { genCollapse, groupAt, hasMove, removeCells, type Cols } from './playkit/collapse-gen';
+import { genCollapse, groupAt, hasMove, removeCells, stranded, type Cols } from './playkit/collapse-gen';
 import './collapse.css';
 
 /** Palette slots used for the blocks (well apart from each other in both themes). */
@@ -102,7 +102,9 @@ export const collapse: PuzzleDef = {
           : L('Goal: clear every block', 'Objectif : retirer tous les blocs');
       goalEl.classList.toggle('met', n <= target);
       ctx.status(
-        `${L(`Score ${score}`, `Pointage ${score}`)} · ${P(n, ['block left', 'blocks left'], ['bloc restant', 'blocs restants'])}`,
+        `${L(`Score ${score}`, `Pointage ${score}`)} · ${P(n, ['block left', 'blocks left'], ['bloc restant', 'blocs restants'])}${
+          !over && stranded(cols) > target ? L(' · goal out of reach, undo', ' · objectif hors d’atteinte, annulez') : ''
+        }`,
       );
     };
 

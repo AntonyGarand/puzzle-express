@@ -42,6 +42,16 @@ function regionSize(g: number[], n: number): number {
   return seen.size;
 }
 
+/**
+ * Every colour still outside the corner area costs at least one more move, so the board is lost when
+ * there are more of them than moves left.
+ */
+export function outOfReach(g: number[], n: number, left: number): boolean {
+  const mine = new Set(flood(g, n, g[0] === 0 ? 1 : 0).flatMap((v, i) => (v !== g[i] ? [i] : [])));
+  const colours = new Set(g.filter((_, i) => !mine.has(i)));
+  return colours.size > left;
+}
+
 /** Colour names for the guide, matching PALETTE (French as nouns: « le vert »). */
 const NAMES_EN = ['orange', 'blue', 'green', 'yellow', 'purple', 'teal', 'pink', 'lime'];
 const NAMES_FR = ['l’orange', 'le bleu', 'le vert', 'le jaune', 'le violet', 'le turquoise', 'le rose', 'le lime'];
@@ -71,8 +81,8 @@ export const floodPuzzle: PuzzleDef = {
         'Le compteur au-dessus de la grille indique combien de coups il vous reste; il devient rouge vers la fin.',
       ),
       L(
-        'Cover the board before the counter reaches 0 to win. Run out of moves first and the game is lost.',
-        'Couvrez la grille avant que le compteur tombe à 0 pour gagner. Si vos coups s’épuisent avant, la partie est perdue.',
+        'Cover the board before the counter reaches 0 to win. The game is lost once more colours are left than moves.',
+        'Couvrez la grille avant que le compteur tombe à 0 pour gagner. La partie est perdue dès qu’il reste plus de couleurs que de coups.',
       ),
     ],
     tips: [
@@ -158,7 +168,10 @@ export const floodPuzzle: PuzzleDef = {
       moves++;
       render();
       if (regionSize(g, n) === n * n) ctx.solved();
-      else if (moves >= limit) ctx.failed();
+      else if (moves >= limit || outOfReach(g, n, limit - moves)) {
+        if (moves < limit) ctx.status(L('Too many colours left for your moves', 'Trop de couleurs restantes pour vos coups'));
+        ctx.failed();
+      }
     };
     const sv = ctx.saved as { g?: number[]; moves?: number } | undefined;
     if (sv?.g?.length === g.length) {

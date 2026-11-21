@@ -3,7 +3,7 @@ import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, pad, s, shake } from '../core/ui';
 import { anim, keyDir, type Dir } from './movekit/kit';
 import { solvePush } from './movekit/push-hint';
-import { generateRoom, stepper } from './movekit/pushgen';
+import { generateRoom, liveCells, stepper, stuckCrates } from './movekit/pushgen';
 import './push.css';
 
 const LETTERS = 'urdl';
@@ -65,6 +65,7 @@ export const push: PuzzleDef = {
     const { floor, targets } = room;
     const nb = stepper(w, hh);
     const tset = new Set(targets);
+    const live = liveCells(w, hh, floor, targets);
 
     let player = room.player;
     let boxes = room.boxes.slice();
@@ -160,7 +161,13 @@ export const push: PuzzleDef = {
       const moves = history.reduce((a, act) => a + act.length, drag?.cur.length ?? 0);
       const home = boxes.filter((b) => tset.has(b)).length;
       const ms = P(moves, ['move', 'moves'], ['pas', 'pas']);
-      ctx.status(L(`${home}/${boxes.length} home · ${ms}`, `${home}/${boxes.length} · ${ms}`));
+      // A crate wedged where it can never reach a target: say so (Undo/Restart get out of it).
+      const stuck = stuckCrates(w, hh, floor, targets, boxes, live).length;
+      ctx.status(
+        stuck
+          ? `${P(stuck, ['crate stuck', 'crates stuck'], ['caisse coincée', 'caisses coincées'])} · ${L('undo', 'annulez')}`
+          : L(`${home}/${boxes.length} home · ${ms}`, `${home}/${boxes.length} · ${ms}`),
+      );
     };
     const after = (rec: string) => {
       if (!rec) return;

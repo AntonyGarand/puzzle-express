@@ -1,4 +1,5 @@
-import { isRed, rank, suit, type Card } from './cards';
+import type { Rng } from '../../core/rng';
+import { deck, isRed, rank, suit, type Card } from './cards';
 
 /** Klondike rules engine (pure; no DOM). */
 interface KCol {
@@ -19,7 +20,7 @@ export interface KRules {
   redeals: number;
 }
 
-export function dealK(cards: Card[]): KState {
+function dealK(cards: Card[]): KState {
   const c = cards.slice();
   const tab: KCol[] = [];
   for (let i = 0; i < 7; i++) {
@@ -148,10 +149,11 @@ function talonTops(s: KState, r: KRules): Card[] {
 const keyK = (s: KState) => s.found.join(',') + '|' + s.tab.map((t) => t.d.length + ':' + t.u.join('.')).join('/');
 
 /**
- * Is real progress still possible? Searches short chains of tableau / foundation→tableau shuffles
- * for a foundation play, a flip, or a talon play. Errs on the side of "yes".
+ * Is real progress still possible? Searches every chain of tableau / foundation→tableau shuffles
+ * for a foundation play, a flip, or a talon play (the talon shows the same cards on every pass, so
+ * one more pass covers them all). Exact unless the node cap is hit, where it answers "yes".
  */
-export function hasProgress(s0: KState, r: KRules, depth = 3, cap = 1500): boolean {
+export function hasProgress(s0: KState, r: KRules, cap = 3000): boolean {
   if (wonK(s0)) return true;
   const tops = talonTops(s0, r);
   const seen = new Set<string>();
@@ -169,10 +171,9 @@ export function hasProgress(s0: KState, r: KRules, depth = 3, cap = 1500): boole
     }
     return false;
   };
-  const rec = (s: KState, dleft: number): boolean => {
+  const rec = (s: KState): boolean => {
     if (++nodes > cap) return true;
     if (immediate(s)) return true;
-    if (!dleft) return false;
     const k = keyK(s);
     if (seen.has(k)) return false;
     seen.add(k);
@@ -185,7 +186,7 @@ export function hasProgress(s0: KState, r: KRules, depth = 3, cap = 1500): boole
           if (!s.tab[b].u.length && j === 0) continue; // whole column to an empty one: no change
           const n = cloneK(s);
           moveK(n, 't' + a, col.d.length + j, 't' + b);
-          if (rec(n, dleft - 1)) return true;
+          if (rec(n)) return true;
         }
       }
     }
@@ -195,12 +196,12 @@ export function hasProgress(s0: KState, r: KRules, depth = 3, cap = 1500): boole
         if (!fitsCol(s.tab[b], su * 13 + s.found[su] - 1)) continue;
         const n = cloneK(s);
         moveK(n, 'f' + su, 0, 't' + b);
-        if (rec(n, dleft - 1)) return true;
+        if (rec(n)) return true;
       }
     }
     return false;
   };
-  return rec(cloneK(s0), depth);
+  return rec(cloneK(s0));
 }
 
 /** All face-down cards revealed and the talon empty: the rest is mechanical. */
@@ -280,4 +281,14 @@ export function greedyK(s0: KState, r: KRules, maxSteps = 900): boolean {
     if (idle > (s.stock.length + s.waste.length) / r.draw + 3) return false;
   }
   return false;
+}
+
+/**
+ * A deal the greedy player wins under the real rules (so it is certainly winnable). Each deal has at
+ * least a 1.2% chance (Master: draw 3, 3 passes), so 3000 tries all failing is a ~1e-16 event.
+ */
+export function genK(rng: Rng, r: KRules, tries = 3000): KState {
+  let s = dealK(deck(rng));
+  for (let t = 1; t < tries && !greedyK(s, r); t++) s = dealK(deck(rng));
+  return s;
 }

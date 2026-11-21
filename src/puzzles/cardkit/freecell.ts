@@ -1,4 +1,6 @@
-import { isRed, rank, suit, type Card } from './cards';
+import type { Rng } from '../../core/rng';
+import type { Difficulty } from '../../core/types';
+import { deck, isRed, rank, suit, type Card } from './cards';
 
 /** FreeCell rules engine + a small best-first solver (pure; no DOM). */
 export interface FState {
@@ -8,7 +10,7 @@ export interface FState {
   moves: number;
 }
 
-export function dealF(cards: Card[], cells: number): FState {
+function dealF(cards: Card[], cells: number): FState {
   const cas: Card[][] = Array.from({ length: 8 }, () => []);
   cards.forEach((c, i) => cas[i % 8].push(c));
   return { cells: new Array(cells).fill(-1), found: [0, 0, 0, 0], cas, moves: 0 };
@@ -160,7 +162,8 @@ function scoreF(s: FState): number {
   return (52 - home) * 3 + blocked * 2 + (s.cells.length - freeCells(s)) - emptyCols(s) * 2;
 }
 
-function childrenF(s: FState): FState[] {
+/** Successor states. `full` adds every run length to an empty cascade (needed to prove a loss). */
+function childrenF(s: FState, full: boolean): FState[] {
   const out: FState[] = [];
   const push = (n: FState) => {
     autoF(n);
@@ -228,9 +231,10 @@ function childrenF(s: FState): FState[] {
           moveF(n, 't' + a, i, 't' + b);
           push(n);
         }
-        if (i !== col.length - 1 && col.length > 1) {
+        for (let j = i + 1; j < col.length; j++) {
+          if (!full && j !== col.length - 1) continue;
           const n = cloneF(s);
-          moveF(n, 't' + a, col.length - 1, 't' + b);
+          moveF(n, 't' + a, j, 't' + b);
           push(n);
         }
       }
@@ -245,8 +249,14 @@ function childrenF(s: FState): FState[] {
   return out;
 }
 
-/** Best-first search. Returns true if a win was found within `budget` expansions. */
-export function solveF(s0: FState, budget = 3000): boolean {
+/** Solver outcome: a winning line exists, no line exists, or the budget ran out first. */
+type Verdict = 'win' | 'dead' | 'unknown';
+
+/**
+ * Best-first search within `budget` expansions. 'dead' only when every reachable state was seen,
+ * which needs `full` move generation.
+ */
+export function solveF(s0: FState, budget = 3000, full = false): Verdict {
   const start = cloneF(s0);
   autoF(start);
   const seen = new Set<number>([hashF(start)]);
@@ -282,16 +292,51 @@ export function solveF(s0: FState, budget = 3000): boolean {
     return top;
   };
   pushH(start, scoreF(start));
+  if (wonF(start)) return 'win';
   for (let n = 0; n < budget && heap.length; n++) {
     const { s } = popH();
-    if (wonF(s)) return true;
-    for (const c of childrenF(s)) {
-      if (wonF(c)) return true;
+    for (const c of childrenF(s, full)) {
+      if (wonF(c)) return 'win';
       const h = hashF(c);
       if (seen.has(h)) continue;
       seen.add(h);
       pushH(c, scoreF(c));
     }
   }
-  return false;
+  return heap.length || !full ? 'unknown' : 'dead';
+}
+
+// ---------- generator ----------
+
+/** Lift low cards toward the exposed end of their cascades (easier deals). */
+function easeDeal(s: FState, rng: Rng, maxRank: number, depth: number) {
+  for (const col of s.cas) {
+    for (let i = 0; i < col.length; i++) {
+      const r = rank(col[i]);
+      if (r > maxRank) continue;
+      const fromTop = col.length - 1 - i;
+      if (fromTop < depth) continue;
+      // swap with a non-low card near the top
+      const j = col.length - 1 - rng.int(0, depth - 1);
+      if (rank(col[j]) <= maxRank) continue;
+      [col[i], col[j]] = [col[j], col[i]];
+    }
+  }
+}
+
+/**
+ * Deal for a difficulty level that the solver proved winnable: the first deal gets a full search (as
+ * before), later ones a quick look. Each quick look proves at least half of 3-cell deals, so running
+ * out (about 1 in 10^7 on Master, never seen on other levels) is practically impossible.
+ */
+export function genF(d: Difficulty, rng: Rng): FState {
+  const cells = d === 5 ? 3 : 4;
+  for (let t = 0, spent = 0; ; t++) {
+    const s = dealF(deck(rng), cells);
+    if (d === 1) easeDeal(s, rng, 2, 2);
+    else if (d === 2) easeDeal(s, rng, 1, 3);
+    const budget = t ? 1000 : 4000;
+    spent += budget;
+    if (solveF(s, budget) === 'win' || spent >= 25000) return s;
+  }
 }

@@ -1,6 +1,6 @@
 import { L } from '../core/i18n';
-import { byLevel, type Hint, type PuzzleDef } from '../core/types';
-import { board, h, shake } from '../core/ui';
+import { byLevel, type Difficulty, type Hint, type PuzzleDef } from '../core/types';
+import { board, btn, h, shake } from '../core/ui';
 import { anim, baseSeed, GROW, int, isIntArr, keyDir, onSwipe, POP, subRng, type Dir } from './movekit/kit';
 import './merge.css';
 
@@ -44,22 +44,45 @@ export function slideBoard(b: number[], n: number, dir: Dir) {
   return { b: out, moved, gained, merged };
 }
 
+/** Best score per difficulty, kept on this device. */
+const BEST_KEY = 'puzzle-feed:merge:best:v1';
+const readBests = (): Record<string, number> => {
+  try {
+    const v = JSON.parse(localStorage.getItem(BEST_KEY) ?? '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+};
+const getBest = (d: Difficulty) => {
+  const v = readBests()[d];
+  return typeof v === 'number' && v > 0 ? Math.floor(v) : 0;
+};
+const putBest = (d: Difficulty, score: number) => {
+  if (score <= getBest(d)) return;
+  try {
+    localStorage.setItem(BEST_KEY, JSON.stringify({ ...readBests(), [d]: score }));
+  } catch {
+    /* private mode / quota: the best just isn't kept */
+  }
+};
+
 export const canMove = (b: number[], n: number) =>
   b.some((v, i) => !v || (i % n < n - 1 && b[i + 1] === v) || (i + n < n * n && b[i + n] === v));
 
 export const merge: PuzzleDef = {
   id: 'merge',
   get name() {
-    return L('Merge', 'Fusion');
+    return '2048';
   },
   category: 'numbers',
   get rules() {
-    return L('Slide to merge equal tiles. Reach the goal tile.', 'Glissez pour fusionner les tuiles égales. Visez l’objectif.');
+    return L('Merge equal tiles. Reach the goal, then keep going.', 'Fusionnez les tuiles égales. Atteignez l’objectif, et plus.');
   },
   help: () => ({
     goal: L(
-      'Slide the tiles to merge equal numbers and build the goal tile, from 64 on Easy up to 1024 on Master.',
-      'Faites glisser les tuiles pour fusionner les nombres égaux et obtenir la tuile objectif, de 64 en Facile à 1024 en Maître.',
+      'Slide the tiles to merge equal numbers and build the goal tile, from 64 on Easy up to 1024 on Master. Then keep going as long as you can for a higher score.',
+      'Faites glisser les tuiles pour fusionner les nombres égaux et obtenir la tuile objectif, de 64 en Facile à 1024 en Maître. Continuez ensuite aussi longtemps que possible pour hausser votre pointage.',
     ),
     steps: [
       L(
@@ -72,8 +95,12 @@ export const merge: PuzzleDef = {
       ),
       L('After each move, a new 2 or 4 appears in an empty cell.', 'Après chaque coup, un 2 ou un 4 apparaît dans une case vide.'),
       L(
-        'If the board is full and nothing can merge, the game is lost.',
-        'Si le plateau est plein et que rien ne peut fusionner, la partie est perdue.',
+        'If the board is full and nothing can merge, the game is over: lost before the goal tile, won after it.',
+        'Si le plateau est plein et que rien ne peut fusionner, la partie se termine : perdue avant la tuile objectif, gagnée après.',
+      ),
+      L(
+        'Once the goal is reached the game goes on: tap Finish to stop and keep your score.',
+        'Une fois l’objectif atteint, la partie continue : touchez Terminer pour arrêter et garder votre pointage.',
       ),
     ],
     tips: [
@@ -97,6 +124,8 @@ export const merge: PuzzleDef = {
     let score = 0;
     let spawns = 0;
     let over = false;
+    let reached = false;
+    const prevBest = getBest(d);
 
     /** Spawn number k always lands on the same choice for the same board, so resumes replay exactly. */
     const spawn = (): number => {
@@ -113,11 +142,15 @@ export const merge: PuzzleDef = {
       cells = sv.cells.slice();
       score = int(sv.score, 0);
       spawns = int(sv.spawns, 2);
+      reached = Math.max(...cells) >= goal;
     } else {
       spawn();
       spawn();
     }
 
+    const finishBtn = btn(L('Finish', 'Terminer'), () => finish(), 'primary');
+    finishBtn.title = L('End the game and keep your score', 'Terminer la partie et garder votre pointage');
+    ctx.controls(finishBtn);
     const grid = board(n, n, 'merge-grid');
     const els = cells.map(() => {
       const el = h('div', { class: 'cell' });
@@ -144,7 +177,31 @@ export const merge: PuzzleDef = {
         if (t) el.setAttribute('style', `--c:${t.c}`);
         else el.removeAttribute('style');
       });
-      ctx.status(L(`Score ${score} · goal ${goal}`, `Pointage ${score} · objectif ${goal}`));
+      finishBtn.hidden = over || !reached;
+      if (over) return;
+      const record = Math.max(prevBest, score);
+      ctx.status(
+        reached
+          ? L(`Score ${score} · best ${record} · keep going!`, `Pointage ${score} · record ${record} · continuez!`)
+          : L(`Score ${score} · goal ${goal}`, `Pointage ${score} · objectif ${goal}`),
+      );
+    };
+
+    /** End the run: closes a solve already recorded at the goal (Finish, or stuck afterwards), or fails before it. */
+    const finish = () => {
+      if (over) return;
+      over = true;
+      putBest(d, score);
+      render();
+      const tail = score > prevBest && prevBest > 0 ? L(' · new best!', ' · nouveau record!') : '';
+      if (reached) {
+        ctx.status(L(`Final score ${score} · top tile ${best()}${tail}`, `Pointage final ${score} · plus grosse tuile ${best()}${tail}`));
+        ctx.solved();
+      } else {
+        shake(grid);
+        ctx.status(L(`No moves left · score ${score}`, `Plus aucun coup · pointage ${score}`));
+        ctx.failed();
+      }
     };
 
     const move = (dir: Dir) => {
@@ -161,15 +218,15 @@ export const merge: PuzzleDef = {
       render();
       for (const i of res.merged) anim(els[i], POP, 150);
       if (born >= 0) anim(els[born], GROW, 140);
-      if (best() >= goal) {
-        over = true;
-        ctx.solved();
-      } else if (!canMove(cells, n)) {
-        over = true;
-        shake(grid);
-        ctx.status(L(`No moves left · score ${score}`, `Plus aucun coup · pointage ${score}`));
-        ctx.failed();
+      putBest(d, score);
+      if (!reached && best() >= goal) {
+        reached = true;
+        render();
+        anim(finishBtn, [{ transform: 'scale(1.15)' }, { transform: 'scale(1)' }], 320);
+        // Record the solve (and its time) now; the run goes on until Finish or no move is left.
+        ctx.solved({ keepPlaying: true });
       }
+      if (!canMove(cells, n)) finish();
     };
 
     onSwipe(grid, move);
