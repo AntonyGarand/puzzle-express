@@ -119,8 +119,8 @@ export const sudoku: PuzzleDef = {
         'Touchez une case vide pour la sélectionner. Sa rangée, sa colonne et son bloc sont surlignés.',
       ),
       L(
-        'Tap a number on the pad (or type it) to fill the cell. Tap the same number again, or ⌫, to clear it.',
-        'Touchez un chiffre du pavé (ou tapez-le) pour remplir la case. Retouchez le même chiffre, ou ⌫, pour l’effacer.',
+        'Tap a number on the pad (or type it) to fill the cell. Tap the same number again, or ✕, to clear it.',
+        'Touchez un chiffre du pavé (ou tapez-le) pour remplir la case. Retouchez le même chiffre, ou ✕, pour l’effacer.',
       ),
       L(
         'Numbers that clash turn red and count as a mistake. Starting numbers can’t be changed.',
@@ -203,8 +203,11 @@ export const sudoku: PuzzleDef = {
       if (vals.every((x) => x) && bad.size === 0) ctx.solved();
     };
 
-    const keys = Array.from({ length: n }, (_, i) => ({ label: String(i + 1), value: String(i + 1) }));
-    keys.push({ label: '⌫', value: '0' });
+    const keys: { label: string; value: string; aria?: string }[] = Array.from({ length: n }, (_, i) => ({
+      label: String(i + 1),
+      value: String(i + 1),
+    }));
+    keys.push({ label: '✕', value: '0', aria: L('Erase', 'Effacer') });
     const saved = ctx.saved as { vals?: number[]; sel?: number } | undefined;
     if (saved?.vals?.length === vals.length) saved.vals.forEach((v, i) => !given[i] && (vals[i] = v));
     if (typeof saved?.sel === 'number' && saved.sel >= -1 && saved.sel < vals.length) sel = saved.sel;

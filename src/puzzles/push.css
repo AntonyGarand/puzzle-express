@@ -1,12 +1,18 @@
 [data-puzzle='push'] {
   --accent: var(--p1);
+  /* the ball and its traced path */
+  --push-me: var(--p2);
 }
 [data-puzzle='push'] .push-grid {
+  position: relative;
   touch-action: none;
+  /* walls and crates keep a hard shadow even on big boards, so they read as raised */
+  --lift: max(2px, var(--csh));
+  --unit: calc(var(--board) / var(--cols));
 }
 /* wall: a raised stone block (ink border, hard offset shadow, lit top edge, mortar line) */
 [data-puzzle='push'] .cell.wall {
-  --lit: calc(var(--board) / var(--cols) * 0.07);
+  --lit: calc(var(--unit) * 0.07);
   background:
     linear-gradient(color-mix(in srgb, var(--ink) 30%, transparent), color-mix(in srgb, var(--ink) 30%, transparent)) 0 50% / 100%
       max(1.5px, calc(var(--cbw) * 0.6)) no-repeat,
@@ -16,55 +22,118 @@
   box-shadow:
     inset 0 var(--lit) 0 color-mix(in srgb, var(--cell) 45%, transparent),
     inset 0 calc(var(--lit) * -1) 0 color-mix(in srgb, var(--ink) 18%, transparent),
-    var(--csh) var(--csh) 0 var(--ink);
+    var(--lift) var(--lift) 0 var(--ink);
 }
-/* floor between walls sits lower: flat tiles, so walls and crates read as raised */
+/* floor sits lower: flat tiles with soft seams, so walls and crates stand out */
 [data-puzzle='push'] .push-grid button.cell {
-  box-shadow: inset 0 0 0 0 transparent;
-  background: color-mix(in srgb, var(--accent) 8%, var(--cell));
+  box-shadow: none;
+  border-color: color-mix(in srgb, var(--ink) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--cell-alt));
 }
-/* target: a dashed pad on the floor */
+[data-puzzle='push'] .push-grid button.cell:active {
+  transform: none;
+}
+/* target: a green floor pad with a bullseye */
+[data-puzzle='push'] .push-grid button.cell.tg {
+  border-color: var(--ink);
+  border-style: dashed;
+  background: color-mix(in srgb, var(--good) 30%, var(--cell));
+}
 [data-puzzle='push'] .cell.tg::before {
   content: '';
   position: absolute;
-  width: 52%;
-  height: 52%;
-  border: max(2px, var(--cbw)) dashed var(--ink);
+  width: 62%;
+  height: 62%;
+  box-sizing: border-box;
+  border: max(2px, var(--cbw)) solid var(--ink);
   border-radius: 50%;
-  background: var(--accent-soft);
+  background: radial-gradient(circle, var(--ink) 0 22%, var(--good) 23% 44%, var(--ink) 45% 56%, var(--good) 57%);
 }
 /* crate: a raised block in the game's tone */
-[data-puzzle='push'] .push-grid .cell.bx {
-  --lit: calc(var(--board) / var(--cols) * 0.07);
+[data-puzzle='push'] .push-grid button.cell.bx {
+  --lit: calc(var(--unit) * 0.07);
+  z-index: 4;
+  border-style: solid;
+  border-color: var(--ink);
   background: var(--accent);
   box-shadow:
     inset 0 var(--lit) 0 color-mix(in srgb, var(--cell) 40%, transparent),
     inset 0 calc(var(--lit) * -1) 0 color-mix(in srgb, var(--ink) 22%, transparent),
-    var(--csh) var(--csh) 0 var(--ink);
+    var(--lift) var(--lift) 0 var(--ink);
 }
 [data-puzzle='push'] .cell.bx::after {
   content: '';
   width: 56%;
   height: 56%;
+  box-sizing: border-box;
   border: max(2px, var(--cbw)) solid var(--ink);
   border-radius: 3px;
-  background: linear-gradient(45deg, transparent 44%, var(--ink) 44% 56%, transparent 56%);
+  background: linear-gradient(45deg, transparent 42%, var(--ink) 42% 58%, transparent 58%);
   opacity: 0.6;
 }
 [data-puzzle='push'] .cell.bx.tg::before {
   display: none;
 }
-[data-puzzle='push'] .push-grid .cell.bx.on {
+/* crate on a target: done, green with a bold check */
+[data-puzzle='push'] .push-grid button.cell.bx.on {
   background: var(--good);
   color: var(--on-tone);
 }
-/* player */
+[data-puzzle='push'] .cell.bx.on::after {
+  width: 24%;
+  height: 46%;
+  border: none;
+  border-right: max(3px, calc(var(--unit) * 0.11)) solid var(--ink);
+  border-bottom: max(3px, calc(var(--unit) * 0.11)) solid var(--ink);
+  border-radius: 1px;
+  background: none;
+  opacity: 1;
+  transform: translateY(-10%) rotate(45deg);
+}
+/* player: a ball you can grab and drag */
+[data-puzzle='push'] .push-grid .cell.me {
+  z-index: 4;
+  cursor: grab;
+}
 [data-puzzle='push'] .cell.me::after {
   content: '';
-  width: 56%;
-  height: 56%;
+  position: relative;
+  width: 64%;
+  height: 64%;
+  box-sizing: border-box;
+  border: max(2px, var(--cbw)) solid var(--ink);
   border-radius: 50%;
-  background: var(--fg);
+  background: var(--push-me);
+  box-shadow: calc(var(--lift) * 0.8) calc(var(--lift) * 0.8) 0 var(--ink);
+}
+/* the path traced while dragging the ball */
+[data-puzzle='push'] .push-trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 3;
+}
+[data-puzzle='push'] .push-trail polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+[data-puzzle='push'] .push-trail .under {
+  stroke: var(--ink);
+  stroke-width: calc(var(--unit) * 0.26);
+}
+[data-puzzle='push'] .push-trail .over {
+  stroke: var(--push-me);
+  stroke-width: calc(var(--unit) * 0.16);
+}
+[data-puzzle='push'] .push-trail .start {
+  r: calc(var(--unit) * 0.16);
+  fill: var(--cell);
+  stroke: var(--ink);
+  stroke-width: max(2px, var(--cbw));
 }
 [data-puzzle='push'] .push-pad {
   width: min(var(--board), 300px);

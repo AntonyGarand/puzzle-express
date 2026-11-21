@@ -95,8 +95,11 @@ export function entryGame(o: EntryOpts): PuzzleInstance {
     }
   };
 
-  const keys = Array.from({ length: N }, (_, i) => ({ label: String(i + 1), value: String(i + 1) }));
-  keys.push({ label: '⌫', value: '0' });
+  const keys: { label: string; value: string; aria?: string }[] = Array.from({ length: N }, (_, i) => ({
+    label: String(i + 1),
+    value: String(i + 1),
+  }));
+  keys.push({ label: '✕', value: '0', aria: L('Erase', 'Effacer') });
 
   const saved = ctx.saved as { vals?: unknown[]; sel?: unknown } | undefined;
   if (Array.isArray(saved?.vals) && saved.vals.length === size) {
@@ -150,8 +153,8 @@ export function entryGame(o: EntryOpts): PuzzleInstance {
 export function entryHelpSteps(): string[] {
   return [
     L(
-      'Tap a cell, then a number on the pad. Tap the same number again, or ⌫, to erase it.',
-      'Touchez une case, puis un chiffre du pavé. Touchez le même chiffre, ou ⌫, pour l’effacer.',
+      'Tap a cell, then a number on the pad. Tap the same number again, or ✕, to erase it.',
+      'Touchez une case, puis un chiffre du pavé. Touchez le même chiffre, ou ✕, pour l’effacer.',
     ),
     L(
       'Keyboard: arrow keys move, digits fill, Backspace erases. Clashing numbers are marked.',

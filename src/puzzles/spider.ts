@@ -89,7 +89,7 @@ export const spider: PuzzleDef = {
       s = sv.s;
       hist.restore(sv.hist);
     }
-    const table = tableEl(cfg.cols, TOP + cfg.tab);
+    const table = tableEl(cfg.cols, TOP + cfg.tab, cfg.suits.length > 2 ? 'four-colour' : '');
     let over = false;
 
     const status = () => {

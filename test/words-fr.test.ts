@@ -75,6 +75,14 @@ describe('French word data', () => {
     expect(isWord('zqxw')).toBe(false);
     expect(isWord('house')).not.toBe(true);
   });
+
+  it('only accepts familiar short words, Québec words included', async () => {
+    await new Promise<void>((r) => whenDict(r));
+    for (const w of ['fats', 'let', 'rai', 'ers', 'ohm', 'fat', 'out', 'usa', 'jack']) expect(isWord(w), w).toBe(false);
+    for (const w of ['chat', 'lit', 'pis', 'ben', 'job', 'chum', 'tuque', 'pogne', 'niaiser', 'igloo', 'faon'])
+      expect(isWord(w), w).toBe(true);
+    for (const w of commonOfLength(3)) expect(isWord(w), w).toBe(true);
+  });
 });
 
 describe.each(GAMES)('%s (fr)', (_id, def) => {

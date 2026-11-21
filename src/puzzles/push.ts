@@ -1,7 +1,7 @@
 import { L, P } from '../core/i18n';
 import { byLevel, type Hint, type PuzzleDef } from '../core/types';
-import { board, btn, h, pad, shake } from '../core/ui';
-import { anim, keyDir, onSwipe, type Dir } from './movekit/kit';
+import { board, btn, h, pad, s, shake } from '../core/ui';
+import { anim, keyDir, type Dir } from './movekit/kit';
 import { solvePush } from './movekit/push-hint';
 import { generateRoom, stepper } from './movekit/pushgen';
 import './push.css';
@@ -21,8 +21,8 @@ export const push: PuzzleDef = {
     goal: L('Push every crate onto a target square.', 'Poussez chaque caisse sur une case cible.'),
     steps: [
       L(
-        'Move by swiping on the board, with the arrow buttons, or with the arrow keys / WASD.',
-        'Déplacez-vous en balayant le plateau, avec les flèches à l’écran ou les touches fléchées / WASD.',
+        'Drag from your ball to trace a path: it follows your finger square by square. Drag back over the path to retrace your steps.',
+        'Glissez à partir de votre bille pour tracer un chemin : elle suit votre doigt case par case. Revenez sur le tracé pour reculer.',
       ),
       L(
         'Walk into a crate to push it one square, if the square behind it is free.',
@@ -30,10 +30,13 @@ export const push: PuzzleDef = {
       ),
       L('You can’t pull a crate, and you can’t push two at once.', 'Impossible de tirer une caisse ou d’en pousser deux à la fois.'),
       L(
-        'Tap a square to walk there, or tap a crate next to you to push it.',
-        'Touchez une case pour vous y rendre, ou une caisse voisine pour la pousser.',
+        'Shortcuts: tap a square to walk there, swipe, or use the arrow buttons, the arrow keys or WASD for one step.',
+        'Raccourcis : touchez une case pour vous y rendre, balayez, ou utilisez les flèches à l’écran, les touches fléchées ou WASD pour un pas.',
       ),
-      L('Undo (Z) takes back an action; Restart (R) resets the room.', 'Annuler (Z) reprend une action; Repartir (R) remet tout à zéro.'),
+      L(
+        'Undo (Z) takes back a walk or a push; Restart (R) resets the room.',
+        'Annuler (Z) reprend un déplacement ou une poussée; Repartir (R) remet tout à zéro.',
+      ),
     ],
     tips: [
       L(
@@ -133,15 +136,19 @@ export const push: PuzzleDef = {
       rows = r1 - r0 + 1;
     const grid = board(cols, rows, 'push-grid');
     const els = new Map<number, HTMLElement>();
+    const idx = new Map<Element, number>();
     for (let r = r0; r <= r1; r++)
       for (let c = c0; c <= c1; c++) {
         const i = r * w + c;
-        const el = floor[i] ? h('button', { type: 'button', class: 'cell', onclick: () => tap(i) }) : h('div', { class: 'cell wall' });
+        const el = floor[i] ? h('button', { type: 'button', class: 'cell', onclick: () => click(i) }) : h('div', { class: 'cell wall' });
         els.set(i, el);
+        idx.set(el, i);
         grid.append(el);
       }
 
     const solved = () => boxes.every((b) => tset.has(b));
+    /** Path being traced by a drag from the ball: `cur` is the unsaved tail of the action (pushes close an action). */
+    let drag: { id: number; cur: string; path: number[] } | null = null;
     const render = () => {
       els.forEach((el, i) => {
         if (!floor[i]) return;
@@ -150,7 +157,7 @@ export const push: PuzzleDef = {
           .replace(/\s+/g, ' ')
           .trim();
       });
-      const moves = history.reduce((a, s) => a + s.length, 0);
+      const moves = history.reduce((a, act) => a + act.length, drag?.cur.length ?? 0);
       const home = boxes.filter((b) => tset.has(b)).length;
       const ms = P(moves, ['move', 'moves'], ['pas', 'pas']);
       ctx.status(L(`${home}/${boxes.length} home · ${ms}`, `${home}/${boxes.length} · ${ms}`));
@@ -171,7 +178,7 @@ export const push: PuzzleDef = {
       }
     };
     const move = (dir: Dir) => {
-      if (done) return;
+      if (done || drag) return;
       const rec = step(dir);
       if (!rec) {
         shake(grid);
@@ -181,10 +188,7 @@ export const push: PuzzleDef = {
     };
     /** Tap: adjacent cell = one step (push if a crate), otherwise walk there if reachable. */
     const tap = (i: number) => {
-      if (done || swiped) {
-        swiped = false;
-        return;
-      }
+      if (done || drag) return;
       for (let dd = 0; dd < 4; dd++)
         if (nb(player, dd) === i) {
           move(dd as Dir);
@@ -215,15 +219,20 @@ export const push: PuzzleDef = {
       }
       after(rec);
     };
+    /** A cell's click, unless it ends a drag or a swipe. */
+    const click = (i: number) => {
+      if (swiped) swiped = false;
+      else tap(i);
+    };
     const undo = () => {
-      if (done) return;
+      if (done || drag) return;
       const a = history.pop();
       if (!a) return;
       for (let k = a.length - 1; k >= 0; k--) unstep(a[k]);
       render();
     };
     const reset = () => {
-      if (done || !history.length) return;
+      if (done || drag || !history.length) return;
       restart();
       history = [];
       render();
@@ -247,8 +256,8 @@ export const push: PuzzleDef = {
         ][dir];
         return {
           text: L(
-            `You can only push, never pull. To push this crate ${dirName}, first stand ${side}: tap that square to walk there.`,
-            `On peut seulement pousser, jamais tirer. Pour pousser cette caisse ${dirName}, placez-vous d’abord ${side} : touchez cette case pour y aller.`,
+            `You can only push, never pull. To push this crate ${dirName}, first stand ${side}: drag your ball there, or tap that square.`,
+            `On peut seulement pousser, jamais tirer. Pour pousser cette caisse ${dirName}, placez-vous d’abord ${side} : glissez-y votre bille, ou touchez cette case.`,
           ),
           why: [el(box)],
           at: [el(behind)],
@@ -287,11 +296,121 @@ export const push: PuzzleDef = {
       };
     };
 
+    // Drag from the ball: it follows the pointer square by square (pushing crates on the way), and going
+    // back over the last square retraces a plain step. Elsewhere, a tap walks there and a swipe takes one step.
+    const pin = (i: number) => {
+      const g = grid.getBoundingClientRect(),
+        r = els.get(i)!.getBoundingClientRect();
+      return `${r.left + r.width / 2 - g.left},${r.top + r.height / 2 - g.top}`;
+    };
+    const trail = s('svg', { class: 'push-trail', 'aria-hidden': 'true' });
+    const drawTrail = () => {
+      if (!drag || drag.path.length < 2) {
+        trail.replaceChildren();
+        return;
+      }
+      const pts = drag.path.map(pin).join(' ');
+      const [x, y] = pin(drag.path[0]).split(',');
+      trail.replaceChildren(
+        s('polyline', { class: 'under', points: pts }),
+        s('polyline', { class: 'over', points: pts }),
+        s('circle', { class: 'start', cx: x, cy: y }),
+      );
+    };
+    /** One traced step: retrace the last plain step if `dir` goes back over it, else walk or push. */
+    const trace = (dir: Dir): boolean => {
+      const tr = drag!;
+      const last = tr.cur[tr.cur.length - 1];
+      if (last && last === last.toLowerCase() && nb(player, dir) === tr.path[tr.path.length - 2]) {
+        unstep(last);
+        tr.cur = tr.cur.slice(0, -1);
+        tr.path.pop();
+        return true;
+      }
+      const rec = step(dir);
+      if (!rec) return false;
+      ctx.touch();
+      tr.cur += rec;
+      tr.path.push(player);
+      if (rec !== rec.toLowerCase()) {
+        // A push is its own action for Undo, and can't be retraced by dragging back.
+        history.push(tr.cur);
+        tr.cur = '';
+        const b = els.get(nb(player, dir));
+        if (b) anim(b, [{ transform: 'scale(0.9)' }, { transform: 'scale(1)' }], 120);
+      }
+      return true;
+    };
+    const endDrag = () => {
+      if (!drag) return;
+      if (drag.cur) history.push(drag.cur);
+      drag = null;
+      trail.replaceChildren();
+      trail.remove();
+      swiped = true; // the click that ends the gesture is not a tap
+      render();
+      if (solved()) {
+        done = true;
+        ctx.solved();
+      }
+    };
+    /** Walk toward cell `t` one square at a time, preferring the longer axis and plain steps over pushes. */
+    const follow = (t: number) => {
+      let moved = false;
+      for (let guard = 0; guard < 64; guard++) {
+        if (!drag || t === player) break;
+        const dr = Math.floor(t / w) - Math.floor(player / w),
+          dc = (t % w) - (player % w);
+        const v = dr > 0 ? 2 : 0,
+          hz = dc > 0 ? 1 : 3;
+        let order: Dir[] = !dr ? [hz] : !dc ? [v] : Math.abs(dr) >= Math.abs(dc) ? [v, hz] : [hz, v];
+        if (order.length > 1 && boxes.includes(nb(player, order[0]))) order = [order[1], order[0]];
+        if (!order.some((dd) => trace(dd))) break;
+        moved = true;
+        if (solved()) break;
+      }
+      if (!moved) return;
+      render();
+      drawTrail();
+      if (solved()) endDrag();
+    };
+    const cellAt = (x: number, y: number) => {
+      const el = document.elementFromPoint(x, y)?.closest('.cell');
+      return el ? (idx.get(el) ?? -1) : -1;
+    };
+
     let swiped = false;
-    grid.addEventListener('pointerdown', () => (swiped = false));
-    onSwipe(grid, (dir) => {
+    let down: { id: number; x: number; y: number } | null = null;
+    grid.addEventListener('pointerdown', (e) => {
+      swiped = false;
+      if (done || drag || down) return;
+      if (e.button === 0 && cellAt(e.clientX, e.clientY) === player) {
+        drag = { id: e.pointerId, cur: '', path: [player] };
+        grid.setPointerCapture?.(e.pointerId);
+        grid.append(trail);
+      } else down = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    });
+    grid.addEventListener('pointermove', (e) => {
+      if (drag?.id !== e.pointerId) return;
+      const t = cellAt(e.clientX, e.clientY);
+      if (t >= 0) follow(t);
+    });
+    grid.addEventListener('pointerup', (e) => {
+      if (drag?.id === e.pointerId) {
+        endDrag();
+        return;
+      }
+      if (down?.id !== e.pointerId) return;
+      const dx = e.clientX - down.x,
+        dy = e.clientY - down.y;
+      down = null;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 22) return; // a tap: the click walks there
       swiped = true;
-      move(dir);
+      move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : dy > 0 ? 2 : 0);
+    });
+    grid.addEventListener('pointercancel', (e) => {
+      if (drag?.id === e.pointerId) endDrag();
+      if (down?.id === e.pointerId) down = null;
     });
 
     const arrows = pad(
@@ -309,7 +428,7 @@ export const push: PuzzleDef = {
     render();
 
     return {
-      snapshot: () => ({ h: history }),
+      snapshot: () => ({ h: drag?.cur ? [...history, drag.cur] : history }),
       hint,
       onKey(e) {
         const k = keyDir(e);

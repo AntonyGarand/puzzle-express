@@ -3,8 +3,9 @@ import { helpButton } from './help';
 import { L, locale, P } from './i18n';
 import { Rng } from './rng';
 import { clearSave, putSave, type Save } from './saves';
+import { encodeCode, shareSection } from './share';
 import { openSheet } from './sheet';
-import { prefs, record, setLevel, setWeight, getProfile, type Weight } from './store';
+import { prefs, record, setLevel, setWeight, getProfile, type RecordOutcome, type Weight } from './store';
 import { LEVELS, LEVEL_NAMES, type Difficulty, type PuzzleDef, type PuzzleInstance } from './types';
 import { btn, cogIcon, fmtTime, h } from './ui';
 
@@ -15,11 +16,19 @@ export interface CardOptions {
   level?: Difficulty;
   /** Resume this saved puzzle on first mount. */
   resume?: Save;
+  /** Play this exact seed on first mount (with `level`). */
+  seed?: number;
+  /** The first mount is a shared puzzle: separate save slot, no auto-levelling. */
+  shared?: boolean;
+  /** Called after every (re)generation, e.g. to keep the URL in sync. */
+  onMount?: (card: Card) => void;
 }
 
 interface Launch {
   level?: Difficulty;
   resume?: Save;
+  seed?: number;
+  shared?: boolean;
 }
 
 export class Card {
@@ -37,6 +46,8 @@ export class Card {
   level: Difficulty = 1;
   mounted = false;
   done = false;
+  /** Solve recorded at the goal while the player keeps going (`solved({ keepPlaying })`). */
+  private reached: { ms: number; res: RecordOutcome | null } | null = null;
   interacted = false;
   private active = false;
   private elapsed = 0;
@@ -44,6 +55,8 @@ export class Card {
   private mistakes = 0;
   private gen = 0;
   private seed = 0;
+  /** Opened from a share code (until the player starts another puzzle on this card). */
+  shared = false;
   private saveTimer = 0;
   private launch: Launch | null;
 
@@ -52,10 +65,15 @@ export class Card {
     private readonly onNext: (card: Card) => void,
     private readonly opts: CardOptions = {},
   ) {
-    this.launch = { level: opts.level, resume: opts.resume };
+    this.launch = { level: opts.level, resume: opts.resume, seed: opts.seed, shared: opts.shared };
     this.el = h('article', { class: 'card', 'data-puzzle': def.id });
     (this.el as HTMLElement & { card?: Card }).card = this;
     this.build();
+  }
+
+  /** Share code of the current puzzle: game, level, seed (and locale for word games). */
+  get code() {
+    return encodeCode({ id: this.def.id, level: this.level, seed: this.seed, locale: this.def.localized ? locale() : undefined });
   }
 
   /** Not yet started: safe to regenerate or drop. */
@@ -175,6 +193,8 @@ export class Card {
             ),
         this.opts.lab ? null : h('h3', null, L('In the feed', 'Dans le fil')),
         this.opts.lab ? null : freq,
+        h('h3', null, L('Share this puzzle', 'Partager cette partie')),
+        shareSection(this.code, this.def.name),
       ],
       footer: [
         h('a', { class: 'btn ghost', href: '#/settings', onclick: () => close() }, L('All settings', 'Tous les réglages')),
@@ -197,6 +217,29 @@ export class Card {
     });
   }
 
+  /** Sheet with this puzzle's share code and link. */
+  openShare() {
+    const resume = this.pauseWhile();
+    openSheet({
+      title: L('Share this puzzle', 'Partager cette partie'),
+      puzzle: this.def.id,
+      className: 'share-sheet',
+      body: [
+        h(
+          'p',
+          { class: 'muted small' },
+          `${this.def.name} · ${LEVEL_NAMES[this.level]}. `,
+          L(
+            'Send the code or the link: the other person gets the same puzzle at the same level.',
+            'Envoyez le code ou le lien : l’autre personne obtient la même partie, au même niveau.',
+          ),
+        ),
+        shareSection(this.code, this.def.name),
+      ],
+      onClose: resume,
+    });
+  }
+
   private makeHelpButton() {
     let resume = () => {};
     return helpButton(this.def, {
@@ -206,8 +249,9 @@ export class Card {
   }
 
   private syncLevelSel() {
-    const auto = !this.opts.lab && !prefs(this.def.id).manual;
-    this.levelEl.textContent = auto ? `${LEVEL_NAMES[this.level]} · auto` : LEVEL_NAMES[this.level];
+    const auto = !this.opts.lab && !this.shared && !prefs(this.def.id).manual;
+    const tag = this.shared ? ` · ${L('shared', 'partagée')}` : auto ? ' · auto' : '';
+    this.levelEl.textContent = LEVEL_NAMES[this.level] + tag;
   }
 
   private syncMistakes() {
@@ -257,9 +301,11 @@ export class Card {
     // Word games generate from the locale's word list: a save from the other language can't be resumed.
     const resume = launch?.resume && (!this.def.localized || (launch.resume.locale ?? 'en') === locale()) ? launch.resume : undefined;
     this.level = resume?.level ?? launch?.level ?? (this.opts.lab && this.mounted ? this.level : prefs(this.def.id).level);
-    this.seed = resume?.seed ?? (Math.random() * 2 ** 32) >>> 0;
+    this.seed = resume?.seed ?? launch?.seed ?? (Math.random() * 2 ** 32) >>> 0;
+    this.shared = !!launch?.shared;
     this.mounted = true;
     this.done = false;
+    this.reached = resume?.reached ? { ms: resume.elapsed, res: null } : null;
     this.interacted = !!resume;
     this.mistakes = resume?.mistakes ?? 0;
     this.elapsed = resume?.elapsed ?? 0;
@@ -283,7 +329,7 @@ export class Card {
         rng: new Rng(this.seed),
         root,
         saved: resume?.state,
-        solved: () => live() && this.finish('solved'),
+        solved: (opts) => live() && (opts?.keepPlaying ? this.reach() : this.finish('solved')),
         failed: () => live() && this.finish('failed'),
         mistake: () => {
           if (!live()) return;
@@ -310,6 +356,7 @@ export class Card {
     this.resize.observe(root);
     this.fit();
     if (this.active) this.inst.activate?.();
+    this.opts.onMount?.(this);
   }
 
   /** Re-sync the level label without regenerating (e.g. auto→manual elsewhere). */
@@ -332,15 +379,20 @@ export class Card {
     } catch {
       state = undefined;
     }
-    putSave(this.def.id, {
-      seed: this.seed,
-      level: this.level,
-      elapsed: Math.round(this.time()),
-      mistakes: this.mistakes,
-      state,
-      at: Date.now(),
-      locale: locale(),
-    });
+    putSave(
+      this.def.id,
+      {
+        seed: this.seed,
+        level: this.level,
+        elapsed: Math.round(this.time()),
+        mistakes: this.mistakes,
+        state,
+        at: Date.now(),
+        locale: locale(),
+        ...(this.reached ? { reached: true as const } : {}),
+      },
+      this.shared,
+    );
   }
 
   time() {
@@ -379,25 +431,51 @@ export class Card {
     return handled;
   }
 
+  /** Goal reached in an endless game: record the solve now, keep the board live. */
+  private reach() {
+    if (this.reached) return;
+    const ms = Math.round(this.time());
+    this.reached = { ms, res: this.recordResult('solved', ms) };
+    this.queueSave();
+    const res = this.reached.res!;
+    if (res.best || res.prevBest == null) {
+      const r = this.stage.getBoundingClientRect();
+      if (r.height) confetti(r.left + r.width / 2, r.top + r.height / 2, res.best ? 90 : 50);
+    }
+  }
+
+  private recordResult(o: 'solved' | 'failed' | 'skipped', ms: number) {
+    return record(
+      this.def.id,
+      { d: this.level, o, ms, m: this.mistakes, ...(this.shared ? { sh: true as const } : {}) },
+      this.def.par(this.level) * 1000,
+    );
+  }
+
   private finish(o: 'solved' | 'failed' | 'skipped') {
     if (this.done) return;
-    const ms = Math.round(this.time());
+    // An endless game that already reached its goal ends as a solve, timed at the goal, recorded once.
+    const early = this.reached;
+    if (early) o = 'solved';
+    const ms = early ? early.ms : Math.round(this.time());
     this.done = true;
-    clearSave(this.def.id, this.seed);
+    clearSave(this.def.id, this.seed, this.shared);
     this.setActive(false);
     this.active = true; // still the visible card; just stop the clock
     this.stage.inert = true;
     this.el.classList.add(`is-${o}`);
     this.tick();
 
-    const res = record(this.def.id, { d: this.level, o, ms, m: this.mistakes }, this.def.par(this.level) * 1000);
+    // A resumed run that had already reached its goal has no outcome in memory: skip the record line.
+    const res: RecordOutcome = early ? (early.res ?? {}) : this.recordResult(o, ms);
+    const known = !early || !!early.res;
 
     const parts: (string | HTMLElement)[] = [];
     if (o === 'solved') parts.push(h('strong', { class: 'good' }, L('Solved', 'Réussi')), ` ${L('in', 'en')} ${fmtTime(ms)}`);
     else if (o === 'failed') parts.push(h('strong', { class: 'bad' }, L('Not this time', 'Pas cette fois')));
     else parts.push(h('strong', null, L('Skipped', 'Passé')));
     if (this.mistakes && o !== 'skipped') parts.push(` · ${P(this.mistakes, ['mistake', 'mistakes'], ['erreur', 'erreurs'])}`);
-    if (o === 'solved') {
+    if (o === 'solved' && known) {
       if (res.best)
         parts.push(
           ' · ',
@@ -405,7 +483,7 @@ export class Card {
         );
       else if (res.prevBest == null) parts.push(' · ', h('span', { class: 'record' }, L('First clear!', 'Première réussite!')));
       else parts.push(` · ${L('best', 'record')} ${fmtTime(res.prevBest)}`);
-      if (res.best || res.prevBest == null) {
+      if (!early && (res.best || res.prevBest == null)) {
         const r = this.stage.getBoundingClientRect();
         if (r.height) confetti(r.left + r.width / 2, r.top + r.height / 2, res.best ? 90 : 50);
       }
@@ -426,6 +504,7 @@ export class Card {
       h(
         'div',
         { class: 'actions' },
+        this.opts.lab ? btn(L('Share', 'Partager'), () => this.openShare(), 'ghost') : null,
         this.opts.lab ? null : btn(L('Again', 'Rejouer'), () => this.mount(), 'ghost'),
         btn(this.opts.lab ? L('New puzzle', 'Nouvelle partie') : L('Next ↓', 'Suivant ↓'), () => this.onNext(this), 'primary'),
       ),

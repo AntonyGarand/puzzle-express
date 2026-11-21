@@ -7,6 +7,11 @@ import './arrange.css';
 
 type Drag = {
   p: number;
+  /** Pointer that holds the piece; any other pointer going down turns it. */
+  id: number;
+  /** Last pointer position, to redraw the ghost after a turn. */
+  x: number;
+  y: number;
   dr: number;
   dc: number;
   from: [number, number] | null;
@@ -41,8 +46,8 @@ export const arrange: PuzzleDef = {
         'Glissez une pièce placée pour la déplacer. Touchez-la, ou sortez-la de la grille, pour la renvoyer au bac.',
       ),
       L(
-        'From Hard up, pieces can turn: tap a piece in the tray to rotate it a quarter turn.',
-        'À partir de Difficile, les pièces tournent : touchez une pièce du bac pour lui faire faire un quart de tour.',
+        'From Hard up, pieces come turned. Tap one in the tray to turn it; while dragging, tap with a second finger, scroll or press R.',
+        'À partir de Difficile, les pièces arrivent tournées. Touchez-en une dans le bac pour la tourner; en la glissant, touchez avec un 2e doigt, utilisez la molette ou appuyez sur R.',
       ),
       L('Clear sends every piece back to the tray.', 'Vider renvoie toutes les pièces au bac.'),
     ],
@@ -54,6 +59,10 @@ export const arrange: PuzzleDef = {
       L(
         'If a gap is smaller than every piece left, something has to move.',
         'Si un trou est plus petit que toutes les pièces restantes, il faut déplacer quelque chose.',
+      ),
+      L(
+        'From Hard up, turn a piece until it matches the gap you’re aiming for, then drag it in.',
+        'À partir de Difficile, tournez une pièce jusqu’à ce qu’elle épouse le trou visé, puis glissez-la dedans.',
       ),
     ],
   }),
@@ -90,6 +99,9 @@ export const arrange: PuzzleDef = {
     });
     const tray = h('div', { class: 'arrange-tray', style: `--bc:${Math.max(rows, cols)}` });
     const fillMini = (el: HTMLElement, sh: Shape) => {
+      const key = sh.join(' ');
+      if (el.dataset.sh === key) return;
+      el.dataset.sh = key;
       const hgt = Math.max(...sh.map((q) => q[0])) + 1,
         wid = Math.max(...sh.map((q) => q[1])) + 1;
       el.style.setProperty('--pr', String(hgt));
@@ -98,12 +110,9 @@ export const arrange: PuzzleDef = {
     };
     const trayEls = pieces.map((pc, p) => {
       const el = h('button', { type: 'button', class: 'arr-piece', style: `--c:${PALETTE[pc.colour]}`, 'data-p': p });
-      el.addEventListener('click', () => {
-        if (suppressClick) {
-          suppressClick = false;
-          return;
-        }
-        if (finished) return;
+      // Pointer taps are handled in `onUp`; this only catches keyboard activation (Enter / Space).
+      el.addEventListener('click', (e) => {
+        if (e.detail > 0 || finished) return;
         if (!P.rotate) {
           shake(el);
           return;
@@ -115,11 +124,24 @@ export const arrange: PuzzleDef = {
     order.forEach((p) => tray.append(trayEls[p]));
 
     let finished = false;
-    let suppressClick = false;
     const turnPiece = (p: number) => {
       ctx.touch();
       rot[p] = (rot[p] + 1) % 4;
       render();
+      trayEls[p].animate?.([{ rotate: '-90deg' }, { rotate: '0deg' }], { duration: 160, easing: 'ease-out' });
+    };
+    /** Turn the piece being dragged a quarter turn clockwise, about the cell under the finger. */
+    const turnHeld = () => {
+      const g = drag;
+      if (!P.rotate || !g?.moved || !g.ghost) return;
+      const raw = shapeOf(g.p).map(([r, c]) => [c, -r]);
+      const r0 = Math.min(...raw.map((q) => q[0])),
+        c0 = Math.min(...raw.map((q) => q[1]));
+      [g.dr, g.dc] = [g.dc - r0, -g.dr - c0];
+      rot[g.p] = (rot[g.p] + 1) % 4;
+      fillMini(g.ghost, shapeOf(g.p));
+      g.ghost.animate?.([{ rotate: '-90deg' }, { rotate: '0deg' }], { duration: 140, easing: 'ease-out' });
+      follow(g.x, g.y);
     };
     let preview: number[] = [];
     const render = () => {
@@ -148,9 +170,7 @@ export const arrange: PuzzleDef = {
         el.classList.toggle('lifted', drag?.p === p && drag.moved);
       });
       const n = place.filter(Boolean).length;
-      ctx.status(
-        L(`${n}/${K} placed${P.rotate ? ' · tap to turn' : ''}`, P.rotate ? `${n}/${K} · touchez pour tourner` : `${n}/${K} placées`),
-      );
+      ctx.status(L(`${n}/${K} placed${P.rotate ? ' · tap to turn' : ''}`, `${n}/${K} placées${P.rotate ? ' · touchez pour tourner' : ''}`));
       return n === K;
     };
 
@@ -174,8 +194,18 @@ export const arrange: PuzzleDef = {
         c0 = C - drag.dc;
       return fits(drag.p, r0, c0) ? ([r0, c0] as [number, number]) : null;
     };
-    const onMove = (e: PointerEvent) => {
+    /** Move the ghost to the pointer and outline where the piece would land. */
+    const follow = (x: number, y: number) => {
       if (!drag) return;
+      drag.x = x;
+      drag.y = y;
+      ghostAt(x, y);
+      const t = target(x, y);
+      preview = t ? shapeOf(drag.p).map(([r, c]) => (t[0] + r) * cols + t[1] + c) : [];
+      render();
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
       if (!drag.moved) {
         if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
         drag.moved = true;
@@ -187,23 +217,39 @@ export const arrange: PuzzleDef = {
         drag.ghost = ghost;
         root.append(ghost);
       }
-      ghostAt(e.clientX, e.clientY);
-      const t = target(e.clientX, e.clientY);
-      preview = t ? shapeOf(drag.p).map(([r, c]) => (t[0] + r) * cols + t[1] + c) : [];
-      render();
+      follow(e.clientX, e.clientY);
       e.preventDefault();
     };
-    const onUp = (e: PointerEvent) => {
+    /** A second finger (or the wheel) while a piece is held turns it. */
+    const onOtherDown = (e: PointerEvent) => {
+      if (!drag || e.pointerId === drag.id) return;
+      e.preventDefault();
+      e.stopPropagation();
+      turnHeld();
+    };
+    let lastWheel = 0;
+    const onWheel = (e: WheelEvent) => {
+      if (!drag?.moved) return;
+      e.preventDefault();
+      // trackpads fire a burst of wheel events per swipe: one turn per gesture
+      if (e.timeStamp - lastWheel > 250) turnHeld();
+      lastWheel = e.timeStamp;
+    };
+    const unlisten = () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('pointerdown', onOtherDown, true);
+      window.removeEventListener('wheel', onWheel);
+    };
+    const onUp = (e: PointerEvent) => {
+      if (drag && e.pointerId !== drag.id) return;
+      unlisten();
       const dg = drag;
       if (!dg) return;
       drag = null;
       preview = [];
       if (dg.moved) {
-        suppressClick = true;
-        setTimeout(() => (suppressClick = false), 0);
         dg.ghost?.remove();
         const t = e.type === 'pointerup' ? (recompute(), dragTarget(dg, e.clientX, e.clientY)) : null;
         if (t) place[dg.p] = t;
@@ -216,6 +262,11 @@ export const arrange: PuzzleDef = {
         // tap on a placed piece: send it back to the tray
         ctx.touch();
         place[dg.p] = null;
+      } else if (e.type === 'pointerup') {
+        // tap on a tray piece: turn it (from Hard up)
+        if (P.rotate) turnPiece(dg.p);
+        else shake(trayEls[dg.p]);
+        return;
       }
       settle();
     };
@@ -239,11 +290,15 @@ export const arrange: PuzzleDef = {
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
       window.addEventListener('pointercancel', onUp);
+      if (P.rotate) {
+        window.addEventListener('pointerdown', onOtherDown, true);
+        window.addEventListener('wheel', onWheel, { passive: false });
+      }
       e.preventDefault();
     };
     tray.addEventListener('pointerdown', (e) => {
       const el = (e.target as Element | null)?.closest?.('.arr-piece') as HTMLElement | null;
-      if (!el || e.button > 0) return;
+      if (!el || e.button > 0 || drag) return;
       const p = Number(el.dataset.p);
       const sh = shapeOf(p);
       const rc = innerRect(el);
@@ -256,15 +311,17 @@ export const arrange: PuzzleDef = {
         (b, q) => (Math.abs(q[0] - fr) + Math.abs(q[1] - fc) < Math.abs(b[0] - fr) + Math.abs(b[1] - fc) ? q : b),
         sh[0],
       );
-      begin(e, { p, dr, dc, from: null, sx: e.clientX, sy: e.clientY, moved: false });
+      begin(e, { p, id: e.pointerId, x: e.clientX, y: e.clientY, dr, dc, from: null, sx: e.clientX, sy: e.clientY, moved: false });
     });
     grid.addEventListener('pointerdown', (e) => {
+      if (drag) return;
       const { R, C } = boardCell(e.clientX, e.clientY);
       if (R < 0 || R >= rows || C < 0 || C >= cols) return;
       const p = owner[R * cols + C];
       if (p < 0 || !place[p]) return;
       const [r0, c0] = place[p]!;
-      begin(e, { p, dr: R - r0, dc: C - c0, from: [r0, c0], sx: e.clientX, sy: e.clientY, moved: false });
+      const at = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY };
+      begin(e, { p, ...at, dr: R - r0, dc: C - c0, from: [r0, c0], moved: false });
     });
 
     ctx.controls(
@@ -437,10 +494,19 @@ export const arrange: PuzzleDef = {
     return {
       hint,
       snapshot: () => ({ rot, place }),
+      onKey(e) {
+        if (!P.rotate || finished || (e.key !== 'r' && e.key !== 'R')) return false;
+        if (drag?.moved) turnHeld();
+        else {
+          // a tray piece with keyboard focus
+          const p = trayEls.indexOf(document.activeElement as HTMLButtonElement);
+          if (p < 0 || drag) return false;
+          turnPiece(p);
+        }
+        return true;
+      },
       destroy() {
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-        window.removeEventListener('pointercancel', onUp);
+        unlisten();
         drag?.ghost?.remove();
       },
     };

@@ -1,11 +1,38 @@
-import { L } from '../core/i18n';
-import { byLevel, type Hint, type PuzzleDef } from '../core/types';
-import { board, h, PALETTE, shake } from '../core/ui';
+import { confetti } from '../core/confetti';
+import { L, P } from '../core/i18n';
+import { byLevel, type Difficulty, type Hint, type PuzzleDef } from '../core/types';
+import { board, btn, h, PALETTE, shake } from '../core/ui';
 import { anim, baseSeed, int, isIntArr, subRng } from './movekit/kit';
 import { drawPiece, fits, fitsAnywhere, fullLines, PIECES, type Piece } from './movekit/pieces';
 import './blocks.css';
 
 const colour = (p: Piece) => PALETTE[p.fam % PALETTE.length];
+
+/** Best score per difficulty, kept on this device. */
+const BEST_KEY = 'puzzle-express:blocks:best:v1';
+const readBests = (): Record<string, number> => {
+  try {
+    const v = JSON.parse(localStorage.getItem(BEST_KEY) ?? '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+};
+const getBest = (d: Difficulty) => {
+  const v = readBests()[d];
+  return typeof v === 'number' && v > 0 ? Math.floor(v) : 0;
+};
+const putBest = (d: Difficulty, score: number) => {
+  if (score <= getBest(d)) return;
+  try {
+    localStorage.setItem(BEST_KEY, JSON.stringify({ ...readBests(), [d]: score }));
+  } catch {
+    /* private mode / quota: the best just isn't kept */
+  }
+};
+
+/** Points for one placement: 1 per cell, plus 10 × lines² for a clear, multiplied by the combo (clears in a row). */
+const pointsFor = (cells: number, lines: number, combo: number) => cells + (lines ? 10 * lines * lines * combo : 0);
 
 export const blocks: PuzzleDef = {
   id: 'blocks',
@@ -18,8 +45,8 @@ export const blocks: PuzzleDef = {
   },
   help: () => ({
     goal: L(
-      'Clear the target number of lines by filling complete rows or columns with pieces.',
-      'Effacez le nombre de lignes demandé en remplissant des rangées ou des colonnes complètes.',
+      'Clear the target number of lines by filling complete rows or columns, then keep going for a high score.',
+      'Effacez le nombre de lignes demandé en remplissant des rangées ou des colonnes complètes, puis continuez pour battre votre record.',
     ),
     steps: [
       L(
@@ -35,6 +62,10 @@ export const blocks: PuzzleDef = {
         'Une rangée ou une colonne pleine disparaît et compte pour l’objectif.',
       ),
       L(
+        'Each placed cell scores 1 point; lines score much more, especially several at once or clears in a row (combo). After the goal, play on, or tap Finish.',
+        'Chaque case posée vaut 1 point; les lignes valent bien plus, surtout plusieurs d’un coup ou à la suite (combo). Après l’objectif, continuez ou touchez Terminer.',
+      ),
+      L(
         'Pieces don’t rotate. When all three are placed, three new ones arrive.',
         'Les pièces ne tournent pas. Une fois les trois placées, trois nouvelles arrivent.',
       ),
@@ -48,7 +79,10 @@ export const blocks: PuzzleDef = {
         'Keep the board open and leave room for the big pieces.',
         'Gardez la grille dégagée et laissez de la place pour les grosses pièces.',
       ),
-      L('Filling a row and a column at once clears both.', 'Remplir une rangée et une colonne d’un coup efface les deux.'),
+      L(
+        'Filling a row and a column at once clears both, and scores far more than clearing them one at a time.',
+        'Remplir une rangée et une colonne d’un coup efface les deux et rapporte bien plus que les effacer une à la fois.',
+      ),
     ],
   }),
   par: (d) => byLevel(d, [60, 110, 170, 240, 330]),
@@ -72,6 +106,8 @@ export const blocks: PuzzleDef = {
     let tray: number[] = [];
     let batch = 0;
     let cleared = 0;
+    let score = 0;
+    let combo = 0;
     let sel = -1;
     let over = false;
 
@@ -86,7 +122,21 @@ export const blocks: PuzzleDef = {
       tray = hand;
     };
 
-    const sv = ctx.saved as { cells?: unknown; tray?: unknown; batch?: unknown; cleared?: unknown; sel?: unknown } | undefined;
+    const sv = ctx.saved as
+      | {
+          cells?: unknown;
+          tray?: unknown;
+          batch?: unknown;
+          cleared?: unknown;
+          sel?: unknown;
+          score?: unknown;
+          combo?: unknown;
+          beat?: unknown;
+        }
+      | undefined;
+    // The best before this game started: beating it is celebrated once.
+    const prevBest = getBest(d);
+    let beat = false;
     if (
       isIntArr(sv?.cells, n * n) &&
       isIntArr(sv?.tray, 3) &&
@@ -97,10 +147,20 @@ export const blocks: PuzzleDef = {
       tray = sv.tray.slice();
       batch = int(sv.batch, 1);
       cleared = int(sv.cleared, 0);
+      score = Math.max(0, int(sv.score, 0));
+      combo = Math.max(0, int(sv.combo, 0));
+      beat = sv.beat === true;
       sel = int(sv.sel, -1);
       if (sel < 0 || sel > 2 || tray[sel] < 0) sel = -1;
     } else deal();
 
+    const scoreEl = h('strong', { class: 'blk-pts' });
+    const comboEl = h('span', { class: 'blk-combo' });
+    const bestEl = h('span', { class: 'blk-best' });
+    const bar = h('div', { class: 'blk-bar' }, h('span', null, L('Score', 'Pointage'), ' ', scoreEl), comboEl, bestEl);
+    const finishBtn = btn(L('Finish', 'Terminer'), () => finish(), 'primary');
+    finishBtn.title = L('End the game and keep your score', 'Terminer la partie et garder votre pointage');
+    ctx.controls(finishBtn);
     const grid = board(n, n, 'blk-grid');
     const els = cells.map((_, i) => {
       const el = h('button', { type: 'button', class: 'cell', onclick: () => tapCell(i) });
@@ -156,7 +216,28 @@ export const blocks: PuzzleDef = {
           ),
         );
       });
-      ctx.status(L(`Lines ${Math.min(cleared, goal)}/${goal}`, `Lignes ${Math.min(cleared, goal)}/${goal}`));
+      scoreEl.textContent = String(score);
+      comboEl.textContent = combo > 1 ? `Combo ×${combo}` : '';
+      const best = Math.max(getBest(d), score);
+      bestEl.textContent = beat ? L(`New best! ${best}`, `Nouveau record! ${best}`) : L(`Best ${best}`, `Record ${best}`);
+      bestEl.classList.toggle('new', beat);
+      finishBtn.hidden = over || cleared < goal;
+      if (over) return;
+      ctx.status(
+        cleared < goal
+          ? L(`Lines ${cleared}/${goal}`, `Lignes ${cleared}/${goal}`)
+          : `${P(cleared, ['line', 'lines'], ['ligne', 'lignes'])} · ${L('goal reached, keep going!', 'objectif atteint, continuez!')}`,
+      );
+    };
+
+    /** End the run: closes a solve already recorded at the goal (Finish, or stuck afterwards), or fails before it. */
+    const finish = () => {
+      if (over) return;
+      over = true;
+      putBest(d, score);
+      render();
+      if (cleared >= goal) ctx.solved();
+      else ctx.failed();
     };
 
     const place = (k: number, r: number, c: number): boolean => {
@@ -171,7 +252,17 @@ export const blocks: PuzzleDef = {
       for (const rr of rows) for (let j = 0; j < n; j++) gone.add(rr * n + j);
       for (const cc of cols) for (let j = 0; j < n; j++) gone.add(j * n + cc);
       gone.forEach((i) => (cells[i] = 0));
-      cleared += rows.length + cols.length;
+      const lines = rows.length + cols.length;
+      const wasBelow = cleared < goal;
+      cleared += lines;
+      combo = lines ? combo + 1 : 0;
+      score += pointsFor(placed.length, lines, combo);
+      if (prevBest > 0 && score > prevBest && !beat) {
+        beat = true;
+        const gr = grid.getBoundingClientRect();
+        if (gr.height) confetti(gr.left + gr.width / 2, gr.top, 40);
+      }
+      putBest(d, score);
       tray[k] = -1;
       sel = -1;
       preview = null;
@@ -179,16 +270,17 @@ export const blocks: PuzzleDef = {
       render();
       for (const i of placed) if (!gone.has(i)) anim(els[i], [{ transform: 'scale(0.8)' }, { transform: 'scale(1)' }], 140);
       gone.forEach((i) => anim(els[i], [{ background: 'var(--accent)' }, { background: 'var(--cell)' }], 320));
-      if (cleared >= goal) {
-        over = true;
-        ctx.solved();
-        return true;
+      if (lines) anim(bar, [{ transform: 'scale(1.06)' }, { transform: 'scale(1)' }], 220);
+      if (beat && score - pointsFor(placed.length, lines, combo) <= prevBest)
+        anim(bestEl, [{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }], 400);
+      if (wasBelow && cleared >= goal) {
+        anim(finishBtn, [{ transform: 'scale(1.15)' }, { transform: 'scale(1)' }], 320);
+        // Record the solve (and its time) now; the run goes on until Finish or no piece fits.
+        ctx.solved({ keepPlaying: true });
       }
       if (!tray.some((x) => x >= 0 && fitsAnywhere(cells, n, PIECES[x]))) {
-        over = true;
         shake(grid);
-        ctx.status(L(`No room left · ${cleared}/${goal} lines`, `Plus de place · ${cleared}/${goal} lignes`));
-        ctx.failed();
+        finish();
       }
       return true;
     };
@@ -277,7 +369,7 @@ export const blocks: PuzzleDef = {
     /** Guide: the best-looking placement (clears first, then building lines, edges, no holes), explained. */
     const hint = (): Hint | null => {
       if (over) return null;
-      let best: { k: number; r: number; c: number; score: number; rows: number[]; cols: number[]; tmp: number[] } | null = null;
+      let best: { k: number; r: number; c: number; val: number; rows: number[]; cols: number[]; tmp: number[] } | null = null;
       for (let k = 0; k < 3; k++) {
         const p = PIECES[tray[k]];
         if (!p) continue;
@@ -290,7 +382,7 @@ export const blocks: PuzzleDef = {
             const after = tmp.slice();
             for (const rr of rows) for (let j = 0; j < n; j++) after[rr * n + j] = 0;
             for (const cc of cols) for (let j = 0; j < n; j++) after[j * n + cc] = 0;
-            let score = (rows.length + cols.length) * 1000;
+            let val = (rows.length + cols.length) * 1000;
             // Build lines up: fuller rows and columns score more.
             for (let j = 0; j < n; j++) {
               let rc = 0,
@@ -299,7 +391,7 @@ export const blocks: PuzzleDef = {
                 rc += after[j * n + x] ? 1 : 0;
                 cc += after[x * n + j] ? 1 : 0;
               }
-              score += rc * rc + cc * cc;
+              val += rc * rc + cc * cc;
             }
             // Hug edges and other pieces; avoid single-cell holes.
             for (const [dr, dc] of p.cells) {
@@ -311,7 +403,7 @@ export const blocks: PuzzleDef = {
                 [rr, cc - 1],
                 [rr, cc + 1],
               ])
-                if (y < 0 || x < 0 || y >= n || x >= n || tmp[y * n + x]) score += 2;
+                if (y < 0 || x < 0 || y >= n || x >= n || tmp[y * n + x]) val += 2;
             }
             for (let i = 0; i < n * n; i++) {
               if (after[i]) continue;
@@ -323,9 +415,9 @@ export const blocks: PuzzleDef = {
                 [y, x - 1],
                 [y, x + 1],
               ].every(([a, b]) => a < 0 || b < 0 || a >= n || b >= n || after[a * n + b]);
-              if (shut) score -= 30;
+              if (shut) val -= 30;
             }
-            if (!best || score > best.score) best = { k, r, c, score, rows, cols, tmp };
+            if (!best || val > best.val) best = { k, r, c, val, rows, cols, tmp };
           }
       }
       if (!best) return null;
@@ -395,10 +487,10 @@ export const blocks: PuzzleDef = {
       };
     };
 
-    root.append(grid, trayEl);
+    root.append(bar, grid, trayEl);
     render();
     return {
-      snapshot: () => ({ cells, tray, batch, cleared, sel }),
+      snapshot: () => ({ cells, tray, batch, cleared, sel, score, combo, beat }),
       hint,
       onKey(e) {
         const k = Number(e.key) - 1;

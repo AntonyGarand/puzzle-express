@@ -9,6 +9,7 @@ import { LabView } from './pages/lab';
 import { renderLabs } from './pages/labs';
 import { renderSettings } from './pages/settings';
 import { renderStats } from './pages/stats';
+import { resolveCode } from './core/share';
 import { PUZZLES } from './puzzles';
 import { setupUpdates } from './core/update';
 
@@ -64,12 +65,29 @@ function updateStreak() {
 type View = 'feed' | 'labs' | 'lab' | 'stats' | 'settings';
 let labOpen: string | null = null;
 
+const safeDecode = (str: string) => {
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    return str;
+  }
+};
+
 function route() {
   const [r, arg, sub, lvl] = (location.hash.replace(/^#\/?/, '') || 'feed').split('/');
-  const def = PUZZLES.find((p) => p.id === arg);
+  // #/s/<code>: a shared puzzle (game, level, seed). A bad code lands on the Games tab with the error.
+  let codeError: { input: string; error: string } | undefined;
+  const input = r === 's' ? safeDecode(arg ?? '') : '';
+  const shared = r === 's' ? resolveCode(input, PUZZLES) : undefined;
+  if (shared && 'error' in shared) {
+    codeError = { input, error: shared.error };
+    history.replaceState(null, '', '#/games');
+  }
+  const sharedOk = shared && 'def' in shared ? shared : undefined;
+  const def = sharedOk?.def ?? PUZZLES.find((p) => p.id === arg);
   // #/games (alias #/labs) lists games; #/game/<id> (alias #/lab/<id>) opens one.
-  let view: View = r === 'stats' || r === 'settings' ? r : r === 'labs' || r === 'games' ? 'labs' : 'feed';
-  if ((r === 'lab' || r === 'game') && def) view = 'lab';
+  let view: View = r === 'stats' || r === 'settings' ? r : r === 'labs' || r === 'games' || codeError ? 'labs' : 'feed';
+  if (((r === 'lab' || r === 'game') && def) || sharedOk) view = 'lab';
 
   // Feed (optionally a single-puzzle "endless" feed)
   const only = r === 'play' && def ? def.id : null;
@@ -78,7 +96,13 @@ function route() {
   if (only && def) practice.replaceChildren(h('span', { class: 'swatchlet', 'data-puzzle': def.id }), `${def.name} ✕`);
 
   // Lab: #/lab/<id> resumes (or starts) · #/lab/<id>/new/<level> starts fresh
-  if (view === 'lab' && def) {
+  if (sharedOk) {
+    const key = `s:${sharedOk.code.id}-${sharedOk.code.level}-${sharedOk.code.seed}`;
+    if (labOpen !== key) {
+      lab.open(sharedOk.def, undefined, sharedOk.code);
+      labOpen = key;
+    }
+  } else if (view === 'lab' && def) {
     const level = sub === 'new' && LEVELS.includes(Number(lvl) as Difficulty) ? (Number(lvl) as Difficulty) : undefined;
     if (level || labOpen !== def.id) {
       lab.open(def, level);
@@ -97,7 +121,7 @@ function route() {
   page.hidden = view === 'feed' || view === 'lab';
   feed.setShown(view === 'feed');
   lab.setShown(view === 'lab');
-  if (view === 'labs') renderLabs(page, PUZZLES);
+  if (view === 'labs') renderLabs(page, PUZZLES, codeError);
   if (view === 'stats') renderStats(page, PUZZLES);
   if (view === 'settings') renderSettings(page, PUZZLES);
   if (!page.hidden) page.scrollTop = 0;

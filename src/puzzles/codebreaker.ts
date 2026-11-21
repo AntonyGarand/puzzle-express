@@ -1,6 +1,7 @@
 import { L, P } from '../core/i18n';
 import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, PALETTE, shake } from '../core/ui';
+import './codebreaker.css';
 
 /** Mastermind score of a guess: ● right colour and spot, ○ right colour elsewhere (repeats counted once each). */
 function scoreOf(code: number[], g: number[]) {
@@ -49,8 +50,8 @@ export const codebreaker: PuzzleDef = {
         'Touchez les couleurs de la palette pour remplir la rangée en cours (ou appuyez sur 1, 2, 3…).',
       ),
       L(
-        '⌫ removes the last colour (Backspace). Guess submits a full row (Enter).',
-        '⌫ retire la dernière couleur (Retour arrière). Essayer soumet une rangée complète (Entrée).',
+        '✕ removes the last colour (Backspace). Guess submits a full row (Enter).',
+        '✕ retire la dernière couleur (Retour arrière). Essayer soumet une rangée complète (Entrée).',
       ),
       L(
         'Each ● is a right colour in the right spot; each ○ a right colour in the wrong spot. They don’t say which peg.',
@@ -156,7 +157,10 @@ export const codebreaker: PuzzleDef = {
         ctx.failed();
       }
     };
-    ctx.controls(btn('⌫', back, 'ghost'), btn(L('Guess', 'Essayer'), submit, 'primary'));
+    const del = btn('✕', back, 'ghost');
+    del.setAttribute('aria-label', L('Delete', 'Effacer'));
+    del.title = L('Delete', 'Effacer');
+    ctx.controls(del, btn(L('Guess', 'Essayer'), submit, 'primary'));
     const sv = ctx.saved as { guesses?: typeof guesses; cur?: number[] } | undefined;
     if (Array.isArray(sv?.guesses)) {
       guesses.push(...sv.guesses.slice(0, maxGuesses - 1));

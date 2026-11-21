@@ -62,3 +62,16 @@ describe('auto-levelling', () => {
     expect(s.best[1]).toBe(9_000);
   });
 });
+
+describe('shared puzzles', () => {
+  beforeEach(() => resetProfile());
+
+  it('count in stats but never move the auto level', () => {
+    for (let i = 0; i < 3; i++) record('a', { d: 1, o: 'solved', ms: 1_000, m: 0, sh: true }, PAR);
+    expect(stats('a').solved).toBe(3);
+    expect(prefs('a').level).toBe(1);
+    // ...and don't count towards a later level change either.
+    expect(solve('a', 1_000).levelChange).toBeUndefined();
+    expect(solve('a', 1_000).levelChange?.to).toBe(2);
+  });
+});

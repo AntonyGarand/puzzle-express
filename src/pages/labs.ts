@@ -2,6 +2,7 @@ import { helpButton } from '../core/help';
 import { L, locale, P } from '../core/i18n';
 import { CATEGORIES, type CategoryId } from '../core/categories';
 import { allSaves, clearSave, type Save } from '../core/saves';
+import { encodeCode, resolveCode } from '../core/share';
 import { prefs, stats } from '../core/store';
 import { LEVELS, LEVEL_NAMES, type PuzzleDef } from '../core/types';
 import { fmtTime, h } from '../core/ui';
@@ -17,7 +18,7 @@ const ago = (t: number) => {
 let filter: CategoryId | 'all' = 'all';
 
 /** Games tab: every game grouped by category; resume the unfinished one or start new at a chosen level. */
-export function renderLabs(el: HTMLElement, defs: PuzzleDef[]) {
+export function renderLabs(el: HTMLElement, defs: PuzzleDef[], codeError?: { input: string; error: string }) {
   // Saves of word games made in the other language can't be resumed here.
   const saves = Object.fromEntries(
     Object.entries(allSaves()).filter(([id, sv]) => !defs.find((d) => d.id === id)?.localized || (sv.locale ?? 'en') === locale()),
@@ -95,6 +96,50 @@ export function renderLabs(el: HTMLElement, defs: PuzzleDef[]) {
     );
   };
 
+  // Play a puzzle someone shared: paste a code (or a whole link).
+  const codeInput = h('input', {
+    class: 'input inline',
+    type: 'text',
+    name: 'code',
+    value: codeError?.input ?? '',
+    placeholder: 'sudoku-3-1k2x9q',
+    autocapitalize: 'off',
+    autocomplete: 'off',
+    spellcheck: 'false',
+    enterkeyhint: 'go',
+    'aria-label': L('Puzzle code or link', 'Code ou lien de la partie'),
+    'aria-describedby': 'code-msg',
+  });
+  const codeMsg = h(
+    'p',
+    { id: 'code-msg', class: `small code-msg ${codeError ? 'bad' : 'muted'}`, role: 'status' },
+    codeError?.error ??
+      L(
+        'Someone sent you a puzzle code? Enter it to play that exact puzzle.',
+        'On vous a envoyé un code de partie? Entrez-le pour jouer exactement la même partie.',
+      ),
+  );
+  const codeForm = h(
+    'form',
+    {
+      class: 'code-form',
+      onsubmit: (e: SubmitEvent) => {
+        e.preventDefault();
+        const res = resolveCode(codeInput.value, defs);
+        if ('error' in res) {
+          codeMsg.textContent = res.error;
+          codeMsg.className = 'small code-msg bad';
+          codeInput.focus();
+          return;
+        }
+        location.hash = `#/s/${encodeCode(res.code)}`;
+      },
+    },
+    h('h3', null, L('Play a shared puzzle', 'Jouer une partie partagée')),
+    h('div', { class: 'row' }, codeInput, h('button', { type: 'submit', class: 'btn primary' }, L('Play', 'Jouer'))),
+    codeMsg,
+  );
+
   const inProgress = defs.filter((d) => saves[d.id]).sort((a, b) => saves[b.id].at - saves[a.id].at);
   const cats = CATEGORIES.map((c) => ({ ...c, games: defs.filter((d) => d.category === c.id) })).filter((c) => c.games.length);
   const shown = filter === 'all' ? cats : cats.filter((c) => c.id === filter);
@@ -127,6 +172,7 @@ export function renderLabs(el: HTMLElement, defs: PuzzleDef[]) {
           `${defs.length} jeux. Choisissez un jeu et un niveau — les parties en cours sont sauvegardées automatiquement.`,
         ),
       ),
+      codeForm,
       h(
         'div',
         { class: 'filters', role: 'toolbar', 'aria-label': L('Categories', 'Catégories') },
