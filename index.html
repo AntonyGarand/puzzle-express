@@ -14,6 +14,30 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="puzzles" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <script>
+      // Plausible pageviews -> stats.garand.dev (site "garand.dev", split by hostname).
+      // Opt out: localStorage.plausible_ignore = "true".
+      (function () {
+        if (!/(^|\.)garand\.dev$/.test(location.hostname)) return;
+        try {
+          if (localStorage.getItem("plausible_ignore") === "true") return;
+        } catch (e) {}
+        var last;
+        function pageview() {
+          if (location.href === last) return;
+          last = location.href;
+          fetch("https://stats.garand.dev/api/event", {
+            method: "POST",
+            keepalive: true,
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({ n: "pageview", u: last, d: "garand.dev", r: document.referrer || null, h: 1 }),
+          }).catch(function () {});
+        }
+        pageview();
+        addEventListener("hashchange", pageview);
+        addEventListener("popstate", pageview);
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>
