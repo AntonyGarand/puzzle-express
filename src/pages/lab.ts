@@ -3,8 +3,9 @@ import { L, locale } from '../core/i18n';
 import { Card } from '../core/card';
 import { getSave } from '../core/saves';
 import { prefs } from '../core/store';
+import type { ShareCode } from '../core/share';
 import type { Difficulty, PuzzleDef } from '../core/types';
-import { h } from '../core/ui';
+import { btn, h } from '../core/ui';
 
 /** A single puzzle opened from Labs: resume or new, outside the feed. */
 export class LabView {
@@ -25,22 +26,51 @@ export class LabView {
     window.addEventListener('pagehide', () => this.card?.persist());
   }
 
-  /** Open puzzle `def`: resume its save unless `level` asks for a new one. */
-  open(def: PuzzleDef, level?: Difficulty) {
+  /**
+   * Open puzzle `def`: resume its save unless `level` asks for a new one. With `shared`, play that exact
+   * puzzle in its own save slot (resuming it if it was already started), leaving your own game alone.
+   */
+  open(def: PuzzleDef, level?: Difficulty, shared?: ShareCode) {
     this.close();
-    const saved = level ? undefined : getSave(def.id);
+    const sharedSave = shared && getSave(def.id, true);
+    const saved = shared
+      ? sharedSave && sharedSave.seed === shared.seed && sharedSave.level === shared.level
+        ? sharedSave
+        : undefined
+      : level
+        ? undefined
+        : getSave(def.id);
     const save = saved && (!def.localized || (saved.locale ?? 'en') === locale()) ? saved : undefined;
-    const start = (lvl?: Difficulty, resume = save) => {
+    const start = (lvl?: Difficulty, resume = save, code = shared) => {
       this.card?.setActive(false);
       this.card?.destroy();
-      const card = new Card(def, (c) => start(c.level, undefined), { lab: true, level: lvl ?? prefs(def.id).level, resume });
+      const note = h('span', { class: 'small muted' });
+      const card = new Card(def, (c) => start(c.level, undefined, undefined), {
+        lab: true,
+        level: code?.level ?? lvl ?? prefs(def.id).level,
+        resume,
+        seed: code?.seed,
+        shared: !!code,
+        onMount: (c) => {
+          // Right after mount, `interacted` is only set when a save was resumed.
+          note.textContent = c.shared
+            ? L('Shared puzzle', 'Partie partagée')
+            : c.interacted
+              ? L('Resumed', 'Reprise')
+              : L('New puzzle', 'Nouvelle partie');
+          // Keep the address bar on what's being played, so a reload brings back the same puzzle.
+          const hash = c.shared ? `#/s/${c.code}` : `#/game/${def.id}`;
+          if (location.hash !== hash) history.replaceState(null, '', hash);
+        },
+      });
       this.card = card;
       this.el.replaceChildren(
         h(
           'div',
           { class: 'lab-bar' },
           h('a', { class: 'btn ghost', href: '#/games' }, L('← Games', '← Jeux')),
-          h('span', { class: 'small muted' }, resume ? L('Resumed', 'Reprise') : L('New puzzle', 'Nouvelle partie')),
+          note,
+          btn(L('Share', 'Partager'), () => card.openShare(), 'ghost'),
         ),
         card.el,
       );

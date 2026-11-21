@@ -30,8 +30,8 @@ export const guess: PuzzleDef = {
     ),
     steps: [
       L(
-        'Tap digits (or type them) to fill the row. Tap a digit again to remove it; ⌫ or Backspace erases the last one.',
-        'Touchez des chiffres (ou tapez-les) pour remplir la rangée. Touchez un chiffre de nouveau pour le retirer; ⌫ ou Retour arrière efface le dernier.',
+        'Tap digits (or type them) to fill the row. Tap a digit again to remove it; ✕ or Backspace erases the last one.',
+        'Touchez des chiffres (ou tapez-les) pour remplir la rangée. Touchez un chiffre de nouveau pour le retirer; ✕ ou Retour arrière efface le dernier.',
       ),
       L('Press Guess (or Enter) to submit the row.', 'Appuyez sur Essayer (ou Entrée) pour soumettre la rangée.'),
       L(
@@ -164,7 +164,7 @@ export const guess: PuzzleDef = {
       if (okDigits(sv?.cur, false)) cur = sv.cur.slice();
     }
 
-    const del = btn('⌫', back, 'ghost');
+    const del = btn('✕', back, 'ghost');
     del.setAttribute('aria-label', L('Delete', 'Effacer'));
     del.title = L('Delete', 'Effacer');
     ctx.controls(del, btn(L('Guess', 'Essayer'), submit, 'primary'));

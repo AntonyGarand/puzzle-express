@@ -22,14 +22,14 @@ export const slide: PuzzleDef = {
         'Tap a tile in the same row or column as the gap: it slides into the gap, along with any tiles in between.',
         'Touchez une tuile sur la même rangée ou colonne que le trou : elle glisse vers le trou, avec les tuiles entre les deux.',
       ),
+      L(
+        'Or drag that tile toward the gap and let go past a third of a square. Let go sooner to cancel.',
+        'Ou faites glisser cette tuile vers le trou et relâchez après un tiers de case. Relâchez avant pour annuler.',
+      ),
       L('Tiles that are already in their home spot are highlighted.', 'Les tuiles déjà à leur place sont mises en couleur.'),
       L(
         'Keyboard: an arrow key slides the tile next to the gap in that direction.',
         'Clavier : une flèche fait glisser dans cette direction la tuile voisine du trou.',
-      ),
-      L(
-        'The status line counts your moves. Higher levels go from 3×3 to 4×4 and shuffle more.',
-        'La ligne d’état compte vos coups. Les niveaux supérieurs passent de 3×3 à 4×4 et mélangent davantage.',
       ),
     ],
     tips: [
@@ -134,14 +134,17 @@ export const slide: PuzzleDef = {
       if (solved()) ctx.solved();
     };
 
-    // Drag a tile toward the gap; the tiles in between come along. Past a third of a cell it slides.
-    let drag: { i: number; delta: number; run: number[]; x: number; y: number; px: number } | null = null;
+    // Tap or drag a tile in line with the gap; the tiles in between come along. A drag slides past a third
+    // of a cell. The grid captures the pointer, so the tile never gets the click: taps are handled on pointerup.
+    let drag: { id: number; i: number; delta: number; run: number[]; x: number; y: number; px: number } | null = null;
     let dragged = false;
+    /** When the last captured gesture ended; the click that follows it is swallowed. */
+    let ended = -1e9;
     grid.addEventListener('pointerdown', (e) => {
       const t = (e.target as Element).closest('.tile');
       const i = t ? cells.indexOf(t as HTMLButtonElement) : -1;
+      if (drag || i < 0 || e.button > 0) return;
       dragged = false;
-      if (i < 0) return;
       const delta = towards(i);
       if (!delta) return;
       const run: number[] = [];
@@ -149,11 +152,11 @@ export const slide: PuzzleDef = {
         run.push(k);
         if (k === i) break;
       }
-      drag = { i, delta, run, x: e.clientX, y: e.clientY, px: 0 };
-      grid.setPointerCapture(e.pointerId);
+      drag = { id: e.pointerId, i, delta, run, x: e.clientX, y: e.clientY, px: 0 };
+      grid.setPointerCapture?.(e.pointerId);
     });
     grid.addEventListener('pointermove', (e) => {
-      if (!drag) return;
+      if (drag?.id !== e.pointerId) return;
       const dx = e.clientX - drag.x,
         dy = e.clientY - drag.y;
       if (Math.hypot(dx, dy) > 6) dragged = true;
@@ -162,24 +165,25 @@ export const slide: PuzzleDef = {
       drag.px = Math.max(0, Math.min(pitch(), along));
       for (const k of drag.run) cells[k].style.translate = drag.px ? shift(-drag.delta, drag.px) : '';
     });
-    const endDrag = (commit: boolean) => {
-      if (!drag) return;
+    const endDrag = (e: PointerEvent, commit: boolean) => {
+      if (drag?.id !== e.pointerId) return;
       const d0 = drag;
       drag = null;
-      if (commit && dragged && d0.px > pitch() / 3) {
-        tap(d0.i, d0.px);
-        return;
-      }
-      for (const k of d0.run) glide(cells[k], shift(-d0.delta, d0.px), 120);
+      ended = e.timeStamp;
+      if (commit && !dragged) {
+        for (const k of d0.run) cells[k].style.translate = '';
+        tap(d0.i);
+      } else if (commit && d0.px > pitch() / 3) tap(d0.i, d0.px);
+      else for (const k of d0.run) glide(cells[k], shift(-d0.delta, d0.px), 120);
     };
-    grid.addEventListener('pointerup', () => endDrag(true));
-    grid.addEventListener('pointercancel', () => endDrag(false));
-    // A drag ends with a click on the tile; it was already handled (or deliberately cancelled).
+    grid.addEventListener('pointerup', (e) => endDrag(e, true));
+    grid.addEventListener('pointercancel', (e) => endDrag(e, false));
+    // The click that ends a tap or drag was already handled on pointerup (keyboard clicks still go through).
     grid.addEventListener(
       'click',
       (e) => {
-        if (!dragged) return;
-        dragged = false;
+        if (e.timeStamp - ended > 600) return;
+        ended = -1e9;
         e.stopPropagation();
       },
       true,

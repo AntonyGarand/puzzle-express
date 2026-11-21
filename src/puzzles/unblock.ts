@@ -98,11 +98,15 @@ export const unblock: PuzzleDef = {
     }
 
     const field = h('div', { class: 'ub-field' });
+    /** Faint slot left behind by the block being dragged. */
+    const origin = h('div', { class: 'ub-origin', hidden: true });
+    field.append(origin);
     const exitEl = h('div', { class: 'ub-exit' });
     const wrap = h('div', { class: 'ub-board', style: `--n:${N};--exit:${EXIT_ROW}` }, exitEl, field);
     const els = blocks.map((b, i) => {
       const el = h('div', {
-        class: `ub-blk ${i === 0 ? 'key' : ''} ${b.hz ? 'hz' : 'vt'}`,
+        // Not `.key`: that's the shared on-screen keyboard style, and it would frame the block twice.
+        class: `ub-blk ${i === 0 ? 'ub-key' : ''} ${b.hz ? 'hz' : 'vt'}`,
         style: i === 0 ? '' : `--c:${TONES[(i - 1) % TONES.length]}`,
       });
       field.append(el);
@@ -180,6 +184,7 @@ export const unblock: PuzzleDef = {
       drag = { i, id: e.pointerId, x0: e.clientX, y0: e.clientY, unit, lo: lo2, hi: hi2, moved: false };
       field.setPointerCapture?.(e.pointerId);
       els[i].classList.add('drag');
+      for (const k of ['--x', '--y', '--w', '--h']) origin.style.setProperty(k, els[i].style.getPropertyValue(k));
     });
     const offset = (e: PointerEvent) => {
       const g = drag!;
@@ -190,13 +195,17 @@ export const unblock: PuzzleDef = {
     field.addEventListener('pointermove', (e) => {
       if (!drag || e.pointerId !== drag.id) return;
       const off = offset(e);
-      if (Math.abs(off) > 0.08) drag.moved = true;
+      if (Math.abs(off) > 0.08 && !drag.moved) {
+        drag.moved = true;
+        origin.hidden = false;
+      }
       // One custom property per frame: no layout, no re-render; the compositor moves the block.
       els[drag.i].style.setProperty(blocks[drag.i].hz ? '--dx' : '--dy', `${(off * drag.unit).toFixed(1)}px`);
     });
     /** Drop the live drag offset; with `.drag` removed in the same frame the block glides from where the finger left it. */
     const release = (i: number) => {
       els[i].classList.remove('drag');
+      origin.hidden = true;
       els[i].style.removeProperty('--dx');
       els[i].style.removeProperty('--dy');
     };

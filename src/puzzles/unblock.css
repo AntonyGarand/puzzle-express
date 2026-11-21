@@ -3,6 +3,8 @@
 }
 [data-puzzle='unblock'] .ub-board {
   --pad: 6px;
+  /* one lane, in px of the padding box */
+  --lane: calc((100% - 2 * var(--pad)) / var(--n));
   position: relative;
   width: var(--board);
   aspect-ratio: 1;
@@ -21,18 +23,32 @@
   background-image: radial-gradient(circle, color-mix(in srgb, var(--ink) 22%, transparent) 2px, transparent 2.5px);
   background-size: calc(100% / var(--n)) calc(100% / var(--n));
 }
-/* exit: a tab sticking out of the frame on the key's row */
+/* Exit: a gap cut through the right wall on the key's row, with a short chute leading out.
+   The chute's floor covers the frame and its shadow, so the wall reads as open. */
 [data-puzzle='unblock'] .ub-exit {
+  --out: 18px;
   position: absolute;
-  right: calc(-1 * var(--bw) - 9px);
-  top: calc(var(--pad) + (100% - 2 * var(--pad)) / var(--n) * var(--exit) + 4px);
-  width: calc(var(--pad) + 9px);
-  height: calc((100% - 2 * var(--pad)) / var(--n) - 8px);
-  background: var(--accent);
-  border: var(--bw) solid var(--ink);
-  border-left: 0;
-  border-radius: 0 6px 6px 0;
+  top: calc(var(--pad) + var(--lane) * var(--exit) + 4px);
+  right: calc(-1 * (var(--bw) + var(--out)));
+  width: calc(var(--bw) + var(--out));
+  height: calc(var(--lane) - 8px);
+  background: var(--cell-alt);
+  border-block: var(--bw) solid var(--ink);
+  pointer-events: none;
 }
+/* a chevron in the chute pointing the way out */
+[data-puzzle='unblock'] .ub-exit::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: calc(var(--out) / 2 - 1px);
+  width: 9px;
+  height: 9px;
+  border-top: var(--bw) solid var(--ink);
+  border-right: var(--bw) solid var(--ink);
+  transform: translate(0, -50%) rotate(45deg);
+}
+
 [data-puzzle='unblock'] .ub-blk {
   --u: calc(100% / var(--n));
   position: absolute;
@@ -47,6 +63,7 @@
   translate: calc(100% * var(--x) / var(--w) + var(--dx, 0px)) calc(100% * var(--y) / var(--h) + var(--dy, 0px));
   transition: translate 0.14s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
+/* The visible tile. Raising it (selected / held) moves only this layer, so the hit box stays put. */
 [data-puzzle='unblock'] .ub-blk::before {
   content: '';
   position: absolute;
@@ -55,11 +72,14 @@
   border: var(--bw) solid var(--ink);
   border-radius: var(--r-cell);
   box-shadow: 3px 3px 0 var(--ink);
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.12s ease-out;
 }
-[data-puzzle='unblock'] .ub-blk.key::before {
+[data-puzzle='unblock'] .ub-blk.ub-key::before {
   background: var(--accent);
 }
-[data-puzzle='unblock'] .ub-blk.key::after {
+[data-puzzle='unblock'] .ub-blk.ub-key::after {
   content: '→';
   position: absolute;
   inset: 0;
@@ -69,17 +89,47 @@
   font-weight: 700;
   font-size: calc(var(--board) / 12);
   color: var(--on-tone);
+  transition: transform 0.12s ease-out;
+}
+/* selected: raised a little off the board */
+[data-puzzle='unblock'] .ub-blk.sel::before,
+[data-puzzle='unblock'] .ub-blk.sel::after {
+  transform: translate(-2px, -2px);
 }
 [data-puzzle='unblock'] .ub-blk.sel::before {
-  border-style: dashed;
   box-shadow: 5px 5px 0 var(--ink);
 }
+/* held: lifted higher, one crisp border and a deeper shadow */
 [data-puzzle='unblock'] .ub-blk.drag {
   transition: none;
   will-change: translate;
   z-index: 2;
   cursor: grabbing;
 }
+[data-puzzle='unblock'] .ub-blk.drag::before,
+[data-puzzle='unblock'] .ub-blk.drag::after {
+  transform: translate(-3px, -3px) scale(1.02);
+}
 [data-puzzle='unblock'] .ub-blk.drag::before {
-  box-shadow: 6px 6px 0 var(--ink);
+  box-shadow: 7px 7px 0 var(--ink);
+}
+/* where the held block came from: a faint dashed slot */
+[data-puzzle='unblock'] .ub-origin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(100% / var(--n) * var(--w));
+  height: calc(100% / var(--n) * var(--h));
+  translate: calc(100% * var(--x) / var(--w)) calc(100% * var(--y) / var(--h));
+  pointer-events: none;
+}
+[data-puzzle='unblock'] .ub-origin[hidden] {
+  display: none;
+}
+[data-puzzle='unblock'] .ub-origin::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border: 2px dashed color-mix(in srgb, var(--ink) 35%, transparent);
+  border-radius: var(--r-cell);
 }

@@ -11,6 +11,8 @@ export interface Result {
   ms: number;
   m: number;
   at: number;
+  /** Played from a share code: counts in stats, never in auto-levelling. */
+  sh?: true;
 }
 
 export interface TypePrefs {
@@ -140,7 +142,7 @@ export interface RecordOutcome {
 /**
  * Record a finished puzzle and run auto-levelling.
  * Level goes up after 3 clean solves within par (or 2 very fast flawless ones) at the current level,
- * and down after 2 failures/skips in a row. Manual levels are never touched.
+ * and down after 2 failures/skips in a row. Manual levels and shared puzzles (`sh`) never move it.
  */
 export function record(id: string, r: Omit<Result, 'at'>, parMs: number): RecordOutcome {
   const s = stats(id);
@@ -166,8 +168,8 @@ export function record(id: string, r: Omit<Result, 'at'>, parMs: number): Record
   s.recent.push(res);
   if (s.recent.length > 30) s.recent.splice(0, s.recent.length - 30);
 
-  if (!p.manual) {
-    const rel = s.recent.filter((x) => x.d === p.level && x.at >= p.since);
+  if (!p.manual && !r.sh) {
+    const rel = s.recent.filter((x) => x.d === p.level && x.at >= p.since && !x.sh);
     const last3 = rel.slice(-3);
     const last2 = rel.slice(-2);
     const good = (x: Result) => x.o === 'solved' && x.ms <= parMs && x.m <= 1;

@@ -1,0 +1,5 @@
+/* The board hugs the code: pegs + feedback, not the full board width. */
+[data-puzzle='codebreaker'] .code-board {
+  width: auto;
+  max-width: var(--board);
+}

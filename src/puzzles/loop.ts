@@ -35,6 +35,10 @@ export const loop: PuzzleDef = {
         'Touchez un côté pour tracer une ligne, encore pour un ✕ (aucune ligne), puis une autre fois pour l’effacer.',
       ),
       L(
+        'Or press and hold a side (or right-click it) to put a ✕ straight away; hold again to remove it.',
+        'Ou maintenez le doigt sur un côté (ou faites un clic droit) pour y mettre un ✕ directement; maintenez de nouveau pour l’enlever.',
+      ),
+      L(
         'Drag from dot to dot to draw several lines at once; start a drag on a line to erase instead.',
         'Glissez de point en point pour tracer plusieurs lignes d’un coup; commencez sur une ligne pour effacer plutôt.',
       ),
@@ -164,9 +168,36 @@ export const loop: PuzzleDef = {
     };
     const edgeBetween = (a: number, b: number) => ve[a].find((e) => ea[e] === b || eb[e] === b) ?? -1;
 
-    let drag: { id: number; x: number; y: number; edge: number; anchor: number; mode: number; drew: boolean } | null = null;
+    // Long-press (or right-click) on a side toggles its ✕ directly; a plain tap still cycles line → ✕ → empty.
+    const HOLD_MS = 400;
+    const HOLD_SLOP = 8; // px of movement that cancels a long-press
+    const toggleX = (edge: number) => {
+      st[edge] = st[edge] === 2 ? 0 : 2;
+      after();
+      if (!done) render();
+    };
+    let holdTimer = 0;
+    const stopHold = () => {
+      clearTimeout(holdTimer);
+      holdTimer = 0;
+    };
+    let drag: {
+      id: number;
+      x: number;
+      y: number;
+      cx: number;
+      cy: number;
+      edge: number;
+      anchor: number;
+      mode: number;
+      drew: boolean;
+      held: boolean;
+    } | null = null;
+    svg.addEventListener('contextmenu', (e) => e.preventDefault());
     svg.addEventListener('pointerdown', (e) => {
-      if (done || drag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (done || drag) return;
+      const right = e.pointerType === 'mouse' && e.button === 2;
+      if (e.pointerType === 'mouse' && e.button !== 0 && !right) return;
       const pt = toUnits(e);
       let edge = -1;
       if (pt) edge = edgeAt(pt.x, pt.y);
@@ -177,12 +208,37 @@ export const loop: PuzzleDef = {
       if (edge < 0) return;
       e.preventDefault();
       ctx.touch();
+      if (right) {
+        toggleX(edge);
+        return;
+      }
       capture(svg, e.pointerId);
-      drag = { id: e.pointerId, x: pt?.x ?? 0, y: pt?.y ?? 0, edge, anchor: pt ? dotAt(pt.x, pt.y, 0.36) : -1, mode: -1, drew: false };
+      const g0 = {
+        id: e.pointerId,
+        x: pt?.x ?? 0,
+        y: pt?.y ?? 0,
+        cx: e.clientX,
+        cy: e.clientY,
+        edge,
+        anchor: pt ? dotAt(pt.x, pt.y, 0.36) : -1,
+        mode: -1,
+        drew: false,
+        held: false,
+      };
+      drag = g0;
+      stopHold();
+      holdTimer = window.setTimeout(() => {
+        holdTimer = 0;
+        if (drag !== g0 || g0.drew || done) return;
+        g0.held = true;
+        navigator.vibrate?.(15);
+        toggleX(g0.edge);
+      }, HOLD_MS);
     });
     svg.addEventListener('pointermove', (e) => {
       const g0 = drag;
-      if (!g0 || e.pointerId !== g0.id || done) return;
+      if (!g0 || e.pointerId !== g0.id || done || g0.held) return;
+      if (holdTimer && Math.hypot(e.clientX - g0.cx, e.clientY - g0.cy) > HOLD_SLOP) stopHold();
       const pt = toUnits(e);
       if (!pt) return;
       const v = dotAt(pt.x, pt.y, 0.3);
@@ -190,6 +246,7 @@ export const loop: PuzzleDef = {
       const k = g0.anchor >= 0 ? edgeBetween(g0.anchor, v) : -1;
       g0.anchor = v;
       if (k < 0) return;
+      stopHold();
       // The first edge decides: drawing over a line erases, anything else draws.
       if (g0.mode < 0) g0.mode = st[k] === 1 ? 0 : 1;
       g0.drew = true;
@@ -202,12 +259,16 @@ export const loop: PuzzleDef = {
       const g0 = drag;
       if (!g0 || e.pointerId !== g0.id) return;
       drag = null;
-      if (g0.drew || done) return;
+      stopHold();
+      if (g0.drew || g0.held || done) return;
       st[g0.edge] = (st[g0.edge] + 1) % 3;
       after();
       if (!done) render();
     });
-    svg.addEventListener('pointercancel', () => (drag = null));
+    svg.addEventListener('pointercancel', () => {
+      drag = null;
+      stopHold();
+    });
 
     const sv = ctx.saved as { st?: unknown } | undefined;
     if (Array.isArray(sv?.st) && sv.st.length === E) sv.st.forEach((v, e) => (st[e] = v === 1 || v === 2 ? v : 0));
@@ -237,8 +298,8 @@ export const loop: PuzzleDef = {
           add(
             'zero',
             L(
-              'A 0 has no line around it. Tap each side twice to cross it out with ✕.',
-              'Un 0 n’a aucune ligne autour. Touchez chaque côté deux fois pour le barrer d’un ✕.',
+              'A 0 has no line around it. Press and hold each side (or tap it twice) to cross it out with ✕.',
+              'Un 0 n’a aucune ligne autour. Maintenez le doigt sur chaque côté (ou touchez-le deux fois) pour le barrer d’un ✕.',
             ),
             [el],
             open,
@@ -449,6 +510,6 @@ export const loop: PuzzleDef = {
         play: set([e], 1),
       };
     };
-    return { snapshot: () => ({ st }), hint };
+    return { snapshot: () => ({ st }), hint, destroy: stopHold };
   },
 };

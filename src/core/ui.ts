@@ -64,11 +64,18 @@ export function btn(label: string, onclick: (e: MouseEvent) => void, variant: ''
 }
 
 /** Shared key pad (row of equal keys under a board). */
-export function pad(keys: { label: string; value: string; class?: string; style?: string }[], onkey: (v: string) => void): HTMLDivElement {
+export function pad(
+  keys: { label: string; value: string; class?: string; style?: string; aria?: string }[],
+  onkey: (v: string) => void,
+): HTMLDivElement {
   const el = h('div', { class: 'pad' });
   for (const k of keys) {
     el.append(
-      h('button', { class: `key ${k.class ?? ''}`.trim(), type: 'button', style: k.style, onclick: () => onkey(k.value) }, k.label),
+      h(
+        'button',
+        { class: `key ${k.class ?? ''}`.trim(), type: 'button', style: k.style, 'aria-label': k.aria, onclick: () => onkey(k.value) },
+        k.label,
+      ),
     );
   }
   return el;

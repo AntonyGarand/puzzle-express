@@ -78,3 +78,30 @@
     grid-template-rows: repeat(var(--h), 12px);
   }
 }
+[data-puzzle='blocks'] .blk-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  width: var(--board);
+  margin-bottom: -8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+[data-puzzle='blocks'] .blk-pts {
+  font-size: 22px;
+  color: var(--fg);
+}
+[data-puzzle='blocks'] .blk-combo {
+  flex: 1;
+  color: var(--accent);
+}
+[data-puzzle='blocks'] .blk-best.new {
+  color: var(--fg);
+  background: var(--accent-soft);
+  border: 2px solid var(--ink);
+  border-radius: var(--r-cell);
+  padding: 0 6px;
+}

@@ -56,8 +56,12 @@ export interface PuzzleCtx {
   rng: Rng;
   /** Puzzle content goes here. */
   root: HTMLElement;
-  /** Call once when the puzzle is completed. */
-  solved(): void;
+  /**
+   * Call once when the puzzle is completed. Endless games can pass `keepPlaying` when the goal is
+   * reached: the solve (and its time) is recorded right away, but the board stays playable. Call
+   * `solved()` again when the run ends to close the card without recording a second result.
+   */
+  solved(opts?: { keepPlaying?: boolean }): void;
   /** Call once when the puzzle can no longer be completed (out of moves/lives). */
   failed(): void;
   /** Count a wrong move. */

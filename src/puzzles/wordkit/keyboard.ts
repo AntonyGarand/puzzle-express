@@ -31,9 +31,10 @@ export function keyboard(onKey: (k: string) => void, enterLabel = L('Enter', 'En
       h(
         'div',
         { class: 'kb-row' },
-        r === 2 ? key(enterLabel, 'enter', 'wide') : null,
         ...[...row].map((c) => key(c, c)),
-        r === 2 ? key('⌫', 'back', 'wide') : null,
+        // Right-hand edge, as on a phone: erase closes the middle row, a wide Enter closes the bottom one.
+        r === 1 ? key('⌫', 'back', 'back') : null,
+        r === 2 ? key(enterLabel, 'enter', 'wide') : null,
       ),
     ),
   );

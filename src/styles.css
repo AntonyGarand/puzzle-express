@@ -1904,3 +1904,51 @@ dialog.sheet::backdrop {
   margin-top: 28px;
   text-align: center;
 }
+
+/* share codes: "Play a shared puzzle" on the Games tab, "Share this puzzle" in the game sheets */
+.code-form {
+  margin-top: 18px;
+  padding: 12px 14px;
+  background: var(--cell);
+  border: 2px dashed var(--ink);
+  border-radius: var(--r);
+}
+.code-form h3 {
+  margin: 0 0 8px;
+}
+.page .code-form .row {
+  margin-top: 0;
+}
+.code-form .input.inline,
+.share .input.inline {
+  max-width: none;
+  font-size: 16px;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  box-shadow: none;
+}
+.code-msg {
+  margin: 8px 0 0;
+}
+.code-msg.bad {
+  color: var(--bad);
+  font-weight: 700;
+}
+.share-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.share-row .input.inline {
+  flex: 1 1 100%;
+}
+.share-row .btn {
+  flex: 1;
+}
+.share-note {
+  min-height: 1.3em;
+  margin: 8px 0 0;
+}
+.lab-bar .small {
+  flex: 1;
+  text-align: center;
+}
