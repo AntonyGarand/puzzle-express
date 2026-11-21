@@ -1,7 +1,8 @@
+import { dailyStats } from '../core/daily';
 import { L, localeTag } from '../core/i18n';
 import { clearAllSaves } from '../core/saves';
 import { dayKey, dayStreak, exportProfile, getProfile, importProfile, prefs, resetProfile, stats, update } from '../core/store';
-import { LEVEL_NAMES } from '../core/types';
+import { LEVELS, LEVEL_NAMES } from '../core/types';
 import type { PuzzleDef } from '../core/types';
 import { btn, fmtTime, h } from '../core/ui';
 
@@ -54,6 +55,54 @@ export function renderStats(el: HTMLElement, defs: PuzzleDef[]) {
       );
     });
 
+  // Daily challenges: streak and completed lists per difficulty.
+  const ds = dailyStats();
+  const dailySection = [
+    h('h3', null, h('a', { href: '#/daily' }, L('Daily challenges', 'Défis du jour'))),
+    h(
+      'p',
+      { class: 'muted small' },
+      L(
+        `Streak: ${ds.streak} (best ${ds.bestStreak}) · ${ds.completed} lists completed · ${ds.solved} dailies solved`,
+        `Série : ${ds.streak} (record ${ds.bestStreak}) · ${ds.completed} listes terminées · ${ds.solved} défis réussis`,
+      ),
+    ),
+    h(
+      'div',
+      { class: 'table-wrap' },
+      h(
+        'table',
+        null,
+        h(
+          'thead',
+          null,
+          h(
+            'tr',
+            null,
+            ...[L('Level', 'Niveau'), L('Lists', 'Listes'), L('Solved', 'Réussis'), L('Best list', 'Meilleure liste')].map((x, i) =>
+              h('th', { class: i ? 'num' : '' }, x),
+            ),
+          ),
+        ),
+        h(
+          'tbody',
+          null,
+          ...LEVELS.map((l) => {
+            const x = ds.byLevel[l];
+            return h(
+              'tr',
+              null,
+              h('td', null, h('a', { href: `#/daily/${l}` }, LEVEL_NAMES[l])),
+              h('td', { class: 'num' }, x.completed),
+              h('td', { class: 'num' }, x.solved),
+              h('td', { class: 'num' }, x.bestTotal != null ? fmtTime(x.bestTotal) : '—'),
+            );
+          }),
+        ),
+      ),
+    ),
+  ];
+
   const fileInput = h('input', { type: 'file', accept: 'application/json', hidden: true });
   fileInput.addEventListener('change', async () => {
     const f = fileInput.files?.[0];
@@ -90,6 +139,7 @@ export function renderStats(el: HTMLElement, defs: PuzzleDef[]) {
       ),
       h('h3', null, L('Last 4 weeks', '4 dernières semaines')),
       h('div', { class: 'days' }, ...days),
+      ...dailySection,
       h('h3', null, L('By game', 'Par jeu')),
       h(
         'div',

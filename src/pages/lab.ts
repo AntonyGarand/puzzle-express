@@ -1,7 +1,8 @@
 import { sheetOpen } from '../core/sheet';
 import { L, locale } from '../core/i18n';
-import { Card } from '../core/card';
-import { getSave } from '../core/saves';
+import { Card, type DailyRef } from '../core/card';
+import { dailySaveKey, getSave } from '../core/saves';
+import type { DailyEntry } from '../core/store';
 import { prefs } from '../core/store';
 import type { ShareCode } from '../core/share';
 import type { Difficulty, PuzzleDef } from '../core/types';
@@ -32,7 +33,7 @@ export class LabView {
    */
   open(def: PuzzleDef, level?: Difficulty, shared?: ShareCode) {
     this.close();
-    const sharedSave = shared && getSave(def.id, true);
+    const sharedSave = shared && getSave(def.id, 'shared');
     const saved = shared
       ? sharedSave && sharedSave.seed === shared.seed && sharedSave.level === shared.level
         ? sharedSave
@@ -80,6 +81,43 @@ export class LabView {
     start(level);
   }
 
+  /**
+   * Play puzzle `ref.index` of a daily list of `count` puzzles (resuming it if it was started).
+   * `next` runs on "Next".
+   */
+  openDaily(def: PuzzleDef, entry: DailyEntry, ref: DailyRef, count: number, next: () => void) {
+    this.close();
+    const saved = getSave(dailySaveKey(ref.date, ref.level, ref.index), 'daily');
+    const resume =
+      saved && saved.seed === entry.seed && saved.level === ref.level && (!def.localized || (saved.locale ?? 'en') === locale())
+        ? saved
+        : undefined;
+    const note = h('span', { class: 'small muted' });
+    const card = new Card(def, next, {
+      lab: true,
+      level: ref.level,
+      seed: entry.seed,
+      resume,
+      daily: ref,
+      onMount: (c) => {
+        note.textContent = `${L('Daily', 'Défi du jour')} · ${ref.index + 1}/${count}`;
+        if (c.interacted) note.textContent += ` · ${L('Resumed', 'Reprise')}`;
+      },
+    });
+    this.card = card;
+    this.el.replaceChildren(
+      h(
+        'div',
+        { class: 'lab-bar' },
+        h('a', { class: 'btn ghost', href: `#/daily/${ref.level}` }, L('← Daily', '← Défis')),
+        note,
+        btn(L('Share', 'Partager'), () => card.openShare(), 'ghost'),
+      ),
+      card.el,
+    );
+    card.mount();
+    card.setActive(this.shown && !document.hidden);
+  }
   setShown(shown: boolean) {
     this.shown = shown;
     this.card?.setActive(shown && !document.hidden);

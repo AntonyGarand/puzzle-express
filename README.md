@@ -35,7 +35,7 @@ The same commands are available as mise tasks (`mise run check`, `mise run fix`,
 
 ```
 src/
-  main.ts            app shell: tabs, routing (#/, #/games, #/game/<id>, #/play/<id>, #/s/<share code>, #/stats, #/settings)
+  main.ts            app shell: tabs, routing (#/, #/daily, #/daily/<level>/<n>, #/games, #/game/<id>, #/play/<id>, #/s/<share code>, #/stats, #/settings)
   styles.css         design tokens + shared components (neo-brutalist)
   core/              feed, card, store (profile/stats/auto-levelling), saves, i18n, help dialog, ui helpers
   pages/             Games, single-game view, Profile, Settings
@@ -65,6 +65,10 @@ Every game is generated from a seed, has five levels (Easy to Master) and a how-
 - **French:** validation from `an-array-of-french-words`, frequencies from `@zxcvbn-ts/language-fr` (OpenSubtitles, ODC-BY), filtered with `french-badwords-list`.
 
 Each language's dictionary is a lazily loaded chunk.
+
+## Daily challenges
+
+The **Daily** tab has one list of 5 puzzles per difficulty, new every day at local midnight. Lists come from a preset seed mixed with the date and level (`src/core/daily.ts`), so everyone gets the same puzzles on the same day; the first time a player opens a list it's stored in their profile, so it stays put even if a new version adds games. Each puzzle can be retried until it's solved. Daily results count in the regular stats but never in auto-levelling. A day counts toward the daily streak when at least one list is complete; the Profile tab shows streaks and completed lists per difficulty.
 
 ## Difficulty
 
