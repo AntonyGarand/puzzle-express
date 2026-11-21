@@ -2,8 +2,8 @@ import './spider.css';
 import { L, P } from '../core/i18n';
 import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, shake } from '../core/ui';
-import { cardEl, deck, elAt, fan, label, leCard, pileEl, rank, slotEl, suit, SUITS, tableEl, topEl } from './cardkit/cards';
-import { bestDestS, canDealS, dealRow, dealS, hasMoveS, moveS, pickedS, wonS, type SState } from './cardkit/spider';
+import { cardEl, elAt, fan, label, leCard, pileEl, rank, slotEl, suit, SUITS, tableEl, topEl } from './cardkit/cards';
+import { bestDestS, canDealS, dealRow, genS, hasMoveS, moveS, pickedS, progressS, wonS, type SState } from './cardkit/spider';
 import { bindTable, History } from './cardkit/table';
 
 const TOP = 1.7;
@@ -14,6 +14,8 @@ interface Cfg {
   cols: number;
   dealt: number;
   tab: number;
+  /** How often a card turned up while building the deal is one that fits (0 to 1). */
+  help: number;
 }
 
 function validState(v: unknown, cfg: Cfg): v is SState {
@@ -75,14 +77,15 @@ export const spider: PuzzleDef = {
   create(ctx) {
     const { root, rng, difficulty: d } = ctx;
     const cfg = byLevel<Cfg>(d, [
-      { suits: [0], copies: 4, cols: 8, dealt: 36, tab: 9 },
-      { suits: [0], copies: 6, cols: 8, dealt: 46, tab: 9 },
-      { suits: [0, 1], copies: 3, cols: 8, dealt: 46, tab: 9 },
-      { suits: [0, 1], copies: 4, cols: 10, dealt: 54, tab: 10.5 },
-      { suits: [0, 1, 2, 3], copies: 2, cols: 10, dealt: 54, tab: 10.5 },
+      { suits: [0], copies: 4, cols: 8, dealt: 36, tab: 9, help: 0.3 },
+      { suits: [0], copies: 6, cols: 8, dealt: 46, tab: 9, help: 0.5 },
+      { suits: [0, 1], copies: 3, cols: 8, dealt: 46, tab: 9, help: 0.8 },
+      { suits: [0, 1], copies: 4, cols: 10, dealt: 54, tab: 10.5, help: 0.7 },
+      { suits: [0, 1, 2, 3], copies: 2, cols: 10, dealt: 54, tab: 10.5, help: 0.9 },
     ]);
     const runs = cfg.suits.length * cfg.copies;
-    let s = dealS(deck(rng, cfg.suits, cfg.copies), cfg.cols, cfg.dealt);
+    // Always winnable: dealt by playing a winning game (see genS).
+    let s = genS(rng, cfg.suits, cfg.copies, cfg.cols, cfg.dealt, cfg.help).s;
     const hist = new History<SState>(60);
     const sv = ctx.saved as { s?: unknown; hist?: unknown } | undefined;
     if (sv && validState(sv.s, cfg)) {
@@ -133,9 +136,10 @@ export const spider: PuzzleDef = {
         ctx.solved();
         return;
       }
-      if (!hasMoveS(s)) {
+      // No deal left and no way to turn a card or finish a run: shuffling runs around can't win.
+      if (!hasMoveS(s) || !progressS(s)) {
         over = true;
-        ctx.status(L('No moves left', 'Aucun coup possible'));
+        ctx.status(L('No useful moves left', 'Plus aucun coup utile'));
         ctx.failed();
         return;
       }

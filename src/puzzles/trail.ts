@@ -123,7 +123,9 @@ export const trail: PuzzleDef = {
           ? missed
             ? L(`${missed} cell${missed > 1 ? 's' : ''} missed`, missed > 1 ? `${missed} cases oubliées` : '1 case oubliée')
             : L('Done!', 'Terminé!')
-          : L(`${len} / ${N} cells · next ${reached + 1}`, `${len} / ${N} cases · prochain ${reached + 1}`),
+          : [head - n, head + 1, head + n, head - 1].some((j) => j >= 0 && j < N && canEnter(head, j))
+            ? L(`${len} / ${N} cells · next ${reached + 1}`, `${len} / ${N} cases · prochain ${reached + 1}`)
+            : L('Dead end · tap an earlier cell to back up', 'Cul-de-sac · touchez une case plus tôt pour reculer'),
       );
       return head === end && !missed;
     };
@@ -255,7 +257,8 @@ export const trail: PuzzleDef = {
       for (const j of add) if (canEnter(path[path.length - 1], j)) path.push(j);
       check();
     };
-    let lastRule: (() => Hint | null) | undefined;
+    // Index into `rules` (rebuilt on every call, so the closures themselves can't be compared).
+    let lastRule = -1;
     const hint = (): Hint | null => {
       if (finished) return null;
       const on = new Set(path);
@@ -374,14 +377,16 @@ export const trail: PuzzleDef = {
         };
       };
       const rules = [forced, deadEnd, split, checkpoint];
-      for (const rule of [...rules.filter((r) => r !== lastRule), lastRule]) {
-        const found = rule?.();
+      const order = [0, 1, 2, 3].filter((k) => k !== lastRule);
+      if (lastRule >= 0) order.push(lastRule);
+      for (const k of order) {
+        const found = rules[k]();
         if (found) {
-          lastRule = rule;
+          lastRule = k;
           return found;
         }
       }
-      lastRule = undefined;
+      lastRule = -1;
       const j = sol[path.length];
       if (j == null) return null;
       return {

@@ -51,8 +51,11 @@ export function slide(n: number, cell: Uint8Array, i: number, dir: number): numb
   return out;
 }
 
-/** BFS over (position, collected mask), never entering a mine. Returns a shortest move list, or null. */
-function solveGems(n: number, cell: Uint8Array, start: number, gems: number[]): number[] | null {
+/**
+ * BFS over (position, collected mask), never entering a mine. Returns a shortest move list, or null.
+ * `have` lists gems already collected (the start cell's own gem counts as collected too).
+ */
+export function solveGems(n: number, cell: Uint8Array, start: number, gems: number[], have: Iterable<number> = []): number[] | null {
   const G = gems.length;
   const N = n * n;
   const gemBit = new Int32Array(N);
@@ -75,16 +78,18 @@ function solveGems(n: number, cell: Uint8Array, start: number, gems: number[]): 
   const q = new Int32Array(S);
   let head = 0,
     tail = 0;
-  // the start cell never holds a gem, so we begin with an empty mask
-  prev[start] = start;
-  q[tail++] = start;
+  let m0 = gemBit[start];
+  for (const g of have) m0 |= gemBit[g];
+  const s0 = m0 * N + start;
+  prev[s0] = s0;
+  q[tail++] = s0;
   while (head < tail) {
     const st = q[head++];
     const m = Math.floor(st / N),
       i = st % N;
     if (m === full) {
       const path: number[] = [];
-      for (let x = st; x !== start; x = prev[x]) path.push(how[x]);
+      for (let x = st; x !== s0; x = prev[x]) path.push(how[x]);
       return path.reverse();
     }
     for (let d = 0; d < 8; d++) {

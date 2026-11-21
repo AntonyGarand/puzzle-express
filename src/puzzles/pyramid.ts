@@ -2,8 +2,8 @@ import './pyramid.css';
 import { L, P } from '../core/i18n';
 import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, h, shake } from '../core/ui';
-import { cardEl, deck, elAt, label, leCard, pileEl, rank, rankLabel, slotEl, tableEl, topEl } from './cardkit/cards';
-import { cardAt, canRecycle, clearedP, dealP, drawP, exposed, idx, removeP, solveP, stuckP, type PState } from './cardkit/pyramid';
+import { cardEl, elAt, label, leCard, pileEl, rank, rankLabel, slotEl, tableEl, topEl } from './cardkit/cards';
+import { cardAt, canRecycle, clearedP, deadP, drawP, exposed, genP, idx, removeP, solveP, type PState } from './cardkit/pyramid';
 import { bindTable, History } from './cardkit/table';
 
 const STEP = 0.7; // row step in card widths
@@ -66,11 +66,8 @@ export const pyramid: PuzzleDef = {
   create(ctx) {
     const { root, rng, difficulty: d } = ctx;
     const passes = byLevel(d, [-1, 3, 2, 2, 1]); // -1 = unlimited
-    const solvePasses = passes < 0 ? 3 : passes;
-    const tries = byLevel(d, [10, 10, 16, 6, 30]);
-    const budget = d === 5 ? 2000 : 5000;
-    let s = dealP(deck(rng));
-    for (let t = 1; t < tries && !solveP(s, solvePasses, budget); t++) s = dealP(deck(rng));
+    // Always winnable: a random deal the solver proves, else one built around a winning line.
+    let s = genP(rng, passes, byLevel(d, [10, 10, 16, 6, 30]), d === 5 ? 2000 : 5000);
 
     const hist = new History<PState>(80);
     let sel: string | null = null;
@@ -84,8 +81,20 @@ export const pyramid: PuzzleDef = {
     const table = tableEl(7, BOTTOM + 1.4);
     let over = false;
 
+    /** Proven unwinnable from here, though moves remain (undo can still save it). */
+    let doomed = false;
+    const judge = () => {
+      doomed = solveP(s, passes, 6000) === 'dead';
+    };
+
     const status = () => {
       const left = s.pyr.filter((c) => c >= 0).length;
+      if (doomed) {
+        ctx.status(
+          `${L(`${left} left`, `Reste ${left}`)} · ${L('No way to clear it from here · Undo or skip', 'Impossible de la vider d’ici · Annulez ou passez')}`,
+        );
+        return;
+      }
       const pass = passes < 0 ? '' : ` · ${L('Pass', 'Passe')} ${s.passes + 1}/${passes}`;
       const rest = L(`${left} left`, `Reste ${left}`);
       ctx.status(`${rest} · ${L('Stock', 'Pioche')} ${s.stock.length}${pass}`);
@@ -128,12 +137,13 @@ export const pyramid: PuzzleDef = {
         ctx.solved();
         return;
       }
-      if (stuckP(s, passes)) {
+      if (deadP(s, passes)) {
         over = true;
         ctx.status(L('No pairs left', 'Plus aucune paire possible'));
         ctx.failed();
         return;
       }
+      judge();
       status();
     };
 
@@ -215,11 +225,13 @@ export const pyramid: PuzzleDef = {
       s = prev;
       sel = null;
       render();
+      judge();
       status();
     };
     ctx.controls(btn(L('Undo', 'Annuler'), undo, 'ghost'));
     root.append(table);
     render();
+    if (sv) judge();
     status();
 
     let lastRule = '';

@@ -2,7 +2,7 @@ import { L } from '../core/i18n';
 import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { board, btn, h, pad, shake } from '../core/ui';
 import { anim } from './movekit/kit';
-import { DIRS8, MINE, ROCK, genGems, slide } from './pathkit/gems-gen';
+import { DIRS8, MINE, ROCK, genGems, slide, solveGems } from './pathkit/gems-gen';
 import { capture, cellAt } from './pathkit/grid';
 import './gems.css';
 
@@ -163,7 +163,15 @@ export const gems: PuzzleDef = {
       const mv = `${hist.length}${limit ? `/${limit}` : ''}`;
       mid.textContent = mv;
       const hearts = hasMines ? ` · ${'♥'.repeat(LIVES - boom)}${'♡'.repeat(boom)}` : '';
-      ctx.status(L(`${got.size}/${G} gems · ${mv} moves${hearts}`, `${got.size}/${G} gemmes · ${mv} coups${hearts}`));
+      // Dead end (some gem out of reach, or not enough moves left): Undo gets out of it, so just say so.
+      const rest = finished || got.size === G ? [] : solveGems(n, cell, at, P.gems, got);
+      const stuck =
+        rest === null
+          ? L(' · a gem is out of reach, undo', ' · une gemme est hors d’atteinte, annulez')
+          : limit && hist.length + rest.length > limit
+            ? L(' · too few moves left, undo', ' · trop peu de coups restants, annulez')
+            : '';
+      ctx.status(L(`${got.size}/${G} gems · ${mv} moves${hearts}`, `${got.size}/${G} gemmes · ${mv} coups${hearts}`) + stuck);
     };
 
     const move = (dir: number) => {

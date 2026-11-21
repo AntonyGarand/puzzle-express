@@ -38,6 +38,13 @@ export function hasMove(cols: Cols): boolean {
   return cols.some((col, x) => col.some((c, y) => col[y + 1] === c || cols[x + 1]?.[y] === c));
 }
 
+/** Blocks that can never be removed: the last block of its colour can't join a group of 2. */
+export function stranded(cols: Cols): number {
+  const count = new Map<number, number>();
+  for (const col of cols) for (const c of col) count.set(c, (count.get(c) ?? 0) + 1);
+  return [...count.values()].filter((v) => v === 1).length;
+}
+
 /**
  * Solvable board, built backwards: start empty and repeatedly insert a connected group (pushing the
  * blocks above it up, or adding a new column), keeping it apart from same-coloured blocks. Removing

@@ -161,7 +161,7 @@ export const target: PuzzleDef = {
           shake(chipRow);
           ctx.status(L('Not quite — undo and try again', 'Raté — annulez et réessayez'));
         }
-      }
+      } else if (!plan()) ctx.status(L('Target out of reach — undo', 'Cible hors d’atteinte — annulez'));
     };
     const tapOp = (o: Op) => {
       if (sel === null) return;

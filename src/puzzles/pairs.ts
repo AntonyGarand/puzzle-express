@@ -60,8 +60,8 @@ export const pairs: PuzzleDef = {
         'Chaque paire de cartes retournées compte pour un essai, affiché en bas. Une paire ratée ne compte comme erreur ✕ que si vous pouviez le savoir : la jumelle de votre première carte avait déjà été vue, ou votre deuxième carte était déjà connue.',
       ),
       L(
-        'On Master you have 40 tries; run out and the game is lost.',
-        'En Maître, vous avez 40 essais; une fois épuisés, la partie est perdue.',
+        'On Master you have 40 tries; once fewer tries are left than pairs to find, the game is lost.',
+        'En Maître, vous avez 40 essais; dès qu’il reste moins d’essais que de paires à trouver, la partie est perdue.',
       ),
     ],
     tips: [
@@ -215,7 +215,7 @@ export const pairs: PuzzleDef = {
           ctx.solved();
           return;
         }
-        if (limit && tries >= limit) {
+        if (limit && limit - tries < np - matched.filter(Boolean).length / 2) {
           over = true;
           open = [];
           render();

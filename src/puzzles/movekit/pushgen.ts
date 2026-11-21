@@ -23,7 +23,7 @@ export const stepper = (w: number, h: number) => (i: number, d: number) => {
 };
 
 /** Cells a box could still be pushed from onto some target (ignores other boxes). */
-function liveCells(w: number, h: number, floor: boolean[], targets: number[]) {
+export function liveCells(w: number, h: number, floor: boolean[], targets: number[]) {
   const nb = stepper(w, h);
   const live = new Array<boolean>(w * h).fill(false);
   const q = [...targets];
@@ -41,6 +41,39 @@ function liveCells(w: number, h: number, floor: boolean[], targets: number[]) {
     }
   }
   return live;
+}
+
+/**
+ * Crates that can never reach a target again (cheap checks only): an off-target crate on a cell no
+ * push can bring to any target (corners, walls without targets), or a 2×2 square packed with walls
+ * and crates where one of the crates is off target (none of them can move).
+ */
+export function stuckCrates(
+  w: number,
+  h: number,
+  floor: boolean[],
+  targets: number[],
+  boxes: number[],
+  live = liveCells(w, h, floor, targets),
+) {
+  const tset = new Set(targets);
+  const bset = new Set(boxes);
+  const out = new Set<number>();
+  for (const b of boxes) if (!tset.has(b) && !live[b]) out.add(b);
+  const blocked = (r: number, c: number) => r < 0 || c < 0 || r >= h || c >= w || !floor[r * w + c] || bset.has(r * w + c);
+  for (let r = -1; r < h; r++)
+    for (let c = -1; c < w; c++) {
+      const sq = [
+        [r, c],
+        [r, c + 1],
+        [r + 1, c],
+        [r + 1, c + 1],
+      ];
+      if (!sq.every(([y, x]) => blocked(y, x))) continue;
+      const crates = sq.filter(([y, x]) => y >= 0 && x >= 0 && y < h && x < w && bset.has(y * w + x)).map(([y, x]) => y * w + x);
+      if (crates.some((b) => !tset.has(b))) for (const b of crates) if (!tset.has(b)) out.add(b);
+    }
+  return [...out];
 }
 
 /** Push-optimal BFS. Returns min pushes, or -1 when unsolvable or out of node/time budget. */

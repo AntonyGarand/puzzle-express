@@ -1,4 +1,5 @@
-import { rank, type Card } from './cards';
+import type { Rng } from '../../core/rng';
+import { deck, rank, type Card } from './cards';
 
 /** Pyramid rules engine + DFS solver (pure; no DOM). */
 export interface PState {
@@ -12,7 +13,7 @@ export interface PState {
 const ROW = (i: number) => Math.floor((Math.sqrt(8 * i + 1) - 1) / 2);
 export const idx = (r: number, k: number) => (r * (r + 1)) / 2 + k;
 
-export function dealP(cards: Card[]): PState {
+function dealP(cards: Card[]): PState {
   return { pyr: cards.slice(0, 28), stock: cards.slice(28), waste: [], passes: 0, moves: 0 };
 }
 export function exposed(pyr: number[], i: number): boolean {
@@ -77,46 +78,65 @@ export function drawP(s: PState, maxPasses: number): boolean {
 
 export const clearedP = (s: PState) => s.pyr.every((c) => c < 0);
 
-function availableP(s: PState): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < 28; i++) if (exposed(s.pyr, i)) out.push('p' + i);
-  if (s.waste.length) out.push('w');
-  return out;
-}
-
-function anyPairP(s: PState): boolean {
-  const av = availableP(s);
-  for (let x = 0; x < av.length; x++) {
-    const cx = cardAt(s, av[x])!;
-    if (rank(cx) === 13) return true;
-    for (let y = x + 1; y < av.length; y++) if (rank(cx) + rank(cardAt(s, av[y])!) === 13) return true;
-  }
-  return false;
-}
-
-/** Can the pyramid still be cleared? */
-export const stuckP = (s: PState, maxPasses: number) => !s.stock.length && !canRecycle(s, maxPasses) && !anyPairP(s);
+/** A pass through the stock is still available after the current one (maxPasses -1 = unlimited). */
+const passLeft = (s: PState, maxPasses: number) => maxPasses < 0 || s.passes < maxPasses - 1;
 
 /**
- * DFS: can the pyramid be cleared from the initial deal with `passes` passes through the stock?
- * False if unsolvable or the node budget ran out.
+ * Exact loss test: no pyramid card can ever be removed again. Pyramid exposure can't change until a
+ * pyramid card goes, so only the open cards matter, against every talon card that can still reach
+ * the waste top (talon cards never pair with each other).
  */
-export function solveP(s0: PState, passes: number, budget = 20000): boolean {
-  const talon = s0.stock.slice().reverse(); // draw order
+export function deadP(s: PState, maxPasses: number): boolean {
+  if (clearedP(s)) return false;
+  const open: number[] = [];
+  for (let i = 0; i < 28; i++) if (exposed(s.pyr, i)) open.push(rank(s.pyr[i]));
+  const want = new Set<number>();
+  for (let x = 0; x < open.length; x++) {
+    if (open[x] === 13) return false;
+    want.add(13 - open[x]);
+    for (let y = x + 1; y < open.length; y++) if (open[x] + open[y] === 13) return false;
+  }
+  // Talon cards that can still show on the waste: all of them if another pass is coming; otherwise the
+  // stock, the waste top, and whatever lies under kings at the top of the waste.
+  const reach = s.stock.slice();
+  if (passLeft(s, maxPasses)) reach.push(...s.waste);
+  else
+    for (let k = s.waste.length - 1; k >= 0; k--) {
+      reach.push(s.waste[k]);
+      if (rank(s.waste[k]) !== 13) break;
+    }
+  return !reach.some((c) => want.has(rank(c)));
+}
+
+/** Solver outcome: a winning line exists, no line exists, or the node budget ran out first. */
+export type Verdict = 'win' | 'dead' | 'unknown';
+
+/**
+ * DFS: can the pyramid be cleared from this state (any point of a game) with `maxPasses` passes
+ * through the stock in all (-1 = unlimited)?
+ */
+export function solveP(s0: PState, maxPasses: number, budget = 20000): Verdict {
+  const talon = [...s0.waste, ...s0.stock.slice().reverse()]; // draw order
   const T = talon.length;
-  const pyr0 = s0.pyr;
+  const unlimited = maxPasses < 0;
   const seen = new Set<string>();
   let pm = 0; // removed pyramid bits
   let tm = 0; // removed talon bits
   let nodes = 0;
-  const pyr = pyr0.slice();
+  let out = false;
+  const pyr = s0.pyr.slice();
   const tal = new Array<boolean>(T).fill(false); // removed
   const exp = (i: number) => exposed(pyr, i);
 
+  // talon[0, ptr) has been drawn (the waste), talon[ptr, T) is still in the stock.
   const rec = (ptr: number, pass: number, left: number): boolean => {
     if (left === 0) return true;
-    if (++nodes > budget) return false;
-    const key = pm * 16777216 + tm + ':' + (ptr * 8 + pass);
+    if (++nodes > budget) {
+      out = true;
+      return false;
+    }
+    // With unlimited passes, the pass count doesn't change what's possible.
+    const key = pm * 16777216 + tm + ':' + (unlimited ? ptr : ptr * 8 + pass);
     if (seen.has(key)) return false;
     seen.add(key);
     // waste top
@@ -179,12 +199,111 @@ export function solveP(s0: PState, passes: number, budget = 20000): boolean {
         if (ok) return true;
       }
     }
-    // draw
-    let nx = ptr;
-    while (nx < T && tal[nx]) nx++;
-    if (nx < T) return rec(nx + 1, pass, left);
-    if (pass < passes - 1 && tal.some((r) => !r)) return rec(0, pass + 1, left);
+    // draw, or start a new pass
+    if (ptr < T) return rec(ptr + 1, pass, left);
+    if ((unlimited || pass < maxPasses - 1) && tal.some((r) => !r)) return rec(0, pass + 1, left);
     return false;
   };
-  return rec(0, 0, pyr0.filter((c) => c >= 0).length);
+  const ok = rec(s0.waste.length, s0.passes, pyr.filter((c) => c >= 0).length);
+  return ok ? 'win' : out ? 'unknown' : 'dead';
+}
+
+/**
+ * Builds a deal around a random winning line: plays removals on still-blank positions and hands each
+ * one cards from the deck as it goes (a king, or two cards adding to 13). Unused talon slots get the
+ * leftovers; extra options never break the known line. Null if the random line dead-ends.
+ */
+function buildP(rng: Rng, maxPasses: number): PState | null {
+  const byRank: Card[][] = Array.from({ length: 14 }, () => []);
+  for (const c of deck(rng)) byRank[rank(c)].push(c);
+  const pyr = new Array<number>(28).fill(0); // 0 = still there (blank), -1 = removed
+  const val = new Array<number>(52).fill(-1); // 0..27 pyramid, 28 + t = talon slot t (draw order)
+  const tal = new Array<boolean>(24).fill(false); // removed
+  let ptr = 0;
+  let pass = 0;
+  let left = 28;
+  const give = (pos: number, r: number) => (val[pos] = byRank[r].pop()!);
+  for (let step = 0; left > 0; step++) {
+    if (step > 400) return null;
+    let w = ptr - 1;
+    while (w >= 0 && tal[w]) w--;
+    const open: number[] = [];
+    for (let i = 0; i < 28; i++) if (exposed(pyr, i)) open.push(i);
+    const kinds: number[] = []; // r and 13 - r both still in the deck
+    for (let r = 1; r <= 6; r++) if (byRank[r].length && byRank[13 - r].length) kinds.push(r);
+    const pair = (a: number, b: number) => {
+      const r = rng.pick(kinds);
+      const swap = rng.chance(0.5);
+      give(a, swap ? r : 13 - r);
+      give(b, swap ? 13 - r : r);
+    };
+    const acts: { wt: number; go: () => number }[] = []; // go() returns the pyramid cards removed
+    if (byRank[13].length)
+      for (const i of open)
+        acts.push({
+          wt: 0.25,
+          go: () => {
+            give(i, 13);
+            pyr[i] = -1;
+            return 1;
+          },
+        });
+    if (kinds.length) {
+      for (let x = 0; x < open.length; x++)
+        for (let y = x + 1; y < open.length; y++)
+          acts.push({
+            wt: 1,
+            go: () => {
+              pair(open[x], open[y]);
+              pyr[open[x]] = pyr[open[y]] = -1;
+              return 2;
+            },
+          });
+      if (w >= 0)
+        for (const i of open)
+          acts.push({
+            wt: 2.5,
+            go: () => {
+              pair(i, 28 + w);
+              pyr[i] = -1;
+              tal[w] = true;
+              return 1;
+            },
+          });
+    }
+    if (ptr < 24 || ((maxPasses < 0 || pass < maxPasses - 1) && tal.some((r) => !r)))
+      acts.push({
+        wt: 1.5 * Math.max(1, acts.length / 4),
+        go: () => {
+          if (ptr < 24) ptr++;
+          else {
+            ptr = 0;
+            pass++;
+          }
+          return 0;
+        },
+      });
+    if (!acts.length) return null;
+    let x = rng.next() * acts.reduce((a, b) => a + b.wt, 0);
+    left -= (acts.find((a) => (x -= a.wt) < 0) ?? acts[acts.length - 1]).go();
+  }
+  const rest = rng.shuffle(byRank.flat());
+  for (let p = 0; p < 52; p++) if (val[p] < 0) val[p] = rest.pop()!;
+  return dealP([...val.slice(0, 28), ...val.slice(28).reverse()]);
+}
+
+/**
+ * A deal that can certainly be won with `maxPasses`: the first of `tries` random deals the solver
+ * proves (keeps the natural feel), else one built around a random winning line.
+ */
+export function genP(rng: Rng, maxPasses: number, tries: number, budget: number): PState {
+  for (let t = 0; t < tries; t++) {
+    const s = dealP(deck(rng));
+    if (solveP(s, maxPasses, budget) === 'win') return s;
+  }
+  for (let t = 0; t < 500; t++) {
+    const s = buildP(rng, maxPasses);
+    if (s) return s;
+  }
+  return dealP(deck(rng)); // never reached in practice (see test/cards.test.ts)
 }

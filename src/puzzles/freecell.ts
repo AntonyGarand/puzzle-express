@@ -1,52 +1,13 @@
 import './freecell.css';
 import { L, P } from '../core/i18n';
-import type { Rng } from '../core/rng';
-import { byLevel, type Difficulty, type Hint, type PuzzleDef } from '../core/types';
+import { byLevel, type Hint, type PuzzleDef } from '../core/types';
 import { btn, shake } from '../core/ui';
-import { cap, cardEl, deck, elAt, fan, isRed, label, leCard, pileEl, rank, slotEl, suit, SUITS, tableEl, topEl } from './cardkit/cards';
-import { autoF, bestDestF, dealF, moveF, pickedF, solveF, wonF, type FState } from './cardkit/freecell';
+import { cap, cardEl, elAt, fan, isRed, label, leCard, pileEl, rank, slotEl, suit, SUITS, tableEl, topEl } from './cardkit/cards';
+import { autoF, bestDestF, genF, moveF, pickedF, solveF, wonF, type FState } from './cardkit/freecell';
 import { bindTable, History } from './cardkit/table';
 
 const TAB_H = 7.5;
 const TOP = 1.7;
-
-/** Lift low cards toward the exposed end of their cascades (easier deals). */
-function easeDeal(s: FState, rng: Rng, maxRank: number, depth: number) {
-  for (const col of s.cas) {
-    for (let i = 0; i < col.length; i++) {
-      const r = rank(col[i]);
-      if (r > maxRank) continue;
-      const fromTop = col.length - 1 - i;
-      if (fromTop < depth) continue;
-      // swap with a non-low card near the top
-      const j = col.length - 1 - rng.int(0, depth - 1);
-      if (rank(col[j]) <= maxRank) continue;
-      [col[i], col[j]] = [col[j], col[i]];
-    }
-  }
-}
-
-function generate(d: Difficulty, rng: Rng): FState {
-  if (d === 5) {
-    for (let t = 0; t < 3; t++) {
-      const s = dealF(deck(rng), 3);
-      if (solveF(s, 4000)) return s;
-    }
-  }
-  let s = dealF(deck(rng), 4);
-  const ease = (st: FState) => {
-    if (d === 1) easeDeal(st, rng, 2, 2);
-    else if (d === 2) easeDeal(st, rng, 1, 3);
-  };
-  ease(s);
-  if (d <= 3) {
-    for (let t = 0; t < 3 && !solveF(s, 3000); t++) {
-      s = dealF(deck(rng), 4);
-      ease(s);
-    }
-  }
-  return s;
-}
 
 function validState(v: unknown): v is FState {
   const s = v as FState;
@@ -104,7 +65,7 @@ export const freecell: PuzzleDef = {
   par: (d) => byLevel(d, [200, 260, 330, 420, 520]),
   create(ctx) {
     const { root, rng, difficulty: d } = ctx;
-    let s = generate(d, rng);
+    let s = genF(d, rng);
     autoF(s);
     const hist = new History<FState>(80);
     const sv = ctx.saved as { s?: unknown; hist?: unknown } | undefined;
@@ -116,8 +77,20 @@ export const freecell: PuzzleDef = {
     const table = tableEl(8, TOP + TAB_H);
     let over = false;
 
+    /** Proven unwinnable from here, though moves remain (undo can still save it). */
+    let doomed = false;
+    const judge = () => {
+      doomed = solveF(s, 1500, true) === 'dead';
+    };
+
     const status = () => {
       const home = s.found.reduce((a, b) => a + b, 0);
+      if (doomed) {
+        ctx.status(
+          `${L('Home', 'Fondations')} ${home}/52 · ${L('No way to win from here · Undo or skip', 'Impossible de gagner d’ici · Annulez ou passez')}`,
+        );
+        return;
+      }
       ctx.status(
         `${L('Home', 'Fondations')} ${home}/52 · ${L('Moves', 'Coups')} ${s.moves}${nc < 4 ? ` · ${P(nc, ['cell', 'cells'], ['cellule', 'cellules'])}` : ''}`,
       );
@@ -172,6 +145,7 @@ export const freecell: PuzzleDef = {
         ctx.failed();
         return;
       }
+      judge();
       status();
     };
 
@@ -222,11 +196,13 @@ export const freecell: PuzzleDef = {
       ctx.touch();
       s = prev;
       render();
+      judge();
       status();
     };
     ctx.controls(btn(L('Undo', 'Annuler'), undo, 'ghost'));
     root.append(table);
     render();
+    if (sv) judge();
     status();
 
     let lastRule = '';
