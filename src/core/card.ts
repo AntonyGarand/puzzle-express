@@ -1,3 +1,4 @@
+import { telemetry } from './analytics';
 import { confetti } from './confetti';
 import { helpButton } from './help';
 import { L, locale, P } from './i18n';
@@ -445,11 +446,24 @@ export class Card {
   }
 
   private recordResult(o: 'solved' | 'failed' | 'skipped', ms: number) {
-    return record(
+    const res = record(
       this.def.id,
       { d: this.level, o, ms, m: this.mistakes, ...(this.shared ? { sh: true as const } : {}) },
       this.def.par(this.level) * 1000,
     );
+    telemetry.track('puzzle.result', {
+      'puzzle.id': this.def.id,
+      'puzzle.difficulty': this.level,
+      'puzzle.outcome': o,
+      'puzzle.duration_ms': ms,
+      'puzzle.mistakes': this.mistakes,
+      'puzzle.mode': this.opts.lab ? 'lab' : this.shared ? 'shared' : 'feed',
+      'puzzle.auto_level': !this.opts.lab && !this.shared && !prefs(this.def.id).manual,
+      'puzzle.personal_best': !!res.best,
+      'puzzle.first_clear': o === 'solved' && res.prevBest == null,
+      'puzzle.level_change': res.levelChange ? res.levelChange.to - res.levelChange.from : 0,
+    });
+    return res;
   }
 
   private finish(o: 'solved' | 'failed' | 'skipped') {

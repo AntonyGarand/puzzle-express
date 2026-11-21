@@ -1,3 +1,4 @@
+import { telemetry } from './core/analytics';
 import { L, localeTag } from './core/i18n';
 import '@fontsource-variable/space-grotesk';
 import './styles.css';
@@ -14,6 +15,11 @@ import { PUZZLES } from './puzzles';
 import { setupUpdates } from './core/update';
 
 const app = document.getElementById('app')!;
+telemetry.track('app.open', {
+  'app.installed': matchMedia('(display-mode: standalone)').matches,
+  'player.age_days': Math.floor((Date.now() - getProfile().created) / 86_400_000),
+  'player.games_played': Object.values(getProfile().stats).reduce((n, st) => n + st.played, 0),
+});
 // For scripts/shots.mjs & scripts/audit.mjs
 (window as unknown as { __puzzles: string[] }).__puzzles = PUZZLES.map((p) => p.id);
 
